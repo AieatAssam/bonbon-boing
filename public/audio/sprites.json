@@ -1,0 +1,14 @@
+{
+  "launch": {
+    "file": "launch.ogg",
+    "db": -12
+  },
+  "pop": {
+    "file": "pop.ogg",
+    "db": -12
+  },
+  "ui": {
+    "file": "ui.ogg",
+    "db": -12
+  }
+}
