@@ -2,7 +2,7 @@
 
 **Bonbon Boing!** is a squishy bounce-and-pop puzzle for phones: aim **Pip** from **Puff** the cloud, borrow colours on bump, and pop hug chains before the Bonbons reach the icing line.
 
-Play: [**AieatAssam.github.io/bonbon-boing/**](https://aieatassam.github.io/bonbon-boing/)
+Play now: https://aieatassam.github.io/bonbon-boing/
 
 ![Play on phone](qa/shots/play_390x844.png)
 
