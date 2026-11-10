@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "levels": [
+    { "id": 1, "seed": "trail-1", "template": "heart", "hearts": 8 },
+    { "id": 2, "seed": "trail-2", "template": "smile", "hearts": 9 },
+    { "id": 3, "seed": "trail-3", "template": "ring", "hearts": 10 }
+  ]
+}
