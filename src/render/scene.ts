@@ -20,6 +20,7 @@ export interface SceneDrawOpts {
   puffMouthO?: boolean;
   puffScale?: { x: number; y: number };
   aiming?: boolean;
+  landscape?: boolean;
 }
 
 export function drawSky(
@@ -87,7 +88,7 @@ export function drawField(
 
   for (const b of playBonbons) {
     const r = bonbonRadius(b.size);
-    const w = r * 2.02;
+    const w = r * 1.96;
     const expr: Expression =
       b.expr ??
       (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
@@ -126,9 +127,11 @@ export function drawField(
   ctx.restore();
 
   const ps = o.puffScale ?? { x: 1, y: 1 };
-  drawCloudBody(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, ps);
+  const puffY = puffAnchorY(!!o.landscape);
+  const pipY = pipAnchorY(!!o.landscape);
+  drawCloudBody(ctx, W.puffCloud.x, puffY, W.puffCloud.w, ps);
   if (o.pipInCloud !== false) {
-    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y, {
+    drawBonbon(ctx, W.pipSpawn.x, pipY, {
       pip: true,
       coat: o.pipCoat ?? 'berry',
       w: tokens.physics.pipRadiusU * 2.45,
@@ -137,7 +140,7 @@ export function drawField(
       sy: 1.04,
     });
   }
-  drawCloudFace(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, {
+  drawCloudFace(ctx, W.puffCloud.x, puffY, W.puffCloud.w, {
     mouthO: o.puffMouthO,
     sx: ps.x,
     sy: ps.y,
@@ -450,6 +453,14 @@ const VIEW_H_P =
 const VIEW_H_L =
   tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP_L;
 
+export function puffAnchorY(landscape: boolean): number {
+  return landscape ? 400 : W.puffCloud.y;
+}
+
+export function pipAnchorY(landscape: boolean): number {
+  return landscape ? 458 : W.pipSpawn.y;
+}
+
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
   const hudH = landscape ? 0 : Math.max(60, Math.min(76, vh * 0.08));
@@ -460,21 +471,19 @@ export function computeLayout(vw: number, vh: number) {
   const availH = vh - hudH - (landscape ? 0 : 6);
   const viewTop = landscape ? VIEW_TOP_L : VIEW_TOP;
   const viewH = landscape ? VIEW_H_L : VIEW_H_P;
-  let scale = landscape
-    ? Math.min(availW / W.worldW, availH / viewH)
-    : availH / viewH;
-  let fh = viewH * scale;
-  if (landscape && fh > availH) {
-    scale = availH / viewH;
-    fh = availH;
-  }
+  const widthFit = availW / W.worldW;
+  const heightFit = availH / viewH;
+  const scale = Math.min(widthFit, heightFit);
+  const fh = viewH * scale;
   const fw = W.worldW * scale;
-  const fx = (vw - fw) / 2;
-  const fy = landscape ? (vh - fh) / 2 : hudH;
+  const fx = sideW + (availW - fw) / 2;
+  const fieldY = landscape
+    ? (vh - fh) / 2 - viewTop * scale
+    : vh - (viewTop + viewH) * scale;
+  const fy = fieldY + viewTop * scale;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
     : Math.max(1, Math.min(1.2, vw / 430));
-  const fieldY = fy - viewTop * scale;
   return {
     landscape,
     hudH,
@@ -498,9 +507,10 @@ export function puffScreenRect(
   const L = computeLayout(vw, vh);
   const fieldY = L.fieldY ?? L.fy;
   const puff = W.puffCloud;
+  const py = puffAnchorY(L.landscape);
   const sc = L.scale;
   const cx = L.fx + puff.x * sc;
-  const cy = fieldY + (puff.y - puff.w * 0.28) * sc;
+  const cy = fieldY + (py - puff.w * 0.28) * sc;
   const ww = puff.w * sc;
   const hh = puff.w * 0.52 * sc;
   return {

@@ -168,7 +168,7 @@ const CAST_ROW: Flavour[][] = [
 const START_ROWS = 6;
 /** First row sits below icing + bounce room under Puff/Pip. */
 const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 4.15;
-const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 2.15;
+const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 0.32;
 
 export function initialRiseField(
   seed: string,

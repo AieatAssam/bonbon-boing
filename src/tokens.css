@@ -420,12 +420,12 @@
   --bb-layout-lattice-jitter-y: 6;
   --bb-layout-lattice-neighbours: "6 hex-lattice neighbours (same row +/-1 slot, rows above/below the two diagonal slots)";
   --bb-layout-puff-cloud-x: 500;
-  --bb-layout-puff-cloud-y: 522;
+  --bb-layout-puff-cloud-y: 220;
   --bb-layout-puff-cloud-w: 290;
   --bb-layout-pip-spawn-x: 500;
-  --bb-layout-pip-spawn-y: 586;
-  --bb-layout-next-bubble-portrait-x: 808;
-  --bb-layout-next-bubble-portrait-y: 508;
+  --bb-layout-pip-spawn-y: 278;
+  --bb-layout-next-bubble-portrait-x: 778;
+  --bb-layout-next-bubble-portrait-y: 235;
   --bb-layout-next-bubble-portrait-r: 40;
   --bb-layout-frosting-y: 330;
   --bb-layout-sea-surface-y: 1480;

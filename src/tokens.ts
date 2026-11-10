@@ -766,16 +766,16 @@ export const tokens = {
     },
     "puffCloud": {
       "x": 500,
-      "y": 522,
+      "y": 220,
       "w": 290
     },
     "pipSpawn": {
       "x": 500,
-      "y": 586
+      "y": 278
     },
     "nextBubblePortrait": {
-      "x": 808,
-      "y": 508,
+      "x": 778,
+      "y": 235,
       "r": 40
     },
     "frostingY": 330,

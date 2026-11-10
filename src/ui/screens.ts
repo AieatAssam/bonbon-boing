@@ -233,9 +233,8 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
 
 export function renderTip(root: HTMLElement, text: string): void {
   const L = computeLayout(innerWidth, innerHeight);
-  const milkY =
-    L.fy + (tokens.layout.seaSurfaceY - L.viewTop) * L.scale - 6;
-  const bottom = Math.max(10, innerHeight - milkY + 12);
+  const sliceBottom = L.fieldY + (L.viewTop + L.viewH) * L.scale;
+  const bottom = Math.max(6, innerHeight - sliceBottom + 8);
   root.insertAdjacentHTML(
     'beforeend',
     `<div class="ui ui-abs tip-milk" style="left:50%;bottom:${bottom}px;transform:translateX(-50%)">${text}</div>`,

@@ -1,4 +1,6 @@
 import { puffScreenRect } from '../render/scene';
+import { checkPlayGeometry } from './play-geometry';
+import type { GameApp } from '../game/app';
 
 function intersects(
   a: { left: number; top: number; right: number; bottom: number },
@@ -90,6 +92,12 @@ export function installOverlapChecker(): void {
       .map((x) => `offscreen:${x.n}`);
     return { overlaps: bad, offscreen: off };
   };
+
+  window.__checkPlayGeometry = () => {
+    const app = window.__bbApp;
+    if (!app) return { violations: [] as string[] };
+    return { violations: checkPlayGeometry(app) };
+  };
 }
 
 declare global {
@@ -104,5 +112,7 @@ declare global {
     };
     __ready?: boolean;
     __uiScale?: () => number;
+    __bbApp?: GameApp;
+    __checkPlayGeometry?: () => { violations: string[] };
   }
 }

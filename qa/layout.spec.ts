@@ -61,6 +61,15 @@ for (const [w, h] of viewports) {
         });
         expect(check.overlaps, JSON.stringify(check)).toEqual([]);
         expect(check.offscreen).toEqual([]);
+        if (screen === 'play' || screen === 'combo') {
+          const geo = await page.evaluate(() => {
+            const w = window as unknown as {
+              __checkPlayGeometry?: () => { violations: string[] };
+            };
+            return w.__checkPlayGeometry?.() ?? { violations: [] };
+          });
+          expect(geo.violations, JSON.stringify(geo)).toEqual([]);
+        }
         const blank = await page.evaluate(() => {
           const c = document.getElementById('field') as HTMLCanvasElement | null;
           if (!c) return true;

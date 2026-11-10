@@ -606,6 +606,7 @@ export class GameApp {
       puffScale: this.puffScale,
       aiming: this.aiming,
       hideNextBubble: L.landscape,
+      landscape: L.landscape,
     });
     for (const id of [...this.rings.keys()]) {
       if (!this.world.living().some((b) => b.id === id)) this.rings.delete(id);
@@ -705,5 +706,6 @@ declare global {
   interface Window {
     __ready?: boolean;
     __bbApp?: GameApp;
+    __checkPlayGeometry?: () => { violations: string[] };
   }
 }
