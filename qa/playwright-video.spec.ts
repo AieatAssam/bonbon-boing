@@ -14,8 +14,13 @@ test('gameplay video 390x844', async ({ page }) => {
   await page.waitForFunction(() => (window as { __ready?: boolean }).__ready === true, {
     timeout: 40_000,
   });
-  await page.screenshot({ path: '/opt/cursor/artifacts/mid-play-390x844.png', animations: 'disabled' });
-  const src = await page.video()?.path();
+  await page.screenshot({
+    path: '/opt/cursor/artifacts/mid-play-390x844.png',
+    animations: 'disabled',
+  });
+  const video = page.video();
+  await page.close();
+  const src = await video?.path();
   expect(src).toBeTruthy();
   if (src && existsSync(src)) {
     copyFileSync(src, '/opt/cursor/artifacts/gameplay-390x844.webm');
