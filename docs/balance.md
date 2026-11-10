@@ -6,8 +6,8 @@ Includes **rise + refill** after each shot (unless cup catch).
 
 | bot | median shots | p25 | p75 |
 |---|---:|---:|---:|
-| random aim | 63.0 | 55 | 79 |
-| greedy (64 angles) | 126.0 | 81 | 210 |
+| random aim | 53.0 | 48 | 62 |
+| greedy (64 angles) | 54.0 | 48 | 67 |
 
 GDD target: random median 35–60 shots; greedy > 150 shots.
 

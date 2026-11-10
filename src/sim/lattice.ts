@@ -100,8 +100,8 @@ const START_FLAVOURS: Flavour[] = ['berry', 'mint', 'lemon', 'blueberry'];
 export function pickSize(rng: () => number, stage: number): Size {
   const r = rng();
   if (stage < 4) {
-    if (r < 0.18) return 's1';
-    if (r < 0.9) return 's2';
+    if (r < 0.22) return 's1';
+    if (r < 0.96) return 's2';
     return 's3';
   }
   if (r < 0.22) return 's1';
@@ -167,7 +167,7 @@ const CAST_ROW: Flavour[][] = [
 /** Stack height at new game — keep bottom row above the milk band (sea ~1480u). */
 const START_ROWS = 6;
 /** First row sits below icing + bounce room under Puff/Pip. */
-const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 4.15;
+const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 3.95;
 const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 0.32;
 
 export function initialRiseField(

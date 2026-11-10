@@ -237,7 +237,7 @@ export class GameWorld {
   wouldRiseAtShot(shots: number): boolean {
     if (this.mode !== 'rise') return true;
     if (shots <= 18) return false;
-    if (shots <= 36) return shots % 2 === 0;
+    if (shots <= 32) return shots % 2 === 0;
     return true;
   }
 

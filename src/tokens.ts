@@ -760,25 +760,25 @@ export const tokens = {
       "colPitch": 154,
       "oddRowOffset": 77,
       "rowPitch": 122,
-      "jitterX": 8,
-      "jitterY": 6,
+      "jitterX": 4,
+      "jitterY": 3,
       "neighbours": "6 hex-lattice neighbours (same row +/-1 slot, rows above/below the two diagonal slots)"
     },
     "puffCloud": {
       "x": 500,
-      "y": 220,
+      "y": 512,
       "w": 290
     },
     "pipSpawn": {
       "x": 500,
-      "y": 278
+      "y": 530
     },
     "nextBubblePortrait": {
       "x": 778,
-      "y": 235,
+      "y": 498,
       "r": 40
     },
-    "frostingY": 330,
+    "frostingY": 606,
     "seaSurfaceY": 1480,
     "cup": {
       "y": 1470,

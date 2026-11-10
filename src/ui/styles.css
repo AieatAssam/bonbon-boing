@@ -81,7 +81,8 @@ body {
   font-size: 1.05em;
 }
 
-.tip-milk {
+.tip-milk,
+.tip-tutorial {
   background: #fff;
   color: var(--bb-color-ui-ink);
   border-radius: 16px;

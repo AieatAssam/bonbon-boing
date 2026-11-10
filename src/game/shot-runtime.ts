@@ -1,4 +1,5 @@
 import { tokens } from '../tokens';
+import { puffAnchorY, puffMouthU } from '../render/scene';
 import { bonbonRadius } from '../sim/lattice';
 import { hugChainBfs } from '../sim/chain';
 import { bonbonByKey } from '../sim/bonbon-map';
@@ -8,6 +9,7 @@ import {
   type ContactEvent,
   type ShotInput,
 } from '../sim/shot';
+import { computeLayout } from '../render/scene';
 import type { PipState } from '../sim/types';
 import type { Bonbon } from '../sim/types';
 import { GameClocks } from './clocks';
@@ -24,7 +26,10 @@ import {
 
 const P = tokens.physics;
 const W = tokens.layout.walls;
-const SPAWN = tokens.layout.pipSpawn;
+function spawnAtAngle(_angle: number): { x: number; y: number } {
+  const py = puffAnchorY(computeLayout(innerWidth, innerHeight).landscape);
+  return puffMouthU(py, tokens.layout.puffCloud.w, { x: 1, y: 1 });
+}
 
 export type ShotPhase = 'idle' | 'flying' | 'done';
 
@@ -59,9 +64,10 @@ export class ShotRuntime {
     this.angle = angle;
     this.world.beginShot();
     this.cupX = cupXAtTime(this.world.seed, this.world.shots + performance.now() * 0.001);
+    const spawn = spawnAtAngle(angle);
     this.pip = {
-      x: SPAWN.x,
-      y: SPAWN.y,
+      x: spawn.x,
+      y: spawn.y,
       vx: Math.sin(angle) * P.launchSpeedU,
       vy: Math.cos(angle) * P.launchSpeedU,
       coat: this.world.currentCoat,
@@ -69,7 +75,7 @@ export class ShotRuntime {
       radius: P.pipRadiusU,
     };
     this.phase = 'flying';
-    this.path = [{ x: SPAWN.x, y: SPAWN.y }];
+    this.path = [{ x: spawn.x, y: spawn.y }];
     this.contacts = [];
     this.simT = 0;
     this.wallBounces = 0;
@@ -291,11 +297,12 @@ export class ShotRuntime {
   }
 
   buildPreview(): Array<{ x: number; y: number; a: number }> {
+    const spawn = spawnAtAngle(this.angle);
     const input: ShotInput = {
       angleRad: this.angle,
       coat: this.world.currentCoat,
-      spawnX: SPAWN.x,
-      spawnY: SPAWN.y,
+      spawnX: spawn.x,
+      spawnY: spawn.y,
     };
     const prev = previewShot(input, this.world.bonbons, 0);
     const sparse = prev.path.filter((_, i) => i % 3 === 0).slice(0, 28);

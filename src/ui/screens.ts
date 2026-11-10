@@ -233,11 +233,12 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
 
 export function renderTip(root: HTMLElement, text: string): void {
   const L = computeLayout(innerWidth, innerHeight);
-  const sliceBottom = L.fieldY + (L.viewTop + L.viewH) * L.scale;
-  const bottom = Math.max(6, innerHeight - sliceBottom + 8);
+  const score = document.querySelector('[data-hud="score"]');
+  const sr = score?.getBoundingClientRect();
+  const top = sr && sr.height > 0 ? sr.bottom + 8 : L.hudH + L.hudGap + 6;
   root.insertAdjacentHTML(
     'beforeend',
-    `<div class="ui ui-abs tip-milk" style="left:50%;bottom:${bottom}px;transform:translateX(-50%)">${text}</div>`,
+    `<div class="ui ui-abs tip-tutorial" style="left:50%;top:${top}px;transform:translateX(-50%);max-width:min(340px,92vw)">${text}</div>`,
   );
   applyUiScale(L);
 }

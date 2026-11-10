@@ -1,13 +1,44 @@
 import { tokens } from '../tokens';
 import { bonbonRadius } from '../sim/lattice';
-import { computeLayout, puffScreenRect } from '../render/scene';
+import {
+  computeLayout,
+  cupScreenRect,
+  puffScreenRect,
+} from '../render/scene';
+import { cupXAtTime } from '../sim/shot';
 import type { GameApp } from '../game/app';
 
 const W = tokens.layout;
 const PITCH = W.lattice.rowPitch;
+const BONBON_DRAW = 1.84;
 
-function bonbonHalfW(size: import('../sim/types').Size): number {
-  return bonbonRadius(size) * 1.01;
+function rectsOverlap(
+  a: { left: number; top: number; right: number; bottom: number },
+  b: { left: number; top: number; right: number; bottom: number },
+  pad = 2,
+): boolean {
+  const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return ix > pad && iy > pad;
+}
+
+function bonbonScreenBox(
+  b: import('../sim/types').Bonbon,
+  fx: number,
+  fieldY: number,
+  sc: number,
+): { left: number; top: number; right: number; bottom: number } {
+  const r = bonbonRadius(b.size);
+  const hw = r * BONBON_DRAW * 0.5 * sc;
+  const hh = r * BONBON_DRAW * 0.94 * sc;
+  const sx = fx + b.x * sc;
+  const sy = fieldY + b.y * sc;
+  return {
+    left: sx - hw,
+    right: sx + hw,
+    top: sy - hh * 0.55,
+    bottom: sy + hh * 0.45,
+  };
 }
 
 export function checkPlayGeometry(app: GameApp): string[] {
@@ -25,10 +56,9 @@ export function checkPlayGeometry(app: GameApp): string[] {
 
   for (const b of world.living()) {
     if (b.popped || b.falling) continue;
-    const hw = bonbonHalfW(b.size) * sc;
-    const sx = fx + b.x * sc;
-    if (sx - hw < leftWall + 1) v.push(`bonbon:${b.id}:left-wall`);
-    if (sx + hw > rightWall - 1) v.push(`bonbon:${b.id}:right-wall`);
+    const box = bonbonScreenBox(b, fx, fieldY, sc);
+    if (box.left < leftWall + 1) v.push(`bonbon:${b.id}:left-wall`);
+    if (box.right > rightWall - 1) v.push(`bonbon:${b.id}:right-wall`);
   }
 
   const puff = puffScreenRect(vw, vh);
@@ -49,23 +79,26 @@ export function checkPlayGeometry(app: GameApp): string[] {
     if (ncx - nr < leftWall + 3) v.push('next:left-wall');
   }
 
-  const cupBandTop = W.seaSurfaceY - PITCH * 0.35;
-  const tip = document.querySelector('.tip-milk');
+  const tip = document.querySelector('.tip-tutorial');
   if (tip && world.shots === 0) {
     const tr = tip.getBoundingClientRect();
     if (tr.width > 0) {
+      const tipR = {
+        left: tr.left,
+        top: tr.top,
+        right: tr.right,
+        bottom: tr.bottom,
+      };
+      const cupBandTop = W.seaSurfaceY - PITCH * 0.35;
       for (const b of world.living()) {
-        if (b.falling) continue;
-        if (b.y > cupBandTop - bonbonRadius(b.size) * 0.5) continue;
-        const hw = bonbonHalfW(b.size) * sc;
-        const sy = fieldY + b.y * sc;
-        const sx = fx + b.x * sc;
-        const ix =
-          Math.min(tr.right, sx + hw) - Math.max(tr.left, sx - hw);
-        const iy =
-          Math.min(tr.bottom, sy + hw) - Math.max(tr.top, sy - hw);
-        if (ix > 2 && iy > 2) v.push('tip:bonbon-overlap');
+        if (b.falling || b.popped) continue;
+        if (b.y > cupBandTop - bonbonRadius(b.size)) continue;
+        const box = bonbonScreenBox(b, fx, fieldY, sc);
+        if (rectsOverlap(tipR, box)) v.push('tip:bonbon-overlap');
       }
+      const cupX = cupXAtTime(world.seed, world.shots + 0.001);
+      const cup = cupScreenRect(L, cupX);
+      if (rectsOverlap(tipR, cup)) v.push('tip:cup-overlap');
     }
   }
 
@@ -79,8 +112,11 @@ export function checkPlayGeometry(app: GameApp): string[] {
     const topRowScreen = fieldY + topBonbonY * sc;
     if (topRowScreen < puffBottom + 6) v.push('field:top-row-under-puff');
 
+    const py = W.puffCloud.y;
+    const pw = W.puffCloud.w;
+    const puffBottomWorld = py - pw * 0.28 + pw * 0.52;
+    if (icingWorld < puffBottomWorld + 12) v.push('icing:under-puff');
     const icingScreen = fieldY + icingWorld * sc;
-    if (icingScreen < puffBottom + 6) v.push('icing:under-puff');
     if (topRowScreen < icingScreen + 10) v.push('field:top-row-under-icing');
   }
 

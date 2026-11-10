@@ -1,6 +1,12 @@
 import { tokens } from '../tokens';
 import { installOverlapChecker } from '../ui/overlap';
-import { computeLayout, drawField, drawSky } from '../render/scene';
+import {
+  computeLayout,
+  drawField,
+  drawSky,
+  puffAnchorY,
+  puffMouthU,
+} from '../render/scene';
 import { drawBonbon } from '../render/bonbon';
 import { paintBonbonPreview } from '../render/preview';
 import { bonbonRadius } from '../sim/lattice';
@@ -28,7 +34,10 @@ import { cupXAtTime } from '../sim/shot';
 import { tickFalling } from '../sim/gravity';
 import { dailySeed } from '../sim/levels';
 
-const SPAWN = tokens.layout.pipSpawn;
+function pipSpawnU(ps = { x: 1, y: 1 }): { x: number; y: number } {
+  const py = puffAnchorY(computeLayout(innerWidth, innerHeight).landscape);
+  return puffMouthU(py, tokens.layout.puffCloud.w, ps);
+}
 const MAX_AIM = (84 * Math.PI) / 180;
 
 export class GameApp {
@@ -404,7 +413,8 @@ export class GameApp {
     const updateAim = (sx: number, sy: number) => {
       const { x, y } = toWorld(sx, sy);
       this.pointer = { x: sx, y: sy };
-      let a = Math.atan2(x - SPAWN.x, y - SPAWN.y);
+      const spawn = pipSpawnU(this.puffScale);
+      let a = Math.atan2(x - spawn.x, y - spawn.y);
       const down = Math.PI / 2;
       a = Math.max(down - MAX_AIM, Math.min(down + MAX_AIM, a));
       this.aimAngle = a;
@@ -602,7 +612,7 @@ export class GameApp {
       aimDots,
       warn: this.world.warned,
       pipInCloud: this.shot.phase === 'idle',
-      puffMouthO: this.aiming,
+      puffMouthO: this.aiming || this.shot.phase === 'idle',
       puffScale: this.puffScale,
       aiming: this.aiming,
       hideNextBubble: L.landscape,

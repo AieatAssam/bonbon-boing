@@ -63,12 +63,13 @@ export function drawField(
   ctx.globalAlpha = warn ? 1 : 0.55;
   ctx.setLineDash([2, 22]);
   ctx.lineCap = 'round';
+  const frostY = W.frostingY;
   ctx.beginPath();
   for (let i = 0; i < 20; i++) {
     const x = 30 + i * 47;
-    const y = i % 2 === 0 ? 330 : 318;
-    if (i === 0) ctx.moveTo(x, 330);
-    else ctx.quadraticCurveTo(x - 23, y, x + 25, 330);
+    const y = i % 2 === 0 ? frostY : frostY - 12;
+    if (i === 0) ctx.moveTo(x, frostY);
+    else ctx.quadraticCurveTo(x - 23, y, x + 25, frostY);
   }
   ctx.stroke();
   ctx.setLineDash([]);
@@ -88,7 +89,7 @@ export function drawField(
 
   for (const b of playBonbons) {
     const r = bonbonRadius(b.size);
-    const w = r * 1.96;
+    const w = r * 1.84;
     const expr: Expression =
       b.expr ??
       (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
@@ -128,13 +129,13 @@ export function drawField(
 
   const ps = o.puffScale ?? { x: 1, y: 1 };
   const puffY = puffAnchorY(!!o.landscape);
-  const pipY = pipAnchorY(!!o.landscape);
+  const mouth = puffMouthU(puffY, W.puffCloud.w, ps);
   drawCloudBody(ctx, W.puffCloud.x, puffY, W.puffCloud.w, ps);
   if (o.pipInCloud !== false) {
-    drawBonbon(ctx, W.pipSpawn.x, pipY, {
+    drawBonbon(ctx, mouth.x, mouth.y, {
       pip: true,
       coat: o.pipCoat ?? 'berry',
-      w: tokens.physics.pipRadiusU * 2.45,
+      w: tokens.physics.pipRadiusU * 2.35,
       expr: o.aiming ? 'wow' : 'happy',
       sx: 0.92,
       sy: 1.04,
@@ -418,14 +419,14 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.fill();
   ctx.stroke();
   const innerW = r * 1.4;
-  drawBonbon(ctx, nb.x, nb.y + innerW * 0.42, {
+  drawBonbon(ctx, nb.x, nb.y + innerW * 0.38, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
     shadow: false,
   });
-  const bx = nb.x + r * 0.58;
-  const by = nb.y - r * 0.62;
+  const bx = nb.x + r * 0.92;
+  const by = nb.y - r * 0.12;
   ctx.fillStyle = tokens.color.ui.primaryTop;
   ctx.strokeStyle = tokens.color.ui.ink;
   ctx.lineWidth = 2;
@@ -444,10 +445,11 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.stroke();
 }
 
-/** Visible play slice (u): Puff through thin milk band at bottom (~8–10% of height). */
+/** Visible play slice (u): Puff through thin milk band at bottom (~8–12% of height). */
 const MILK_BAND_U = 105;
-const VIEW_TOP = 260;
+const VIEW_TOP = 402;
 const VIEW_TOP_L = 200;
+const MILK_BAND_MAX_EXTRA = 120;
 const VIEW_H_P =
   tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP;
 const VIEW_H_L =
@@ -461,25 +463,48 @@ export function pipAnchorY(landscape: boolean): number {
   return landscape ? 458 : W.pipSpawn.y;
 }
 
+/** Puff mouth anchor (u) — Pip spawn and aim origin. */
+export function puffMouthU(
+  puffY: number,
+  puffW = W.puffCloud.w,
+  ps = { x: 1, y: 1 },
+): { x: number; y: number } {
+  const s = puffW / 200;
+  const sx = s * ps.x;
+  const sy = s * ps.y;
+  const px = W.puffCloud.x;
+  return {
+    x: px + (100 * sx - puffW / 2),
+    y: puffY - puffW * 0.3 + 92 * sy,
+  };
+}
+
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
   const hudH = landscape ? 0 : Math.max(60, Math.min(76, vh * 0.08));
+  const hudGap = landscape ? 0 : 4;
   const sideW = landscape
     ? Math.max(150, Math.min(300, (vw - vh * 0.625) / 2))
     : 0;
   const availW = vw - sideW * 2;
-  const availH = vh - hudH - (landscape ? 0 : 6);
+  const availH = vh - hudH - hudGap;
   const viewTop = landscape ? VIEW_TOP_L : VIEW_TOP;
-  const viewH = landscape ? VIEW_H_L : VIEW_H_P;
+  const viewHBase = landscape ? VIEW_H_L : VIEW_H_P;
   const widthFit = availW / W.worldW;
-  const heightFit = availH / viewH;
+  const heightFit = availH / viewHBase;
   const scale = Math.min(widthFit, heightFit);
+  const extraPx = Math.max(0, availH - viewHBase * scale);
+  const extraU = extraPx / scale;
+  const milkExtraU = landscape
+    ? 0
+    : Math.min(MILK_BAND_MAX_EXTRA, extraU * 0.72);
+  const viewH = viewHBase + milkExtraU;
   const fh = viewH * scale;
   const fw = W.worldW * scale;
   const fx = sideW + (availW - fw) / 2;
   const fieldY = landscape
     ? (vh - fh) / 2 - viewTop * scale
-    : vh - (viewTop + viewH) * scale;
+    : hudH + hudGap - viewTop * scale;
   const fy = fieldY + viewTop * scale;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
@@ -487,6 +512,7 @@ export function computeLayout(vw: number, vh: number) {
   return {
     landscape,
     hudH,
+    hudGap,
     sideW,
     scale,
     fx,
@@ -497,6 +523,23 @@ export function computeLayout(vw: number, vh: number) {
     fw,
     fh,
     uiScale,
+  };
+}
+
+export function cupScreenRect(
+  L: ReturnType<typeof computeLayout>,
+  cupX: number,
+): { left: number; top: number; right: number; bottom: number } {
+  const sc = L.scale;
+  const fieldY = L.fieldY;
+  const cx = L.fx + cupX * sc;
+  const cy = fieldY + W.cup.y * sc;
+  const hw = W.cup.halfW * sc;
+  return {
+    left: cx - hw,
+    right: cx + hw,
+    top: cy - 44 * sc,
+    bottom: cy + 60 * sc,
   };
 }
 
