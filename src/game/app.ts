@@ -126,8 +126,9 @@ export class GameApp {
         this.aiming = true;
         this.aimAngle = -0.72;
       }
-      const n = this.qaAutoplay || (scr === 'combo' ? 4 : scr === 'play' ? 2 : 0);
+      const n = this.qaAutoplay || (scr === 'combo' ? 4 : 0);
       if (n === 0) {
+        this.freeze = this.freeze || params.has('freeze');
         this.syncHud();
         window.__ready = true;
         return;
@@ -147,6 +148,7 @@ export class GameApp {
             }
           }
           this.freeze = true;
+          this.syncHud();
           window.__ready = true;
           return;
         }
@@ -158,6 +160,7 @@ export class GameApp {
       setTimeout(fire, 400);
       setTimeout(() => {
         this.freeze = true;
+        this.syncHud();
         window.__ready = true;
       }, 12_000);
     }
