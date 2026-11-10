@@ -118,7 +118,7 @@ export function drawField(
     sy: ps.y,
   });
   if (o.pipInCloud !== false) {
-    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y + 6, {
+    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y - 8, {
       pip: true,
       coat: o.pipCoat ?? 'berry',
       w: tokens.physics.pipRadiusU * 2.35,
