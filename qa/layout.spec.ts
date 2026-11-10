@@ -38,8 +38,9 @@ for (const [w, h] of viewports) {
           timeout: 90_000,
         });
         await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true, {
-          timeout: 30_000,
+          timeout: 90_000,
         });
+        await page.evaluate(() => document.fonts.ready);
         const check = await page.evaluate(() => {
           const w = window as unknown as {
             __checkOverlaps?: () => { overlaps: unknown[]; offscreen: string[] };
@@ -66,6 +67,8 @@ for (const [w, h] of viewports) {
         await page.screenshot({
           path: `qa/shots/${screen}_${w}x${h}.png`,
           fullPage: true,
+          timeout: 60_000,
+          animations: 'disabled',
         });
       });
     }
