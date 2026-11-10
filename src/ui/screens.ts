@@ -1,5 +1,5 @@
 import { tokens } from '../tokens';
-import { computeLayout } from '../render/scene';
+import { computeLayout, puffScreenRect } from '../render/scene';
 import type { Settings, StoreData } from '../store';
 import type { GameWorld } from '../game/world';
 import type { GameApp } from '../game/app';
@@ -129,7 +129,7 @@ export function renderPlayHud(
         <button class="btn icon gloss ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
         <div class="panel ui" style="width:min(140px,100%);padding:10px 12px 12px;text-align:center">
           <div class="label ui" style="font-size:10px;margin-bottom:6px">Next</div>
-          <div class="label ui" style="font-size:11px;opacity:.85">(on field)</div>
+          <div class="ui" style="width:76px;height:76px;margin:0 auto 10px;border-radius:22px;background:#fff;box-shadow:inset 0 0 0 3px #E8D6F8;display:flex;align-items:center;justify-content:center"><canvas id="next-preview" class="ui" aria-hidden="true"></canvas></div>
           <button class="ui btn swap-badge" style="width:44px;height:44px;padding:0;margin:0 auto 8px;border-radius:50%" data-action="swap" aria-label="Swap colours">${SWAP_SVG}</button>
         </div>
         <div class="chip ui" style="width:min(140px,100%);justify-content:center">RISE IN <span class="num">${riseIn}</span></div>
@@ -234,7 +234,8 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
 
 export function renderTip(root: HTMLElement, text: string): void {
   const L = computeLayout(innerWidth, innerHeight);
-  const icing = L.fieldY + tokens.layout.frostingY * L.scale;
+  const icing = L.fieldY + L.icingWorldY * L.scale;
+  const puff = puffScreenRect(innerWidth, innerHeight);
   const app = (window as unknown as { __bbApp?: GameApp }).__bbApp;
   let topRow = icing + 140;
   if (app?.world) {
@@ -245,9 +246,12 @@ export function renderTip(root: HTMLElement, text: string): void {
     }
     if (topY < Infinity) topRow = L.fieldY + topY * L.scale;
   }
-  const top = Math.max(
-    L.hudH + 4,
-    icing + Math.max(12, (topRow - icing) * 0.42 - 22),
+  const tipH = 56;
+  const gap = Math.max(40, topRow - icing);
+  const puffClear = puff.bottom + (innerHeight < 720 ? 46 : 16);
+  const top = Math.min(
+    Math.max(icing + gap * 0.48, puffClear),
+    topRow - tipH - 8,
   );
   root.insertAdjacentHTML(
     'beforeend',

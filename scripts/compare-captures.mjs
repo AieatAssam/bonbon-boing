@@ -17,17 +17,21 @@ const browser = await chromium.launch();
 const base = 'http://127.0.0.1:4173/bonbon-boing/';
 
 async function capPlay(w, h) {
-  const page = await browser.newPage({ viewport: { width: +w, height: +h } });
+  const page = await browser.newPage({
+    viewport: { width: +w, height: +h },
+    deviceScaleFactor: 2,
+  });
   await page.goto(`${base}?qa&screen=play&aim=1`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__ready === true, { timeout: 45_000 });
   await page.evaluate(() => {
     const a = window.__bbApp;
     if (a) {
       a.freeze = true;
+      a.syncHud?.();
       a.draw();
     }
   });
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(200);
   const cap = `/opt/cursor/artifacts/mid-play-${w}x${h}.png`;
   await page.screenshot({ path: cap, fullPage: true, animations: 'disabled' });
   const mock = `/workspace/docs/mockups/play_${w}x${h}.png`;
@@ -41,7 +45,10 @@ async function capPlay(w, h) {
 }
 
 async function capCombo(w, h) {
-  const page = await browser.newPage({ viewport: { width: +w, height: +h } });
+  const page = await browser.newPage({
+    viewport: { width: +w, height: +h },
+    deviceScaleFactor: 2,
+  });
   await page.goto(`${base}?qa&screen=combo&autoplay=2&aim=1`, {
     waitUntil: 'networkidle',
   });

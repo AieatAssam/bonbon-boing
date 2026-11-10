@@ -58,7 +58,7 @@ export class GameWorld {
   bankWallThisShot = false;
   baseRowY = DEFAULT_BASE_Y;
 
-  constructor(seed: string, mode: ModeKind) {
+  constructor(seed: string, mode: ModeKind, fieldCeilingY?: number) {
     this.seed = seed;
     this.mode = mode;
     this.rng = makeRng(seed);
@@ -69,7 +69,7 @@ export class GameWorld {
     } else {
       const init =
         mode === 'rise'
-          ? initialRiseField(seed)
+          ? initialRiseField(seed, fieldCeilingY)
           : initialField(seed, 5);
       this.baseRowY = init.baseY;
       this.bonbons = init.bonbons.map((b) => ({
@@ -236,8 +236,9 @@ export class GameWorld {
 
   wouldRiseAtShot(shots: number): boolean {
     if (this.mode !== 'rise') return true;
-    if (shots <= 18) return false;
-    if (shots <= 32) return shots % 2 === 0;
+    if (shots <= 26) return false;
+    if (shots <= 58) return shots % 4 === 0;
+    if (shots <= 82) return shots % 3 === 0;
     return true;
   }
 

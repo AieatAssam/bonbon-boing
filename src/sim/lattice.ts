@@ -165,16 +165,16 @@ const CAST_ROW: Flavour[][] = [
 ];
 
 /** Stack height at new game — keep bottom row above the milk band (sea ~1480u). */
-const START_ROWS = 6;
-/** First row sits below icing + bounce room under Puff/Pip. */
-const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 5.2;
+const START_ROWS = 8;
 const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 0.32;
 
 export function initialRiseField(
   seed: string,
+  ceilingY?: number,
 ): { bonbons: Bonbon[]; baseY: number } {
   const rows = START_ROWS;
-  const targetTopY = FIELD_CEILING_Y;
+  const targetTopY =
+    ceilingY ?? tokens.layout.frostingY + PITCH * 1.52;
   const baseY = Math.min(
     targetTopY + (rows - 1) * PITCH,
     FIELD_FLOOR_Y,

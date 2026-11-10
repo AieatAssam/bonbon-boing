@@ -53,6 +53,11 @@ for (const [w, h] of viewports) {
           if (a) a.freeze = true;
         });
         await page.waitForTimeout(80);
+        await page.evaluate(() => {
+          const a = (window as unknown as { __bbApp?: { draw: () => void } }).__bbApp;
+          a?.draw();
+        });
+        await page.waitForTimeout(40);
         const check = await page.evaluate(() => {
           const w = window as unknown as {
             __checkOverlaps?: () => { overlaps: unknown[]; offscreen: string[] };

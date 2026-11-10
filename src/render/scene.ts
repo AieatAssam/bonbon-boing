@@ -150,23 +150,21 @@ export function drawField(
   const puffY = puffAnchorY(!!o.landscape);
   const mouth = puffMouthU(puffY, W.puffCloud.w, ps);
   drawCloudBody(ctx, W.puffCloud.x, puffY, W.puffCloud.w, ps);
-  if (o.pipInCloud !== false) {
-    drawBonbon(ctx, mouth.x, mouth.y, {
-      pip: true,
-      coat: o.pipCoat ?? 'berry',
-      w: tokens.physics.pipRadiusU * 2.35,
-      expr: o.aiming ? 'wow' : 'happy',
-      sx: 0.92,
-      sy: 1.04,
-    });
-  }
   drawCloudFace(ctx, W.puffCloud.x, puffY, W.puffCloud.w, {
     mouthO: o.puffMouthO,
     sx: ps.x,
     sy: ps.y,
   });
-  if (!o.hideNextBubble) {
-    drawNextBonbon(ctx, o.nextCoat ?? 'mint', !!o.landscape);
+  if (o.pipInCloud !== false) {
+    const pipW = tokens.physics.pipRadiusU * 2.35;
+    drawBonbon(ctx, mouth.x, mouth.y - pipW * 0.1, {
+      pip: true,
+      coat: o.pipCoat ?? 'berry',
+      w: pipW,
+      expr: o.aiming ? 'wow' : 'happy',
+      sx: 0.92,
+      sy: 1.04,
+    });
   }
 
   if (o.aimDots?.length) {
@@ -429,47 +427,32 @@ function drawCloudFace(
   ctx.restore();
 }
 
-function drawNextBonbon(
+/** Next preview in CSS pixel space (same transform as sky/field overlay). */
+export function drawNextPreviewScreen(
   ctx: CanvasRenderingContext2D,
+  L: ReturnType<typeof computeLayout>,
   coat: Flavour,
-  landscape: boolean,
 ): void {
-  const nb = landscape ? W.nextBubbleLandscape : W.nextBubblePortrait;
-  const L = computeLayout(innerWidth, innerHeight);
-  const bubbleY = landscape ? nb.y : L.nextWorldY;
-  const r = nb.r;
-  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  if (L.landscape) return;
+  const vw = typeof window !== 'undefined' ? innerWidth : 390;
+  const vh = typeof window !== 'undefined' ? innerHeight : 844;
+  const { cx, cy, r } = nextBubbleScreenRect(vw, vh, false);
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = tokens.color.ui.paperBorder;
   ctx.lineWidth = 4.5;
   ctx.beginPath();
-  ctx.arc(nb.x, bubbleY, r, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  const innerW = r * 1.35;
-  drawBonbon(ctx, nb.x, bubbleY + r * 0.32, {
+  const innerW = r * 1.28;
+  drawBonbon(ctx, cx, cy + r * 0.26, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
     shadow: false,
   });
-  const bx = nb.x + r * 0.92;
-  const by = bubbleY - r * 0.12;
-  ctx.fillStyle = tokens.color.ui.primaryTop;
-  ctx.strokeStyle = tokens.color.ui.ink;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(bx, by, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(bx, by, 7, 0.4 * Math.PI, 1.45 * Math.PI);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(bx, by, 7, 1.15 * Math.PI, 2.2 * Math.PI);
-  ctx.stroke();
+  ctx.restore();
 }
 
 /** Visible play slice (u): thin milk band at bottom (fixed 105u on canvas). */
@@ -543,7 +526,9 @@ export function computeLayout(vw: number, vh: number) {
   const icingWorldY = landscape
     ? W.frostingY
     : (vh * PORTRAIT_MOCKUP.icing - fieldY) / scale;
-  const nextWorldY = puffWorldY + 4;
+  const nextWorldY = landscape
+    ? W.nextBubbleLandscape.y
+    : (mockupPuffCyPx(vh) + 4 - fieldY) / scale;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
     : Math.max(1, Math.min(1.2, vw / 430));
@@ -570,6 +555,13 @@ export function computeLayout(vw: number, vh: number) {
     nextWorldY,
     uiScale,
   };
+}
+
+/** Top-stack world Y: ~1.5 rows below portrait icing (mockup). */
+export function playFieldCeilingY(vw: number, vh: number): number {
+  const L = computeLayout(vw, vh);
+  const gapRows = L.landscape ? 1.22 : 1.38;
+  return (L.landscape ? W.frostingY : L.icingWorldY) + PITCH * gapRows;
 }
 
 export function cupScreenRect(

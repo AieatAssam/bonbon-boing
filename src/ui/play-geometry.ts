@@ -4,17 +4,16 @@ import {
   MILK_BAND_U,
   computeLayout,
   cupScreenRect,
-  nextBonbonCentroidScreen,
-  nextBubbleScreenRect,
   puffScreenRect,
 } from '../render/scene';
-import { mockupPuffCyPx } from '../render/layout-mockup';
 import { cupXAtTime } from '../sim/shot';
 import {
   PORTRAIT_MOCKUP,
   milkBandMaxPx,
+  mockupPuffCyPx,
 } from '../render/layout-mockup';
 import type { GameApp } from '../game/app';
+import { paintBonbonPreview } from '../render/preview';
 
 const W = tokens.layout;
 const PITCH = W.lattice.rowPitch;
@@ -47,6 +46,74 @@ function bonbonScreenBox(
     top: sy - hh * 0.55,
     bottom: sy + hh * 0.45,
   };
+}
+
+function canvasDpr(): number {
+  const c = document.getElementById('field') as HTMLCanvasElement | null;
+  if (!c || !c.width || !c.clientWidth) return Math.min(devicePixelRatio || 1, 2);
+  return c.width / c.clientWidth;
+}
+
+function pixelLooksBonbon(d: Uint8ClampedArray): boolean {
+  if (d[3] < 80) return false;
+  const chroma = Math.max(d[0], d[1], d[2]) - Math.min(d[0], d[1], d[2]);
+  const white = d[0] > 238 && d[1] > 238 && d[2] > 238;
+  return chroma > 22 && !white;
+}
+
+function scanColour(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  ox: number,
+  oy: number,
+  rw: number,
+  rh: number,
+): boolean {
+  const step = Math.max(4, Math.floor(Math.min(rw, rh) / 14));
+  for (let y = oy; y < oy + rh; y += step) {
+    for (let x = ox; x < ox + rw; x += step) {
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      if (pixelLooksBonbon(ctx.getImageData(x, y, 1, 1).data)) return true;
+    }
+  }
+  return false;
+}
+
+function sampleBubbleHasColour(
+  L: ReturnType<typeof computeLayout>,
+  landscape: boolean,
+): boolean {
+  if (landscape) {
+    const prev = document.querySelector(
+      '#next-preview',
+    ) as HTMLCanvasElement | null;
+    if (!prev) return false;
+    const app = (window as unknown as { __bbApp?: GameApp }).__bbApp;
+    if (app?.world) paintBonbonPreview(prev, app.world.nextCoat, 58);
+    const ctx = prev.getContext('2d');
+    if (!ctx || !prev.width) return false;
+    const pad = Math.floor(prev.width * 0.12);
+    return scanColour(ctx, prev.width, prev.height, pad, pad, prev.width - pad * 2, prev.height - pad * 2);
+  }
+  const canvas = document.getElementById('field') as HTMLCanvasElement | null;
+  if (!canvas) return false;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  const nb = W.nextBubblePortrait;
+  const dpr = canvasDpr();
+  const cx = (L.fx + nb.x * L.scale) * dpr;
+  const cy = (L.fieldY + L.nextWorldY * L.scale) * dpr;
+  const r = nb.r * L.scale * dpr;
+  return scanColour(
+    ctx,
+    canvas.width,
+    canvas.height,
+    Math.floor(cx - r * 0.92),
+    Math.floor(cy - r * 0.92),
+    Math.floor(r * 1.84),
+    Math.floor(r * 1.84),
+  );
 }
 
 export function checkPlayGeometry(app: GameApp): string[] {
@@ -96,10 +163,7 @@ export function checkPlayGeometry(app: GameApp): string[] {
     if (ncx - nr < leftWall + 3) v.push('next:left-wall');
   }
 
-  const bubble = nextBubbleScreenRect(vw, vh, L.landscape);
-  const bonbonC = nextBonbonCentroidScreen(vw, vh, L.landscape);
-  const dist = Math.hypot(bonbonC.x - bubble.cx, bonbonC.y - bubble.cy);
-  if (dist > bubble.r * 0.42) v.push('next:bonbon-off-center');
+  if (!sampleBubbleHasColour(L, L.landscape)) v.push('next:empty-bubble');
 
   const tip = document.querySelector('.tip-tutorial');
   if (tip && world.shots === 0) {
@@ -134,15 +198,17 @@ export function checkPlayGeometry(app: GameApp): string[] {
     const topRowScreen = fieldY + topBonbonY * sc;
     if (topRowScreen < puff.bottom + 6) v.push('field:top-row-under-puff');
 
-    const py = W.puffCloud.y;
+    const py = L.puffWorldY;
     const pw = W.puffCloud.w;
     const puffBottomWorld = py - pw * 0.28 + pw * 0.52;
     if (icingWorld < puffBottomWorld + 12) v.push('icing:under-puff');
     const icingScreen = fieldY + icingWorld * sc;
-  const icingTarget = vh * PORTRAIT_MOCKUP.icing;
-  if (Math.abs(icingScreen - icingTarget) > vh * 0.06)
-    v.push('icing:off-mockup');
-    if (topRowScreen < icingScreen + 10) v.push('field:top-row-under-icing');
+    const icingTarget = vh * PORTRAIT_MOCKUP.icing;
+    if (Math.abs(icingScreen - icingTarget) > vh * 0.06)
+      v.push('icing:off-mockup');
+    if (topRowScreen > icingScreen + PITCH * sc * 2.45)
+      v.push('field:gap-under-icing');
+    if (topRowScreen < icingScreen + 2) v.push('field:top-row-under-icing');
   }
 
   return [...new Set(v)];

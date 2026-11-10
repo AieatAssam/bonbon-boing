@@ -2,11 +2,14 @@ import { tokens } from '../tokens';
 import { installOverlapChecker } from '../ui/overlap';
 import {
   computeLayout,
+  playFieldCeilingY,
   drawField,
+  drawNextPreviewScreen,
   drawSky,
   puffAnchorY,
   puffMouthU,
 } from '../render/scene';
+import { paintBonbonPreview } from '../render/preview';
 import { drawBonbon } from '../render/bonbon';
 import { bonbonRadius } from '../sim/lattice';
 import { FxLayer } from '../render/fx';
@@ -178,7 +181,9 @@ export class GameApp {
   }
 
   startMode(mode: ModeKind, seed: string): void {
-    this.world = new GameWorld(seed, mode);
+    const fieldCeilingY =
+      mode === 'rise' ? playFieldCeilingY(innerWidth, innerHeight) : undefined;
+    this.world = new GameWorld(seed, mode, fieldCeilingY);
     if (this.qa) this.world.sugarRushUsed = true;
     this.world.onLifetimePop = (fl) => {
       this.store.book[fl] = (this.store.book[fl] ?? 0) + 1;
@@ -390,6 +395,13 @@ export class GameApp {
         this.world,
       );
     } else if (this.screen === 'gallery') renderGalleryHud(this.uiRoot);
+    const layout = computeLayout(innerWidth, innerHeight);
+    const preview = this.uiRoot.querySelector(
+      '#next-preview',
+    ) as HTMLCanvasElement | null;
+    if (preview && this.world && layout.landscape) {
+      paintBonbonPreview(preview, this.world.nextCoat, 58);
+    }
     else if (this.screen === 'book') renderBookHud(this.uiRoot, this.store);
     else if (this.screen === 'credits') renderCreditsHud(this.uiRoot);
     else if (this.screen === 'trail') renderTrailHud(this.uiRoot, this.store);
@@ -605,9 +617,17 @@ export class GameApp {
       puffMouthO: this.aiming || this.shot.phase === 'idle',
       puffScale: this.puffScale,
       aiming: this.aiming,
-      hideNextBubble: false,
+      hideNextBubble: true,
       landscape: L.landscape,
     });
+    if (!L.landscape) {
+      drawNextPreviewScreen(ctx, L, this.world.nextCoat);
+    } else {
+      const preview = this.uiRoot.querySelector(
+        '#next-preview',
+      ) as HTMLCanvasElement | null;
+      if (preview) paintBonbonPreview(preview, this.world.nextCoat, 58);
+    }
     for (const id of [...this.rings.keys()]) {
       if (!this.world.living().some((b) => b.id === id)) this.rings.delete(id);
     }
