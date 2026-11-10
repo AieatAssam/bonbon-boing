@@ -1,11 +1,19 @@
 import { tokens } from '../tokens';
 import { bonbonRadius } from '../sim/lattice';
 import {
+  MILK_BAND_U,
   computeLayout,
   cupScreenRect,
+  nextBonbonCentroidScreen,
+  nextBubbleScreenRect,
   puffScreenRect,
 } from '../render/scene';
+import { mockupPuffCyPx } from '../render/layout-mockup';
 import { cupXAtTime } from '../sim/shot';
+import {
+  PORTRAIT_MOCKUP,
+  milkBandMaxPx,
+} from '../render/layout-mockup';
 import type { GameApp } from '../game/app';
 
 const W = tokens.layout;
@@ -54,6 +62,13 @@ export function checkPlayGeometry(app: GameApp): string[] {
   const rightWall = fx + W.walls.rightX * sc;
   const v: string[] = [];
 
+  if (!L.landscape) {
+    const milkViewport = milkBandMaxPx(vh);
+    const milkOnCanvas = MILK_BAND_U * sc;
+    const milkTotal = Math.min(vh, Math.max(milkOnCanvas, milkViewport));
+    if (milkTotal > vh * 0.12 + 1) v.push('milk:band-too-tall');
+  }
+
   for (const b of world.living()) {
     if (b.popped || b.falling) continue;
     const box = bonbonScreenBox(b, fx, fieldY, sc);
@@ -66,6 +81,8 @@ export function checkPlayGeometry(app: GameApp): string[] {
     if (puff.left < -2 || puff.right > vw + 2 || puff.top < L.hudH - 4) {
       v.push('puff:offscreen');
     }
+    const targetCy = mockupPuffCyPx(vh);
+    if (Math.abs(puff.cy - targetCy) > vh * 0.08) v.push('puff:off-mockup');
   } else if (puff.top < 0 || puff.bottom > vh + 2) {
     v.push('puff:offscreen');
   }
@@ -79,6 +96,11 @@ export function checkPlayGeometry(app: GameApp): string[] {
     if (ncx - nr < leftWall + 3) v.push('next:left-wall');
   }
 
+  const bubble = nextBubbleScreenRect(vw, vh, L.landscape);
+  const bonbonC = nextBonbonCentroidScreen(vw, vh, L.landscape);
+  const dist = Math.hypot(bonbonC.x - bubble.cx, bonbonC.y - bubble.cy);
+  if (dist > bubble.r * 0.42) v.push('next:bonbon-off-center');
+
   const tip = document.querySelector('.tip-tutorial');
   if (tip && world.shots === 0) {
     const tr = tip.getBoundingClientRect();
@@ -89,6 +111,7 @@ export function checkPlayGeometry(app: GameApp): string[] {
         right: tr.right,
         bottom: tr.bottom,
       };
+      if (rectsOverlap(tipR, puff)) v.push('tip:puff-overlap');
       const cupBandTop = W.seaSurfaceY - PITCH * 0.35;
       for (const b of world.living()) {
         if (b.falling || b.popped) continue;
@@ -102,21 +125,23 @@ export function checkPlayGeometry(app: GameApp): string[] {
     }
   }
 
-  const icingWorld = W.frostingY;
+  const icingWorld = L.icingWorldY;
   let topBonbonY = Infinity;
   for (const b of world.living()) {
     if (!b.falling) topBonbonY = Math.min(topBonbonY, b.y - bonbonRadius(b.size));
   }
   if (!L.landscape) {
-    const puffBottom = puff.bottom;
     const topRowScreen = fieldY + topBonbonY * sc;
-    if (topRowScreen < puffBottom + 6) v.push('field:top-row-under-puff');
+    if (topRowScreen < puff.bottom + 6) v.push('field:top-row-under-puff');
 
     const py = W.puffCloud.y;
     const pw = W.puffCloud.w;
     const puffBottomWorld = py - pw * 0.28 + pw * 0.52;
     if (icingWorld < puffBottomWorld + 12) v.push('icing:under-puff');
     const icingScreen = fieldY + icingWorld * sc;
+  const icingTarget = vh * PORTRAIT_MOCKUP.icing;
+  if (Math.abs(icingScreen - icingTarget) > vh * 0.06)
+    v.push('icing:off-mockup');
     if (topRowScreen < icingScreen + 10) v.push('field:top-row-under-icing');
   }
 

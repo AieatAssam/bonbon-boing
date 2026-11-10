@@ -8,7 +8,6 @@ import {
   puffMouthU,
 } from '../render/scene';
 import { drawBonbon } from '../render/bonbon';
-import { paintBonbonPreview } from '../render/preview';
 import { bonbonRadius } from '../sim/lattice';
 import { FxLayer } from '../render/fx';
 import { SoftRing } from '../render/softring';
@@ -391,13 +390,6 @@ export class GameApp {
         this.world,
       );
     } else if (this.screen === 'gallery') renderGalleryHud(this.uiRoot);
-    const layout = computeLayout(innerWidth, innerHeight);
-    const preview = this.uiRoot.querySelector(
-      '#next-preview',
-    ) as HTMLCanvasElement | null;
-    if (preview && this.world && layout.landscape) {
-      paintBonbonPreview(preview, this.world.nextCoat, 52);
-    }
     else if (this.screen === 'book') renderBookHud(this.uiRoot, this.store);
     else if (this.screen === 'credits') renderCreditsHud(this.uiRoot);
     else if (this.screen === 'trail') renderTrailHud(this.uiRoot, this.store);
@@ -583,10 +575,8 @@ export class GameApp {
       return;
     }
     const L = computeLayout(innerWidth, innerHeight);
-    const milkScreen =
-      (L.fieldY ?? L.fy) +
-      (tokens.layout.seaSurfaceY - L.viewTop) * L.scale;
-    drawSky(ctx, innerWidth, innerHeight, milkScreen);
+    const milkScreen = L.milkTopScreen ?? L.fieldY + tokens.layout.seaSurfaceY * L.scale;
+    drawSky(ctx, innerWidth, innerHeight, milkScreen, L.milkPx);
     const cupX = cupXAtTime(
       this.world.seed,
       this.world.shots + performance.now() * 0.001,
@@ -615,7 +605,7 @@ export class GameApp {
       puffMouthO: this.aiming || this.shot.phase === 'idle',
       puffScale: this.puffScale,
       aiming: this.aiming,
-      hideNextBubble: L.landscape,
+      hideNextBubble: false,
       landscape: L.landscape,
     });
     for (const id of [...this.rings.keys()]) {

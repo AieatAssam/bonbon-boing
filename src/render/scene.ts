@@ -1,4 +1,12 @@
 import { tokens } from '../tokens';
+import {
+  hudEndPx,
+  milkBandMaxPx,
+  mockupPuffCyPx,
+  PORTRAIT_MOCKUP,
+} from './layout-mockup';
+
+export { milkBandMaxPx, mockupPuffCyPx } from './layout-mockup';
 import { drawBonbon } from './bonbon';
 import { bonbonRadius } from '../sim/lattice';
 import type { Bonbon, Flavour, Expression } from '../sim/types';
@@ -28,17 +36,24 @@ export function drawSky(
   vw: number,
   vh: number,
   milkLineY?: number,
+  milkBandPx = milkBandMaxPx(vh),
 ): void {
   const g = ctx.createLinearGradient(0, 0, 0, vh);
   g.addColorStop(0, C.skyTop);
-  g.addColorStop(0.45, C.skyMid);
-  const milkAt = milkLineY ?? vh * 0.9;
-  const t = Math.max(0.62, Math.min(0.92, milkAt / vh - 0.02));
-  g.addColorStop(t, C.skyMid);
-  g.addColorStop(Math.min(0.98, t + 0.06), C.milkTop);
-  g.addColorStop(1, C.milkBottom);
+  g.addColorStop(0.42, C.skyMid);
+  const seaTop = milkLineY ?? vh * 0.88;
+  const skyEnd = Math.max(0, Math.min(1, (seaTop - 8) / vh));
+  g.addColorStop(skyEnd, C.skyMid);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, vw, vh);
+  const bandTop = vh - milkBandPx;
+  if (bandTop < vh - 1) {
+    const m = ctx.createLinearGradient(0, bandTop, 0, vh);
+    m.addColorStop(0, C.milkTop);
+    m.addColorStop(1, C.milkBottom);
+    ctx.fillStyle = m;
+    ctx.fillRect(0, bandTop, vw, milkBandPx);
+  }
 }
 
 export function drawField(
@@ -63,7 +78,11 @@ export function drawField(
   ctx.globalAlpha = warn ? 1 : 0.55;
   ctx.setLineDash([2, 22]);
   ctx.lineCap = 'round';
-  const frostY = W.frostingY;
+  const L = computeLayout(
+    typeof window !== 'undefined' ? innerWidth : 390,
+    typeof window !== 'undefined' ? innerHeight : 844,
+  );
+  const frostY = o.landscape ? W.frostingY : L.icingWorldY;
   ctx.beginPath();
   for (let i = 0; i < 20; i++) {
     const x = 30 + i * 47;
@@ -146,7 +165,9 @@ export function drawField(
     sx: ps.x,
     sy: ps.y,
   });
-  if (!o.hideNextBubble) drawNextBonbon(ctx, o.nextCoat ?? 'mint');
+  if (!o.hideNextBubble) {
+    drawNextBonbon(ctx, o.nextCoat ?? 'mint', !!o.landscape);
+  }
 
   if (o.aimDots?.length) {
     for (let i = 0; i < o.aimDots.length; i++) {
@@ -408,25 +429,31 @@ function drawCloudFace(
   ctx.restore();
 }
 
-function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
-  const nb = W.nextBubblePortrait;
+function drawNextBonbon(
+  ctx: CanvasRenderingContext2D,
+  coat: Flavour,
+  landscape: boolean,
+): void {
+  const nb = landscape ? W.nextBubbleLandscape : W.nextBubblePortrait;
+  const L = computeLayout(innerWidth, innerHeight);
+  const bubbleY = landscape ? nb.y : L.nextWorldY;
   const r = nb.r;
   ctx.fillStyle = 'rgba(255,255,255,0.94)';
   ctx.strokeStyle = tokens.color.ui.paperBorder;
   ctx.lineWidth = 4.5;
   ctx.beginPath();
-  ctx.arc(nb.x, nb.y, r, 0, Math.PI * 2);
+  ctx.arc(nb.x, bubbleY, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  const innerW = r * 1.4;
-  drawBonbon(ctx, nb.x, nb.y + innerW * 0.38, {
+  const innerW = r * 1.35;
+  drawBonbon(ctx, nb.x, bubbleY + r * 0.32, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
     shadow: false,
   });
   const bx = nb.x + r * 0.92;
-  const by = nb.y - r * 0.12;
+  const by = bubbleY - r * 0.12;
   ctx.fillStyle = tokens.color.ui.primaryTop;
   ctx.strokeStyle = tokens.color.ui.ink;
   ctx.lineWidth = 2;
@@ -445,18 +472,19 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.stroke();
 }
 
-/** Visible play slice (u): Puff through thin milk band at bottom (~8–12% of height). */
-const MILK_BAND_U = 105;
-const VIEW_TOP = 402;
+/** Visible play slice (u): thin milk band at bottom (fixed 105u on canvas). */
+export const MILK_BAND_U = 105;
+const VIEW_TOP = 250;
 const VIEW_TOP_L = 200;
-const MILK_BAND_MAX_EXTRA = 120;
 const VIEW_H_P =
   tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP;
 const VIEW_H_L =
   tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP_L;
 
 export function puffAnchorY(landscape: boolean): number {
-  return landscape ? 400 : W.puffCloud.y;
+  if (landscape) return 400;
+  const L = computeLayout(innerWidth, innerHeight);
+  return L.puffWorldY;
 }
 
 export function pipAnchorY(landscape: boolean): number {
@@ -487,25 +515,35 @@ export function computeLayout(vw: number, vh: number) {
     ? Math.max(150, Math.min(300, (vw - vh * 0.625) / 2))
     : 0;
   const availW = vw - sideW * 2;
-  const availH = vh - hudH - hudGap;
+  const milkPx = landscape ? 0 : milkBandMaxPx(vh);
+  const hudEnd = landscape ? hudGap : hudEndPx(vh);
+  const contentBottom = vh - milkPx;
+  const availH = landscape ? vh : contentBottom - hudEnd;
   const viewTop = landscape ? VIEW_TOP_L : VIEW_TOP;
   const viewHBase = landscape ? VIEW_H_L : VIEW_H_P;
   const widthFit = availW / W.worldW;
   const heightFit = availH / viewHBase;
   const scale = Math.min(widthFit, heightFit);
-  const extraPx = Math.max(0, availH - viewHBase * scale);
-  const extraU = extraPx / scale;
-  const milkExtraU = landscape
-    ? 0
-    : Math.min(MILK_BAND_MAX_EXTRA, extraU * 0.72);
-  const viewH = viewHBase + milkExtraU;
+  const viewH = landscape
+    ? viewHBase + Math.max(0, availH / scale - viewHBase)
+    : viewHBase;
   const fh = viewH * scale;
   const fw = W.worldW * scale;
   const fx = sideW + (availW - fw) / 2;
   const fieldY = landscape
     ? (vh - fh) / 2 - viewTop * scale
-    : hudH + hudGap - viewTop * scale;
+    : vh - milkPx - (viewTop + viewH) * scale;
   const fy = fieldY + viewTop * scale;
+  const sliceBottom = fieldY + (viewTop + viewH) * scale;
+  const milkTopScreen = fieldY + W.seaSurfaceY * scale;
+  const milkBandScreen = MILK_BAND_U * scale;
+  const puffWorldY = landscape
+    ? 400
+    : (mockupPuffCyPx(vh) - fieldY) / scale;
+  const icingWorldY = landscape
+    ? W.frostingY
+    : (vh * PORTRAIT_MOCKUP.icing - fieldY) / scale;
+  const nextWorldY = puffWorldY + 4;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
     : Math.max(1, Math.min(1.2, vw / 430));
@@ -513,6 +551,8 @@ export function computeLayout(vw: number, vh: number) {
     landscape,
     hudH,
     hudGap,
+    hudEnd,
+    milkPx,
     sideW,
     scale,
     fx,
@@ -522,6 +562,12 @@ export function computeLayout(vw: number, vh: number) {
     viewH,
     fw,
     fh,
+    sliceBottom,
+    milkTopScreen,
+    milkBandScreen,
+    puffWorldY,
+    icingWorldY,
+    nextWorldY,
     uiScale,
   };
 }
@@ -546,20 +592,55 @@ export function cupScreenRect(
 export function puffScreenRect(
   vw: number,
   vh: number,
-): { left: number; top: number; right: number; bottom: number } {
+): { left: number; top: number; right: number; bottom: number; cx: number; cy: number } {
   const L = computeLayout(vw, vh);
   const fieldY = L.fieldY ?? L.fy;
   const puff = W.puffCloud;
-  const py = puffAnchorY(L.landscape);
+  const py = L.puffWorldY;
   const sc = L.scale;
   const cx = L.fx + puff.x * sc;
   const cy = fieldY + (py - puff.w * 0.28) * sc;
   const ww = puff.w * sc;
   const hh = puff.w * 0.52 * sc;
+  const bodyCy = fieldY + py * sc;
   return {
     left: cx - ww / 2,
     top: cy,
     right: cx + ww / 2,
     bottom: cy + hh,
+    cx,
+    cy: bodyCy,
+  };
+}
+
+export function nextBubbleScreenRect(
+  vw: number,
+  vh: number,
+  landscape: boolean,
+): { cx: number; cy: number; r: number } {
+  const L = computeLayout(vw, vh);
+  const nb = landscape ? W.nextBubbleLandscape : W.nextBubblePortrait;
+  const sc = L.scale;
+  const cy = landscape ? nb.y : L.nextWorldY;
+  return {
+    cx: L.fx + nb.x * sc,
+    cy: L.fieldY + cy * sc,
+    r: nb.r * sc,
+  };
+}
+
+/** Screen Y of the preview bonbon centroid (main canvas). */
+export function nextBonbonCentroidScreen(
+  vw: number,
+  vh: number,
+  landscape: boolean,
+): { x: number; y: number } {
+  const L = computeLayout(vw, vh);
+  const nb = landscape ? W.nextBubbleLandscape : W.nextBubblePortrait;
+  const sc = L.scale;
+  const by = landscape ? nb.y : L.nextWorldY;
+  return {
+    x: L.fx + nb.x * sc,
+    y: L.fieldY + (by + nb.r * 0.08) * sc,
   };
 }
