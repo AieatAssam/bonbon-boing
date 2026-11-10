@@ -2,6 +2,7 @@ import { tokens } from '../tokens';
 import { installOverlapChecker } from '../ui/overlap';
 import { computeLayout, drawField, drawSky } from '../render/scene';
 import { drawBonbon } from '../render/bonbon';
+import { paintBonbonPreview } from '../render/preview';
 import { bonbonRadius } from '../sim/lattice';
 import { FxLayer } from '../render/fx';
 import { SoftRing } from '../render/softring';
@@ -218,8 +219,9 @@ export class GameApp {
           this.fx.showBigWord(`HUG ×${e.chain.length}!`, true);
           this.fx.emitConfetti(b.x, b.y, 40);
         }
-        if (e.bonbon && e.bonbon.x > 40) {
-          this.fx.scorePop(e.bonbon.x, e.bonbon.y - 48, `+${popPts(e)}`);
+        if (e.pop && e.bonbon) {
+          const r = bonbonRadius(e.bonbon.size);
+          this.fx.scorePop(e.bonbon.x, e.bonbon.y - r * 0.55, `+${popPts(e)}`);
         }
         this.clocks.addTrauma(
           tokens.motion.shake.add.sweetPop,
@@ -380,6 +382,13 @@ export class GameApp {
         this.world,
       );
     } else if (this.screen === 'gallery') renderGalleryHud(this.uiRoot);
+    const layout = computeLayout(innerWidth, innerHeight);
+    const preview = this.uiRoot.querySelector(
+      '#next-preview',
+    ) as HTMLCanvasElement | null;
+    if (preview && this.world && layout.landscape) {
+      paintBonbonPreview(preview, this.world.nextCoat, 52);
+    }
     else if (this.screen === 'book') renderBookHud(this.uiRoot, this.store);
     else if (this.screen === 'credits') renderCreditsHud(this.uiRoot);
     else if (this.screen === 'trail') renderTrailHud(this.uiRoot, this.store);
@@ -564,7 +573,10 @@ export class GameApp {
       return;
     }
     const L = computeLayout(innerWidth, innerHeight);
-    drawSky(ctx, innerWidth, innerHeight);
+    const milkScreen =
+      (L.fieldY ?? L.fy) +
+      (tokens.layout.seaSurfaceY - L.viewTop) * L.scale;
+    drawSky(ctx, innerWidth, innerHeight, milkScreen);
     const cupX = cupXAtTime(
       this.world.seed,
       this.world.shots + performance.now() * 0.001,
@@ -595,22 +607,6 @@ export class GameApp {
       aiming: this.aiming,
       hideNextBubble: L.landscape,
     });
-    ctx.save();
-    ctx.translate(L.fx, fieldY);
-    ctx.scale(L.scale, L.scale);
-    for (const b of this.world.living()) {
-      const ring = this.rings.get(b.id);
-      if (!ring || ring.awakeMs <= 0) continue;
-      const fl = tokens.color.flavour[b.flavour];
-      ring.path(ctx);
-      ctx.fillStyle = fl.light;
-      ctx.fill();
-      ctx.strokeStyle = fl.dark;
-      ctx.lineWidth = 4;
-      ring.path(ctx);
-      ctx.stroke();
-    }
-    ctx.restore();
     for (const id of [...this.rings.keys()]) {
       if (!this.world.living().some((b) => b.id === id)) this.rings.delete(id);
     }

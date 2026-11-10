@@ -52,9 +52,11 @@ export function neighbours(row: number, col: number): Array<[number, number]> {
 let nextId = 1;
 
 function clampX(x: number, r: number): number {
-  const left = tokens.layout.walls.leftX + r + 6;
-  const right = tokens.layout.walls.rightX - r - 6;
-  return Math.max(left, Math.min(right, x));
+  const margin = 12;
+  const left = tokens.layout.walls.leftX + r + margin;
+  const right = tokens.layout.walls.rightX - r - margin;
+  const x1 = Math.max(left, Math.min(right, x));
+  return x1;
 }
 
 export function createBonbon(
@@ -164,8 +166,9 @@ const CAST_ROW: Flavour[][] = [
 
 /** Stack height at new game — keep bottom row above the milk band (sea ~1480u). */
 const START_ROWS = 6;
-const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 2.15;
-const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 2.85;
+/** First row sits below icing + bounce room under Puff/Pip. */
+const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 4.15;
+const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 2.15;
 
 export function initialRiseField(
   seed: string,

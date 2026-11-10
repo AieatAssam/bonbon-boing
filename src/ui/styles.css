@@ -59,12 +59,13 @@ body {
 
 .sticker,
 .score-sticker {
-  color: #fff;
-  -webkit-text-fill-color: #fff;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
   paint-order: stroke fill;
-  -webkit-text-stroke: 0.11em var(--bb-color-ui-ink);
-  filter: drop-shadow(0 5px 0 rgba(58, 31, 77, 0.28))
-    drop-shadow(0 2px 10px rgba(58, 31, 77, 0.12));
+  -webkit-text-stroke: 0.12em #3b2350;
+  text-shadow: none;
+  filter: drop-shadow(0 5px 0 rgba(58, 31, 77, 0.32))
+    drop-shadow(0 2px 8px rgba(58, 31, 77, 0.14));
 }
 
 .best-chip {

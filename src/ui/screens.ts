@@ -97,11 +97,6 @@ export function renderTitleHud(root: HTMLElement, best: number): void {
 const ICON_PAUSE = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/><rect x="14" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/></svg>`;
 const ICON_SOUND = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z" fill="#3A1F4D" stroke="#3A1F4D" stroke-width="1.5"/><path d="M16 8.5a5 5 0 010 7" stroke="#3A1F4D" stroke-width="2" stroke-linecap="round"/></svg>`;
 
-function flavourDot(fl: Flavour, px: number): string {
-  const c = tokens.color.flavour[fl];
-  return `<span class="ui" style="display:inline-block;width:${px}px;height:${px}px;border-radius:50%;background:linear-gradient(${c.light},${c.base});border:3px solid ${c.outline}"></span>`;
-}
-
 const SWAP_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l-4 4 4 4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M15 18l4-4-4-4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M5 10h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M19 14H10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>`;
 
 export function renderPlayHud(
@@ -111,7 +106,7 @@ export function renderPlayHud(
   combo?: number,
   _stage = 1,
   _shots = 0,
-  nextCoat: Flavour = 'mint',
+  _nextCoat: Flavour = 'mint',
   world?: GameWorld,
 ): void {
   const L = computeLayout(innerWidth, innerHeight);
@@ -119,22 +114,21 @@ export function renderPlayHud(
   const riseIn = world?.shotsUntilRise() ?? 1;
   const catches = world?.catches ?? 0;
   if (L.landscape) {
-    const sw = L.sideW;
-    const lx = Math.max(12, (L.fx - sw) / 2);
+    const sw = Math.min(L.sideW, Math.max(148, L.fx - 10));
     const rx = Math.max(12, innerWidth - L.fx - L.fw - sw);
     root.innerHTML = `
-      <div class="ui ui-abs" style="left:${lx}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:10px;align-items:stretch">
-        <button class="btn icon gloss ui" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
-        <div class="label ui" style="margin-top:4px">Score</div>
-        <div class="disp score-sticker num ui" style="font-size:44px;line-height:1;text-align:center">${score.toLocaleString()}</div>
-        <div class="chip best-chip ui" style="justify-content:center"><span class="best-star">★</span> BEST <span class="num">${best.toLocaleString()}</span></div>
-        ${combo ? `<div class="chip ui" style="background:#FFE36B;justify-content:center">CHAIN ×${combo}</div>` : ''}
+      <div class="ui ui-abs" style="left:14px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:8px;align-items:stretch">
+        <button class="btn icon gloss ui" aria-label="Pause" data-action="pause" style="align-self:flex-start">${ICON_PAUSE}</button>
+        <div class="label ui">Score</div>
+        <div class="disp score-sticker num ui" style="font-size:44px;line-height:1;text-align:left">${score.toLocaleString()}</div>
+        <div class="chip best-chip ui" style="align-self:flex-start"><span class="best-star">★</span> BEST <span class="num">${best.toLocaleString()}</span></div>
+        ${combo ? `<div class="chip ui" style="background:#FFE36B;align-self:flex-start">CHAIN ×${combo}</div>` : ''}
       </div>
       <div class="ui ui-abs" style="right:${rx}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
         <button class="btn icon gloss ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
-        <div class="panel ui" style="width:min(140px,100%);padding:10px 12px 12px;text-align:center;margin-top:6px">
+        <div class="panel ui" style="width:min(140px,100%);padding:10px 12px 12px;text-align:center">
           <div class="label ui" style="font-size:10px;margin-bottom:6px">Next</div>
-          <div class="ui" style="width:76px;height:76px;margin:0 auto 10px;border-radius:22px;background:#fff;box-shadow:inset 0 0 0 3px #E8D6F8;display:flex;align-items:center;justify-content:center">${flavourDot(nextCoat, 52)}</div>
+          <div class="ui" style="width:76px;height:76px;margin:0 auto 10px;border-radius:22px;background:#fff;box-shadow:inset 0 0 0 3px #E8D6F8;display:flex;align-items:center;justify-content:center"><canvas id="next-preview" class="ui" aria-hidden="true"></canvas></div>
           <button class="ui btn swap-badge" style="width:44px;height:44px;padding:0;margin:0 auto 8px;border-radius:50%" data-action="swap" aria-label="Swap colours">${SWAP_SVG}</button>
         </div>
         <div class="chip ui" style="width:min(140px,100%);justify-content:center">RISE IN <span class="num">${riseIn}</span></div>

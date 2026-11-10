@@ -53,17 +53,6 @@ export class FxLayer {
         kind: 'sparkle',
       });
     }
-    this.particles.push({
-      x,
-      y,
-      vx: 0,
-      vy: -80,
-      life: 0.28,
-      max: 0.28,
-      r: 24,
-      color: '#fff',
-      kind: 'ring',
-    });
   }
 
   emitConfetti(x: number, y: number, count = 24): void {
@@ -143,12 +132,13 @@ export class FxLayer {
       const a = Math.min(1, p.life / (p.max * 0.4));
       ctx.globalAlpha = a;
       if (p.kind === 'score' && p.text) {
-        ctx.font = '700 26px Fredoka, sans-serif';
+        ctx.font = '800 20px Fredoka, sans-serif';
         ctx.textAlign = 'center';
+        ctx.lineJoin = 'round';
         ctx.strokeStyle = tokens.color.fx.scorePopStroke;
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 5;
         ctx.strokeText(p.text, p.x, p.y);
-        ctx.fillStyle = p.color;
+        ctx.fillStyle = '#ffffff';
         ctx.fillText(p.text, p.x, p.y);
       } else if (p.kind === 'ring') {
         ctx.strokeStyle = tokens.color.fx.puffRing;

@@ -26,11 +26,16 @@ export function drawSky(
   ctx: CanvasRenderingContext2D,
   vw: number,
   vh: number,
+  milkLineY?: number,
 ): void {
   const g = ctx.createLinearGradient(0, 0, 0, vh);
   g.addColorStop(0, C.skyTop);
   g.addColorStop(0.45, C.skyMid);
-  g.addColorStop(1, C.skyBottom);
+  const milkAt = milkLineY ?? vh * 0.9;
+  const t = Math.max(0.62, Math.min(0.92, milkAt / vh - 0.02));
+  g.addColorStop(t, C.skyMid);
+  g.addColorStop(Math.min(0.98, t + 0.06), C.milkTop);
+  g.addColorStop(1, C.milkBottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, vw, vh);
 }
@@ -70,7 +75,7 @@ export function drawField(
 
   drawMilk(ctx, o.cupX);
 
-  const cupBandTop = W.seaSurfaceY - PITCH * 0.55;
+  const cupBandTop = W.seaSurfaceY - PITCH * 0.35;
   const playBonbons: Bonbon[] = [];
   const milkBonbons: Bonbon[] = [];
   for (const b of o.bonbons) {
@@ -225,21 +230,24 @@ function drawWalls(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+const MILK_DEPTH_U = 105;
+
 function drawMilk(ctx: CanvasRenderingContext2D, _cupX: number): void {
   const seaY = W.seaSurfaceY;
-  const g = ctx.createLinearGradient(0, seaY, 0, seaY + 400);
+  const depth = MILK_DEPTH_U;
+  const g = ctx.createLinearGradient(0, seaY, 0, seaY + depth);
   g.addColorStop(0, C.milkTop);
-  g.addColorStop(0.4, C.milkBottom);
+  g.addColorStop(0.55, C.milkBottom);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(-200, seaY);
   for (let i = 0; i < 14; i++) {
     const x = -100 + i * 100;
-    const cy = seaY - (i % 2 ? 26 : -10);
+    const cy = seaY - (i % 2 ? 22 : -8);
     ctx.quadraticCurveTo(x - 50, cy, x, seaY);
   }
-  ctx.lineTo(1200, seaY + 2000);
-  ctx.lineTo(-200, seaY + 2000);
+  ctx.lineTo(1200, seaY + depth);
+  ctx.lineTo(-200, seaY + depth);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = C.milkFoam;
@@ -406,8 +414,8 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.arc(nb.x, nb.y, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  const innerW = r * 1.28;
-  drawBonbon(ctx, nb.x - 1, nb.y + innerW * 0.36, {
+  const innerW = r * 1.4;
+  drawBonbon(ctx, nb.x, nb.y + innerW * 0.42, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
@@ -433,11 +441,14 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.stroke();
 }
 
-/** Visible play slice (u): thin milk band at bottom per DESIGN-SYSTEM §6. */
-const VIEW_TOP = 275;
-const VIEW_H = 1280;
-const VIEW_TOP_L = 210;
-const VIEW_H_L = 1540;
+/** Visible play slice (u): Puff through thin milk band at bottom (~8–10% of height). */
+const MILK_BAND_U = 105;
+const VIEW_TOP = 260;
+const VIEW_TOP_L = 200;
+const VIEW_H_P =
+  tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP;
+const VIEW_H_L =
+  tokens.layout.seaSurfaceY + MILK_BAND_U - VIEW_TOP_L;
 
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
@@ -448,13 +459,15 @@ export function computeLayout(vw: number, vh: number) {
   const availW = vw - sideW * 2;
   const availH = vh - hudH - (landscape ? 0 : 6);
   const viewTop = landscape ? VIEW_TOP_L : VIEW_TOP;
-  const viewH = landscape ? VIEW_H_L : VIEW_H;
+  const viewH = landscape ? VIEW_H_L : VIEW_H_P;
   let scale = landscape
     ? Math.min(availW / W.worldW, availH / viewH)
-    : availW / W.worldW;
+    : availH / viewH;
   let fh = viewH * scale;
-  if (fh > availH) scale = availH / viewH;
-  fh = viewH * scale;
+  if (landscape && fh > availH) {
+    scale = availH / viewH;
+    fh = availH;
+  }
   const fw = W.worldW * scale;
   const fx = (vw - fw) / 2;
   const fy = landscape ? (vh - fh) / 2 : hudH;
