@@ -16,6 +16,7 @@ export interface SceneDrawOpts {
   comboFx?: boolean;
   warn?: boolean;
   puffMouthO?: boolean;
+  puffScale?: { x: number; y: number };
 }
 
 export function drawSky(
@@ -86,7 +87,8 @@ export function drawField(
     const r = bonbonRadius(b.size);
     const w = r * 2.05;
     const expr: Expression =
-      b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle';
+      b.expr ??
+      (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
     drawBonbon(ctx, b.x, b.y + r * 0.94, {
       flavour: b.flavour,
       w,

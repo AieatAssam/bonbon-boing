@@ -34,6 +34,18 @@ export interface Bonbon {
   heart: boolean;
   popped: boolean;
   asleep: boolean;
+  /** runtime */
+  expr?: Expression;
+  sx?: number;
+  sy?: number;
+  homeY?: number;
+  homeX?: number;
+  riseT?: number;
+  popT?: number;
+  wowT?: number;
+  tickleT?: number;
+  vy?: number;
+  woken?: boolean;
 }
 
 export interface PipState {

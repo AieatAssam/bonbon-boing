@@ -12,7 +12,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173/bonbon-boing/',
     trace: 'off',
-    video: 'off',
+    video: 'retain-on-failure',
     actionTimeout: 20_000,
     navigationTimeout: 30_000,
     ...devices['Desktop Chrome'],

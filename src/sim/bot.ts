@@ -49,7 +49,11 @@ export function greedyBestAngle(
       clone,
       cupX,
     );
-    const score = res.contacts.filter((c) => c.pop).length;
+    let score = 0;
+    for (const c of res.contacts) {
+      if (c.pop) score += 2;
+      if (c.chain) score += c.chain.length * 3;
+    }
     if (score > bestScore) {
       bestScore = score;
       best = angle;

@@ -31,7 +31,12 @@ for (const [w, h] of viewports) {
         page.on('console', (msg) => {
           if (msg.type() === 'error') errors.push(msg.text());
         });
-        await page.goto(`/?qa&screen=${screen}&freeze=1`, { timeout: 30_000 });
+        const mid = screen === 'play' || screen === 'combo' ? '&autoplay=3' : '';
+        const freeze =
+          screen === 'play' || screen === 'combo' ? '' : '&freeze=1';
+        await page.goto(`/?qa&screen=${screen}${freeze}${mid}`, {
+          timeout: 90_000,
+        });
         await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true, {
           timeout: 30_000,
         });

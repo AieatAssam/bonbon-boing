@@ -1,6 +1,9 @@
 import { tokens } from '../tokens';
 import { bonbonRadius } from './lattice';
+import { hugChainBfs } from './chain';
+import { bonbonByKey } from './bonbon-map';
 import type { Bonbon, Flavour, PipState } from './types';
+export type { PipState };
 import { makeRng } from './rng';
 
 const P = tokens.physics;
@@ -21,9 +24,11 @@ export interface ContactEvent {
   sameColour: boolean;
   tickle: boolean;
   pop: boolean;
+  chain?: Bonbon[];
   t: number;
   x: number;
   y: number;
+  speed: number;
 }
 
 export interface ShotResult {
@@ -31,10 +36,35 @@ export interface ShotResult {
   ended: 'sea' | 'cup' | 'timeout' | 'stuck';
   path: Array<{ x: number; y: number }>;
   final: PipState;
+  wallBounces: number;
 }
 
-function restitution(type: Bonbon['type']): number {
+function restitution(type: Bonbon['type'], marshmallowHold = false): number {
+  if (marshmallowHold) return 0.15;
   return P.restitution[type] ?? P.restitution.plush;
+}
+
+function shrinkTickle(b: Bonbon): void {
+  b.puffs -= 1;
+  if (b.size === 's3') b.size = 's2';
+  else if (b.size === 's2') b.size = 's1';
+  if (b.puffs <= 0 || b.size === 's1' && b.puffs <= 0) {
+    b.popped = true;
+  }
+}
+
+function sweetPopChain(
+  hit: Bonbon,
+  coat: Flavour,
+  _bonbons: Bonbon[],
+  byKey: Map<string, Bonbon>,
+): Bonbon[] {
+  hit.popped = true;
+  const chain = hugChainBfs(hit, byKey, coat);
+  for (const b of chain) {
+    if (b.id !== hit.id && !b.popped) b.popped = true;
+  }
+  return chain;
 }
 
 function integrateShot(
@@ -57,14 +87,18 @@ function integrateShot(
   };
   const contacts: ContactEvent[] = [];
   const path: Array<{ x: number; y: number }> = [];
-  const alive = bonbons.filter((b) => !b.popped);
+  const alive = () => bonbons.filter((b) => !b.popped);
   const dt = P.fixedDt;
   let t = 0;
-  let wallBounced = false;
+  let wallBounces = 0;
+  let marshmallowUntil = 0;
   const maxT = P.maxShotMs / 1000;
 
   for (let step = 0; step < maxSteps && t < maxT; step++) {
     if (step % 4 === 0) path.push({ x: pip.x, y: pip.y });
+    if (t < marshmallowUntil) {
+      /* slow sink */
+    }
     pip.vy += P.gravityU * dt;
     const drag = 1 - P.airDragPerS * dt;
     pip.vx *= drag;
@@ -81,7 +115,7 @@ function integrateShot(
     if (pip.x - pip.radius < W.leftX) {
       pip.x = W.leftX + pip.radius;
       pip.vx = -pip.vx * P.restitution.wall;
-      wallBounced = true;
+      wallBounces += 1;
       if (!previewOnly)
         contacts.push({
           kind: 'wall',
@@ -91,12 +125,13 @@ function integrateShot(
           t,
           x: pip.x,
           y: pip.y,
+          speed,
         });
     }
     if (pip.x + pip.radius > W.rightX) {
       pip.x = W.rightX - pip.radius;
       pip.vx = -pip.vx * P.restitution.wall;
-      wallBounced = true;
+      wallBounces += 1;
       if (!previewOnly)
         contacts.push({
           kind: 'wall',
@@ -106,12 +141,13 @@ function integrateShot(
           t,
           x: pip.x,
           y: pip.y,
+          speed,
         });
     }
 
     let hit: Bonbon | undefined;
     let hitD = Infinity;
-    for (const b of alive) {
+    for (const b of alive()) {
       const r = bonbonRadius(b.size);
       const d = Math.hypot(b.x - pip.x, b.y - pip.y);
       if (d < r + pip.radius && d < hitD) {
@@ -119,27 +155,61 @@ function integrateShot(
         hit = b;
       }
     }
-    if (hit) {
+    if (hit && hitD > 0.001) {
       const same = hit.flavour === pip.coat;
-      const tickle = !same;
       let pop = same;
-      if (tickle && hit.puffs <= 1 && hit.size === 's1') pop = true;
-      const e = restitution(hit.type);
+      const tickle = !same;
+      if (tickle && hit.size === 's1' && hit.puffs <= 1) pop = true;
+      const hold = hit.type === 'marshmallow';
+      const e = restitution(
+        hit.type === 'bubble' ? 'plush' : hit.type,
+        t < marshmallowUntil,
+      );
       const nx = (pip.x - hit.x) / hitD;
       const ny = (pip.y - hit.y) / hitD;
-      const vDot = pip.vx * nx + pip.vy * ny;
+      let vDot = pip.vx * nx + pip.vy * ny;
       pip.vx = pip.vx - (1 + e) * vDot * nx;
       pip.vy = pip.vy - (1 + e) * vDot * ny;
+      if (hit.type === 'jelly') {
+        const boost = 1.12;
+        pip.vx *= boost;
+        pip.vy *= boost;
+        const sp = Math.hypot(pip.vx, pip.vy);
+        if (sp > P.maxSpeedU) {
+          const s = P.maxSpeedU / sp;
+          pip.vx *= s;
+          pip.vy *= s;
+        }
+      }
+      if (hold && !same) {
+        marshmallowUntil = t + P.marshmallowHoldMs / 1000;
+        hit.expr = 'tickled';
+      }
+      if (hit.type === 'bubble') {
+        hit.type = 'plush';
+        hit.flavour = hit.flavour;
+      }
       if (!same) pip.coat = hit.flavour;
+      let chain: Bonbon[] | undefined;
+      if (!previewOnly) {
+        const byKey = bonbonByKey(bonbons);
+        if (pop) chain = sweetPopChain(hit, pip.coat, bonbons, byKey);
+        else if (tickle) {
+          if (pop) hit.popped = true;
+          else shrinkTickle(hit);
+        }
+      }
       contacts.push({
         kind: 'bonbon',
         bonbon: hit,
         sameColour: same,
         tickle,
         pop,
+        chain,
         t,
         x: pip.x,
         y: pip.y,
+        speed: Math.hypot(pip.vx, pip.vy),
       });
       if (previewOnly) {
         return {
@@ -147,18 +217,13 @@ function integrateShot(
           ended: 'sea',
           path,
           final: { ...pip },
+          wallBounces,
         };
-      }
-      if (pop) hit.popped = true;
-      else if (tickle) {
-        hit.puffs -= 1;
-        if (hit.puffs <= 0) hit.popped = true;
-        if (hit.size === 's2') hit.size = 's1';
-        else if (hit.size === 's3') hit.size = 's2';
       }
     }
 
     if (
+      !previewOnly &&
       pip.y > tokens.layout.seaSurfaceY &&
       Math.abs(pip.x - cupX) < cupHalfW &&
       pip.y < cupY + 40
@@ -168,27 +233,30 @@ function integrateShot(
         ended: 'cup',
         path,
         final: { ...pip, active: false },
+        wallBounces,
       };
     }
     if (pip.y > tokens.layout.seaSurfaceY + 80) {
       return {
         contacts,
-        ended: 'sea',
+        ended: previewOnly ? 'sea' : 'sea',
         path,
         final: { ...pip, active: false },
+        wallBounces,
       };
     }
     t += dt;
-    void wallBounced;
   }
   return {
     contacts,
     ended: 'timeout',
     path,
     final: pip,
+    wallBounces,
   };
 }
 
+/** Mutates `bonbons` in place (callers that need a pristine field must clone first). */
 export function simulateShot(
   input: ShotInput,
   bonbons: Bonbon[],
@@ -200,7 +268,7 @@ export function simulateShot(
     cupX,
     tokens.layout.cup.halfW,
     tokens.layout.cup.y,
-    2000,
+    3000,
     false,
   );
 }
@@ -208,15 +276,16 @@ export function simulateShot(
 export function previewShot(
   input: ShotInput,
   bonbons: Bonbon[],
-  cupX: number,
+  _cupX: number,
 ): ShotResult {
+  const clone = bonbons.map((b) => ({ ...b }));
   return integrateShot(
     input,
-    bonbons,
-    cupX,
-    tokens.layout.cup.halfW,
-    tokens.layout.cup.y,
-    2000,
+    clone,
+    0,
+    0,
+    0,
+    3000,
     true,
   );
 }
@@ -229,3 +298,5 @@ export function cupXAtTime(seed: string, tSec: number): number {
   const amp = (driftMaxX - driftMinX) / 2;
   return mid + amp * Math.sin((tSec / periodS) * Math.PI * 2 + phase);
 }
+
+export { integrateShot as stepShotForTests };

@@ -1,6 +1,7 @@
 import { tokens } from '../tokens';
 import { computeLayout } from '../render/scene';
-import type { Settings } from '../store';
+import type { Settings, StoreData } from '../store';
+import type { GameWorld } from '../game/world';
 
 const FLAVOURS = [
   'berry',
@@ -20,7 +21,8 @@ export type Screen =
   | 'gallery'
   | 'settings'
   | 'book'
-  | 'trail';
+  | 'trail'
+  | 'credits';
 
 export function applyUiScale(layout = computeLayout(innerWidth, innerHeight)): number {
   let s = layout.uiScale;
@@ -96,6 +98,9 @@ export function renderPlayHud(
   score: number,
   best: number,
   combo?: number,
+  stage = 1,
+  shots = 0,
+  _next?: string,
 ): void {
   const L = computeLayout(innerWidth, innerHeight);
   const top = 10;
@@ -110,7 +115,9 @@ export function renderPlayHud(
       </div>
       <div class="ui ui-abs" style="right:${Math.max(12, innerWidth - L.fx - L.fw - sw)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px;align-items:flex-end">
         <button class="btn icon tertiary ui" aria-label="Sound" data-action="mute"></button>
-        <div class="chip ui">STAGE <span class="num">1</span></div>
+        <button class="ui btn tertiary" style="height:44px;font-size:16px" data-action="swap">⇄ Swap</button>
+        <div class="chip ui">STAGE <span class="num">${stage}</span></div>
+        <div class="chip ui">SHOT <span class="num">${shots}</span></div>
       </div>`;
   } else {
     const fs = innerWidth < 375 ? 34 : 40;
@@ -120,7 +127,7 @@ export function renderPlayHud(
         <div class="disp sticker num ui" style="font-size:${fs}px;line-height:1.05">${score.toLocaleString()}</div>
         <div class="chip ui" style="display:inline-flex;margin-top:3px;font-size:11px;padding:3px 10px">★ BEST <span class="num">${best.toLocaleString()}</span></div>
       </div>
-      <button class="ui ui-abs btn icon tertiary" style="right:12px;top:${top}px" aria-label="Sound" data-action="mute"></button>`;
+      <button class="ui ui-abs btn tertiary" style="right:12px;top:${top + 2}px;height:40px;padding:0 14px;font-size:14px" data-action="swap">⇄</button>`;
   }
   applyUiScale(L);
 }
@@ -129,7 +136,13 @@ export function renderResultsHud(
   root: HTMLElement,
   score: number,
   newBest: boolean,
+  world?: GameWorld,
 ): void {
+  const pops = world
+    ? Object.values(world.popCounts).reduce((a, b) => a + (b ?? 0), 0)
+    : 0;
+  const hug = world?.bestHug ?? 0;
+  const cat = world?.catches ?? 0;
   const L = computeLayout(innerWidth, innerHeight);
   const vw = innerWidth;
   const vh = innerHeight;
@@ -137,9 +150,9 @@ export function renderResultsHud(
   const compact = vh < 700;
   const stats = `<div style="display:flex;gap:8px;justify-content:space-between">
     ${[
-      ['Pops', '184'],
-      ['Best hug', '×9'],
-      ['Catches', '6'],
+      ['Pops', String(pops)],
+      ['Best hug', `×${hug}`],
+      ['Catches', String(cat)],
     ]
       .map(
         ([k, v]) =>
@@ -186,7 +199,7 @@ export function renderResultsHud(
 
 export function renderGalleryHud(root: HTMLElement): void {
   root.innerHTML = `<div class="ui ui-abs chip" style="left:12px;top:12px" data-action="title">← Gallery</div>
-    <motion-title class="ui ui-abs disp sticker" style="left:50%;transform:translateX(-50%);top:12px;font-size:28px">Bonbon cast</motion-title>`;
+    <div class="ui ui-abs disp sticker" style="left:50%;transform:translateX(-50%);top:12px;font-size:28px">Bonbon cast</div>`;
   applyUiScale();
 }
 
@@ -198,6 +211,72 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
     <label class="ui" style="display:block;margin:8px 0"><input type="checkbox" data-setting="shake" ${s.shake ? 'checked' : ''}/> Screen shake</label>
     <label class="ui" style="display:block;margin:8px 0"><input type="checkbox" data-setting="colorAssist" ${s.colorAssist ? 'checked' : ''}/> Colour assist</label>
     <button class="btn primary ui" style="width:100%;height:52px;margin-top:12px" data-action="title">Done</button>
+  </div>`;
+  applyUiScale();
+}
+
+export function renderTip(root: HTMLElement, text: string): void {
+  root.insertAdjacentHTML(
+    'beforeend',
+    `<div class="ui ui-abs panel" style="left:50%;bottom:18%;transform:translateX(-50%);padding:12px 18px;font-weight:800;max-width:90vw;text-align:center">${text}</div>`,
+  );
+  applyUiScale();
+}
+
+export function renderSugarRushHud(root: HTMLElement): void {
+  root.insertAdjacentHTML(
+    'beforeend',
+    `<div class="ui ui-abs" style="inset:0;background:rgba(142,107,255,.35)"></div>
+    <div class="ui ui-abs panel" style="left:50%;top:50%;transform:translate(-50%,-50%);padding:24px;width:min(340px,90vw);text-align:center">
+      <div class="disp" style="font-size:28px">Sugar Rush?</div>
+      <p style="margin:12px 0">Pop the top 2 rows and keep playing!</p>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button class="btn primary ui" data-action="sugar-yes">Yes!</button>
+        <button class="btn tertiary ui" data-action="sugar-no">Nah</button>
+      </div>
+    </div>`,
+  );
+}
+
+export function renderBookHud(root: HTMLElement, store: StoreData): void {
+  const flavours = ['berry', 'mint', 'lemon', 'blueberry', 'peach', 'grape'];
+  const cards = flavours
+    .map(
+      (f) =>
+        `<div class="ui chip" style="margin:6px">${f} · ${store.book[f] ?? 0} pops</div>`,
+    )
+    .join('');
+  root.innerHTML = `<div class="ui ui-abs panel" style="left:50%;top:50%;transform:translate(-50%,-50%);padding:20px;width:min(400px,92vw);max-height:80vh;overflow:auto">
+    <div class="disp" style="font-size:28px;margin-bottom:12px">Bonbon Book</div>${cards}
+    <button class="btn primary ui" style="width:100%;height:48px;margin-top:16px" data-action="title">Back</button>
+  </div>`;
+  applyUiScale();
+}
+
+export function renderCreditsHud(root: HTMLElement): void {
+  root.innerHTML = `<div class="ui ui-abs panel" style="left:50%;top:50%;transform:translate(-50%,-50%);padding:20px;width:min(420px,92vw);max-height:85vh;overflow:auto;font-size:14px;line-height:1.45">
+    <div class="disp" style="font-size:26px">Credits</div>
+    <p>Audio: Kenney, Freesound CC0, mintodog, Ruskerdax — see CREDITS.md</p>
+    <p>Fonts: Fredoka & Nunito (OFL)</p>
+    <p><strong>No-affiliation:</strong> Bonbon Boing! is independent and not affiliated with PopCap/EA, Taito, Aladdin X, Disney, SEGA, Nintendo/HAL, Jazwares, or Mediatonic.</p>
+    <button class="btn primary ui" style="width:100%;height:48px;margin-top:12px" data-action="title">Back</button>
+  </div>`;
+  applyUiScale();
+}
+
+export function renderTrailHud(root: HTMLElement, _store: StoreData): void {
+  const levels = Array.from({ length: 30 }, (_, i) => i + 1);
+  const grid = levels
+    .map(
+      (n) =>
+        `<button class="ui btn tertiary" style="width:48px;height:48px;margin:4px" data-action="trail-pick" data-level="${n}">${n}</button>`,
+    )
+    .join('');
+  root.innerHTML = `<div class="ui ui-abs panel" style="left:50%;top:50%;transform:translate(-50%,-50%);padding:18px;width:min(380px,94vw)">
+    <div class="disp" style="font-size:26px">Sweet Trail</div>
+    <div class="ui" style="display:flex;flex-wrap:wrap;justify-content:center;margin:12px 0">${grid}</div>
+    <button class="btn primary ui" data-action="trail-start" style="width:100%;height:52px">Level 1</button>
+    <button class="btn tertiary ui" data-action="title" style="width:100%;height:44px;margin-top:8px">Back</button>
   </div>`;
   applyUiScale();
 }
