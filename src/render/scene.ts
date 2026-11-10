@@ -7,7 +7,7 @@ import {
 } from './layout-mockup';
 
 export { milkBandMaxPx, mockupPuffCyPx } from './layout-mockup';
-import { drawBonbon } from './bonbon';
+import { bonbonVisualAnchor, drawBonbon } from './bonbon';
 import { bonbonRadius } from '../sim/lattice';
 import type { Bonbon, Flavour, Expression } from '../sim/types';
 
@@ -478,15 +478,16 @@ export function swapBadgeScreenRect(
   vh: number,
 ): { left: number; top: number; size: number } {
   const p = nextPreviewLayout(vw, vh);
-  const size = Math.max(38, Math.min(44, p.r * 0.92));
-  let left = p.cx + p.r + 6;
-  if (left + size > vw - 6) left = p.cx - p.r - size - 6;
-  left = Math.max(8, Math.min(vw - size - 6, left));
-  return {
-    left,
-    top: Math.max(10, p.cy - p.r - size * 0.85),
-    size,
-  };
+  const size = Math.max(36, Math.min(44, p.r * 0.92));
+  const half = p.card ? (p.r * 2.2) / 2 : p.r;
+  let left = p.cx + half + 5;
+  let top = p.card ? p.cy - size / 2 : p.cy - half - size - 4;
+  if (left + size > vw - 6) {
+    left = p.cx - half - size - 5;
+  }
+  left = Math.max(6, Math.min(vw - size - 6, left));
+  top = Math.max(6, Math.min(vh - size - 6, top));
+  return { left, top, size };
 }
 
 function roundRectScreen(
@@ -510,6 +511,13 @@ function roundRectScreen(
   ctx.closePath();
 }
 
+function fieldCanvasDpr(): number {
+  if (typeof document === 'undefined') return 2;
+  const c = document.getElementById('field') as HTMLCanvasElement | null;
+  if (c?.width && c.clientWidth) return c.width / c.clientWidth;
+  return Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, 2);
+}
+
 /** Next preview in CSS pixel space — disc/card + bonbon share one centre. */
 export function drawNextPreviewScreen(
   ctx: CanvasRenderingContext2D,
@@ -518,11 +526,15 @@ export function drawNextPreviewScreen(
 ): void {
   const vw = typeof window !== 'undefined' ? innerWidth : 390;
   const vh = typeof window !== 'undefined' ? innerHeight : 844;
+  const dpr = fieldCanvasDpr();
   const { cx, cy, r, card } = nextPreviewLayout(vw, vh);
   const bonW = 2 * r * 0.7;
-  // drawBonbon foot lands at (ox + w/2, oy + w*0.94); body centroid ≈ (ox + w/2, oy + w*0.5).
-  const anchorY = cy - bonW * 0.5;
+  const { dx, dy } = bonbonVisualAnchor(coat, bonW, { expr: 'idle', shadow: false });
+  const ox = cx - dx;
+  const oy = cy - dy;
   ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.filter = 'none';
   if (card) {
     const side = r * 2.2;
     roundRectScreen(ctx, cx - side / 2, cy - side / 2, side, side, r * 0.52);
@@ -546,7 +558,7 @@ export function drawNextPreviewScreen(
     ctx.arc(cx, cy, Math.max(1, r - 2), 0, Math.PI * 2);
     ctx.clip();
   }
-  drawBonbon(ctx, cx - bonW / 2, anchorY, {
+  drawBonbon(ctx, ox, oy, {
     flavour: coat,
     w: bonW,
     expr: 'idle',

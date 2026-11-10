@@ -81,7 +81,7 @@ function sampleNextPreviewPixels(vw: number, vh: number): boolean {
       if (pixelLooksBonbon(d)) colourAtCore = true;
     }
   }
-  const padFrac = p.card ? 0.38 : 0.2;
+  const padFrac = p.card ? 0.48 : 0.78;
   const dTop = ctx.getImageData(cx, cy - Math.round(rPx * padFrac), 1, 1).data;
   const whitePad =
     dTop[0] > 232 && dTop[1] > 232 && dTop[2] > 232 && dTop[3] > 200;

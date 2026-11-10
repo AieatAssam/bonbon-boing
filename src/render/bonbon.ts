@@ -533,3 +533,70 @@ export function drawBonbon(
 
   ctx.restore();
 }
+
+const visualAnchorCache = new Map<string, { dx: number; dy: number }>();
+
+/** Alpha bbox centre of drawBonbon(ox, oy) relative to (ox, oy). Cached per flavour and width. */
+export function bonbonVisualAnchor(
+  coat: Flavour,
+  w: number,
+  o: Pick<DrawBonbonOpts, 'expr' | 'shadow' | 'pip' | 'type'> = {},
+): { dx: number; dy: number } {
+  const key = `${coat}:${Math.round(w * 100)}:${o.expr ?? 'idle'}:${o.shadow === false ? 0 : 1}`;
+  const hit = visualAnchorCache.get(key);
+  if (hit) return hit;
+
+  if (typeof document === 'undefined') {
+    return { dx: w / 2, dy: w * 0.5 };
+  }
+
+  const ox = w;
+  const oy = w;
+  const S = Math.ceil(w * 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { dx: w / 2, dy: w * 0.5 };
+
+  ctx.clearRect(0, 0, S, S);
+  ctx.filter = 'none';
+  drawBonbon(ctx, ox, oy, {
+    flavour: coat,
+    w,
+    expr: o.expr ?? 'idle',
+    shadow: o.shadow ?? false,
+    type: o.type,
+    pip: o.pip,
+  });
+
+  const img = ctx.getImageData(0, 0, S, S).data;
+  let minX = S;
+  let minY = S;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const a = img[(y * S + x) * 4 + 3];
+      if (a > 16) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  const fallback = { dx: w / 2, dy: w * 0.5 };
+  if (maxX < minX) {
+    visualAnchorCache.set(key, fallback);
+    return fallback;
+  }
+
+  const anchor = {
+    dx: (minX + maxX) / 2 - ox,
+    dy: (minY + maxY) / 2 - oy,
+  };
+  visualAnchorCache.set(key, anchor);
+  return anchor;
+}
