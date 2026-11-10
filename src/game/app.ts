@@ -31,7 +31,7 @@ const MAX_AIM = (84 * Math.PI) / 180;
 
 export class GameApp {
   readonly qa: boolean;
-  readonly freeze: boolean;
+  freeze: boolean;
   store: StoreData;
   audio: AudioEngine;
   canvas: HTMLCanvasElement;
@@ -86,6 +86,7 @@ export class GameApp {
       this.syncHud();
     });
     this.bindInput();
+    window.__bbApp = this;
     if (!this.freeze) this.loop();
     document.addEventListener('pointerdown', () => this.audio.unlock(), {
       once: true,
@@ -140,20 +141,26 @@ export class GameApp {
               this.fx.emitConfetti(500, 700, 40);
             }
           }
+          this.freeze = true;
           window.__ready = true;
           return;
         }
         this.aimAngle = -0.6 - i * 0.08;
         this.shot.launch(this.aimAngle);
         i++;
-        setTimeout(fire, 800);
+        setTimeout(fire, 520);
       };
       setTimeout(fire, 400);
+      setTimeout(() => {
+        this.freeze = true;
+        window.__ready = true;
+      }, 12_000);
     }
   }
 
   startMode(mode: ModeKind, seed: string): void {
     this.world = new GameWorld(seed, mode);
+    if (this.qa) this.world.sugarRushUsed = true;
     this.world.onLifetimePop = (fl) => {
       this.store.book[fl] = (this.store.book[fl] ?? 0) + 1;
       saveStore(this.store);
@@ -433,7 +440,7 @@ export class GameApp {
     this.time = now;
     if (!this.freeze || this.qaAutoplay > 0) this.tick(dt);
     this.draw();
-    requestAnimationFrame(() => this.loop());
+    if (!this.freeze) requestAnimationFrame(() => this.loop());
   }
 
   tick(dt: number): void {

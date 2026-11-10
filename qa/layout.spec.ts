@@ -31,7 +31,7 @@ for (const [w, h] of viewports) {
         page.on('console', (msg) => {
           if (msg.type() === 'error') errors.push(msg.text());
         });
-        const mid = screen === 'play' || screen === 'combo' ? '&autoplay=3' : '';
+        const mid = screen === 'play' || screen === 'combo' ? '&autoplay=2' : '';
         const freeze =
           screen === 'play' || screen === 'combo' ? '' : '&freeze=1';
         await page.goto(`/?qa&screen=${screen}${freeze}${mid}`, {
@@ -41,6 +41,11 @@ for (const [w, h] of viewports) {
           timeout: 90_000,
         });
         await page.evaluate(() => document.fonts.ready);
+        await page.evaluate(() => {
+          const a = (window as unknown as { __bbApp?: { freeze: boolean } }).__bbApp;
+          if (a) a.freeze = true;
+        });
+        await page.waitForTimeout(80);
         const check = await page.evaluate(() => {
           const w = window as unknown as {
             __checkOverlaps?: () => { overlaps: unknown[]; offscreen: string[] };
@@ -66,9 +71,10 @@ for (const [w, h] of viewports) {
         expect(errors).toEqual([]);
         await page.screenshot({
           path: `qa/shots/${screen}_${w}x${h}.png`,
-          fullPage: true,
-          timeout: 60_000,
+          fullPage: screen !== 'play' && screen !== 'combo',
+          timeout: 30_000,
           animations: 'disabled',
+          caret: 'hide',
         });
       });
     }

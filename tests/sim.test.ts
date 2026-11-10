@@ -21,6 +21,25 @@ describe('rng', () => {
   });
 });
 
+describe('simulateShot', () => {
+  it('mutates bonbon array in place (for balance harness)', () => {
+    const { bonbons } = initialField('mut-1', 5);
+    const field = bonbons.map((b) => ({ ...b }));
+    const coat = field[0].flavour;
+    simulateShot(
+      {
+        angleRad: (-15 * Math.PI) / 180,
+        coat,
+        spawnX: 500,
+        spawnY: 235,
+      },
+      field,
+      400,
+    );
+    expect(field.some((b) => b.popped)).toBe(true);
+  });
+});
+
 describe('preview equals shot until first contact', () => {
   it('matches first bonbon contact', () => {
     const { bonbons } = initialField('prev-1', 5);
