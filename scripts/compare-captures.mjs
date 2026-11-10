@@ -4,16 +4,18 @@ import { execSync } from 'node:child_process';
 
 mkdirSync('/opt/cursor/artifacts', { recursive: true });
 
-const sizes = [
+const playSizes = [
   ['390', '844'],
   ['360', '640'],
+  ['430', '932'],
   ['844', '390'],
+  ['1280', '800'],
 ];
 
 const browser = await chromium.launch();
 const base = 'http://127.0.0.1:4173/bonbon-boing/';
 
-for (const [w, h] of sizes) {
+async function capPlay(w, h) {
   const page = await browser.newPage({ viewport: { width: +w, height: +h } });
   await page.goto(`${base}?qa&screen=play&aim=1`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__ready === true, { timeout: 45_000 });
@@ -36,6 +38,31 @@ for (const [w, h] of sizes) {
   }
   await page.close();
 }
+
+async function capCombo(w, h) {
+  const page = await browser.newPage({ viewport: { width: +w, height: +h } });
+  await page.goto(`${base}?qa&screen=combo&autoplay=2&aim=1`, {
+    waitUntil: 'networkidle',
+  });
+  await page.waitForFunction(() => window.__ready === true, { timeout: 60_000 });
+  await page.evaluate(() => {
+    const a = window.__bbApp;
+    if (a) {
+      a.freeze = true;
+      a.draw();
+    }
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({
+    path: `/opt/cursor/artifacts/combo-mid-${w}x${h}.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.close();
+}
+
+for (const [w, h] of playSizes) await capPlay(w, h);
+await capCombo('390', '844');
 
 await browser.close();
 console.log('Compare captures written to /opt/cursor/artifacts/compare-play-*.png');

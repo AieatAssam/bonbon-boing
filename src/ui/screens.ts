@@ -2,6 +2,7 @@ import { tokens } from '../tokens';
 import { computeLayout } from '../render/scene';
 import type { Settings, StoreData } from '../store';
 import type { GameWorld } from '../game/world';
+import type { Flavour } from '../sim/types';
 
 const FLAVOURS = [
   'berry',
@@ -96,39 +97,56 @@ export function renderTitleHud(root: HTMLElement, best: number): void {
 const ICON_PAUSE = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/><rect x="14" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/></svg>`;
 const ICON_SOUND = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z" fill="#3A1F4D" stroke="#3A1F4D" stroke-width="1.5"/><path d="M16 8.5a5 5 0 010 7" stroke="#3A1F4D" stroke-width="2" stroke-linecap="round"/></svg>`;
 
+function flavourDot(fl: Flavour, px: number): string {
+  const c = tokens.color.flavour[fl];
+  return `<span class="ui" style="display:inline-block;width:${px}px;height:${px}px;border-radius:50%;background:linear-gradient(${c.light},${c.base});border:3px solid ${c.outline}"></span>`;
+}
+
+const SWAP_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l-4 4 4 4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M15 18l4-4-4-4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M5 10h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M19 14H10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+
 export function renderPlayHud(
   root: HTMLElement,
   score: number,
   best: number,
   combo?: number,
-  stage = 1,
-  shots = 0,
-  _next?: string,
+  _stage = 1,
+  _shots = 0,
+  nextCoat: Flavour = 'mint',
+  world?: GameWorld,
 ): void {
   const L = computeLayout(innerWidth, innerHeight);
   const top = Math.max(10, L.hudH * 0.14);
+  const riseIn = world?.shotsUntilRise() ?? 1;
+  const catches = world?.catches ?? 0;
   if (L.landscape) {
     const sw = L.sideW;
+    const lx = Math.max(12, (L.fx - sw) / 2);
+    const rx = Math.max(12, innerWidth - L.fx - L.fw - sw);
     root.innerHTML = `
-      <div class="ui ui-abs" style="left:${Math.max(12, (L.fx - sw) / 2)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px">
+      <div class="ui ui-abs" style="left:${lx}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:10px;align-items:stretch">
         <button class="btn icon gloss ui" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
-        <div class="ui"><div class="label">Score</div><div class="disp sticker num" style="font-size:40px;line-height:1">${score.toLocaleString()}</div></div>
-        <div class="chip ui">★ BEST <span class="num">${best.toLocaleString()}</span></div>
-        ${combo ? `<div class="chip ui" style="background:#FFE36B">CHAIN ×${combo}</div>` : ''}
+        <div class="label ui" style="margin-top:4px">Score</div>
+        <div class="disp score-sticker num ui" style="font-size:44px;line-height:1;text-align:center">${score.toLocaleString()}</div>
+        <div class="chip best-chip ui" style="justify-content:center"><span class="best-star">★</span> BEST <span class="num">${best.toLocaleString()}</span></div>
+        ${combo ? `<div class="chip ui" style="background:#FFE36B;justify-content:center">CHAIN ×${combo}</div>` : ''}
       </div>
-      <div class="ui ui-abs" style="right:${Math.max(12, innerWidth - L.fx - L.fw - sw)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px;align-items:flex-end">
+      <div class="ui ui-abs" style="right:${rx}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
         <button class="btn icon gloss ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
-        <button class="ui btn tertiary" style="height:44px;font-size:16px" data-action="swap">⇄ Swap</button>
-        <div class="chip ui">STAGE <span class="num">${stage}</span></div>
-        <div class="chip ui">SHOT <span class="num">${shots}</span></div>
+        <div class="panel ui" style="width:min(140px,100%);padding:10px 12px 12px;text-align:center;margin-top:6px">
+          <div class="label ui" style="font-size:10px;margin-bottom:6px">Next</div>
+          <div class="ui" style="width:76px;height:76px;margin:0 auto 10px;border-radius:22px;background:#fff;box-shadow:inset 0 0 0 3px #E8D6F8;display:flex;align-items:center;justify-content:center">${flavourDot(nextCoat, 52)}</div>
+          <button class="ui btn swap-badge" style="width:44px;height:44px;padding:0;margin:0 auto 8px;border-radius:50%" data-action="swap" aria-label="Swap colours">${SWAP_SVG}</button>
+        </div>
+        <div class="chip ui" style="width:min(140px,100%);justify-content:center">RISE IN <span class="num">${riseIn}</span></div>
+        <div class="chip ui" style="width:min(140px,100%);justify-content:center">CATCHES <span class="num">${catches}</span></div>
       </div>`;
   } else {
-    const fs = innerWidth < 375 ? 34 : 40;
+    const fs = innerWidth < 375 ? 36 : 42;
     root.innerHTML = `
       <button class="ui ui-abs btn icon gloss" style="left:12px;top:${top}px;width:58px;height:58px" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
-      <div class="ui ui-abs" data-hud="score" style="left:50%;transform:translateX(-50%);top:${top}px;max-height:${L.hudH - 6}px;text-align:center;pointer-events:none;overflow:hidden">
-        <div class="disp sticker num ui" style="font-size:${fs}px;line-height:1">${score.toLocaleString()}</div>
-        <div class="chip ui" style="display:inline-flex;margin-top:2px;font-size:11px;padding:2px 10px">★ BEST <span class="num">${best.toLocaleString()}</span></div>
+      <div class="ui ui-abs" data-hud="score" style="left:50%;transform:translateX(-50%);top:${top}px;max-height:${L.hudH - 6}px;text-align:center;pointer-events:none;overflow:visible">
+        <div class="disp score-sticker num ui" style="font-size:${fs}px;line-height:1">${score.toLocaleString()}</div>
+        <div class="chip best-chip ui" style="display:inline-flex;margin-top:3px;font-size:11px;padding:4px 12px"><span class="best-star">★</span> BEST <span class="num">${best.toLocaleString()}</span></div>
         ${combo ? `<div class="chip ui" style="display:inline-flex;margin-top:4px;font-size:11px;background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
       <button class="ui ui-abs btn icon gloss" style="right:12px;top:${top}px;width:58px;height:58px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>`;
@@ -220,11 +238,15 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
 }
 
 export function renderTip(root: HTMLElement, text: string): void {
+  const L = computeLayout(innerWidth, innerHeight);
+  const milkY =
+    L.fy + (tokens.layout.seaSurfaceY - L.viewTop) * L.scale - 6;
+  const bottom = Math.max(10, innerHeight - milkY + 12);
   root.insertAdjacentHTML(
     'beforeend',
-    `<div class="ui ui-abs panel" style="left:50%;bottom:max(108px,22vh);transform:translateX(-50%);padding:10px 16px;font-weight:800;max-width:86vw;text-align:center;font-size:15px">${text}</div>`,
+    `<div class="ui ui-abs tip-milk" style="left:50%;bottom:${bottom}px;transform:translateX(-50%)">${text}</div>`,
   );
-  applyUiScale();
+  applyUiScale(L);
 }
 
 export function renderSugarRushHud(root: HTMLElement): void {

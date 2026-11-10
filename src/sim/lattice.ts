@@ -162,12 +162,20 @@ const CAST_ROW: Flavour[][] = [
   ['lemon', 'blueberry', 'peach', 'grape', 'berry', 'mint'],
 ];
 
+/** Stack height at new game — keep bottom row above the milk band (sea ~1480u). */
+const START_ROWS = 6;
+const FIELD_CEILING_Y = tokens.layout.frostingY + PITCH * 2.15;
+const FIELD_FLOOR_Y = tokens.layout.seaSurfaceY - PITCH * 2.85;
+
 export function initialRiseField(
   seed: string,
 ): { bonbons: Bonbon[]; baseY: number } {
-  const rows = 8;
-  const targetTopY = 722;
-  const baseY = targetTopY + (rows - 1) * PITCH;
+  const rows = START_ROWS;
+  const targetTopY = FIELD_CEILING_Y;
+  const baseY = Math.min(
+    targetTopY + (rows - 1) * PITCH,
+    FIELD_FLOOR_Y,
+  );
   resetBonbonIds();
   const rng = makeRng(seed);
   const bonbons: Bonbon[] = [];
@@ -186,7 +194,7 @@ export function initialRiseField(
       map,
       all,
       2,
-      r < 2 ? 0.04 : 0.08,
+      r < 2 ? 0.1 : 0.14,
       rng,
       baseY,
     );

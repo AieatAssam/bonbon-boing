@@ -5,6 +5,7 @@ import type { Bonbon, Flavour, Expression } from '../sim/types';
 
 const W = tokens.layout;
 const C = tokens.color.world;
+const PITCH = W.lattice.rowPitch;
 
 export interface SceneDrawOpts {
   bonbons: Bonbon[];
@@ -14,6 +15,7 @@ export interface SceneDrawOpts {
   cupX: number;
   aimDots?: Array<{ x: number; y: number; a: number }>;
   comboFx?: boolean;
+  hideNextBubble?: boolean;
   warn?: boolean;
   puffMouthO?: boolean;
   puffScale?: { x: number; y: number };
@@ -68,10 +70,19 @@ export function drawField(
 
   drawMilk(ctx, o.cupX);
 
+  const cupBandTop = W.seaSurfaceY - PITCH * 0.55;
+  const playBonbons: Bonbon[] = [];
+  const milkBonbons: Bonbon[] = [];
   for (const b of o.bonbons) {
     if (b.popped) continue;
+  const r = bonbonRadius(b.size);
+    if (b.falling || b.y <= cupBandTop + r * 0.35) playBonbons.push(b);
+    else milkBonbons.push(b);
+  }
+
+  for (const b of playBonbons) {
     const r = bonbonRadius(b.size);
-    const w = r * 2.18;
+    const w = r * 2.02;
     const expr: Expression =
       b.expr ??
       (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
@@ -94,6 +105,21 @@ export function drawField(
 
   drawCup(ctx, o.cupX, W.cup.y);
 
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  for (const b of milkBonbons) {
+    const r = bonbonRadius(b.size);
+    const w = r * 1.75;
+    const drawY = (b.falling ? b.y : b.y) + r * 0.94;
+    drawBonbon(ctx, b.x, drawY, {
+      flavour: b.flavour,
+      w,
+      expr: 'sleepy',
+      type: b.type,
+    });
+  }
+  ctx.restore();
+
   const ps = o.puffScale ?? { x: 1, y: 1 };
   drawCloudBody(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, ps);
   if (o.pipInCloud !== false) {
@@ -111,7 +137,7 @@ export function drawField(
     sx: ps.x,
     sy: ps.y,
   });
-  drawNextBonbon(ctx, o.nextCoat ?? 'mint');
+  if (!o.hideNextBubble) drawNextBonbon(ctx, o.nextCoat ?? 'mint');
 
   if (o.aimDots?.length) {
     for (let i = 0; i < o.aimDots.length; i++) {
@@ -380,8 +406,8 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.arc(nb.x, nb.y, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  const innerW = r * 1.55;
-  drawBonbon(ctx, nb.x, nb.y - innerW * 0.02, {
+  const innerW = r * 1.28;
+  drawBonbon(ctx, nb.x - 1, nb.y + innerW * 0.36, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
@@ -410,6 +436,8 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
 /** Visible play slice (u): thin milk band at bottom per DESIGN-SYSTEM §6. */
 const VIEW_TOP = 275;
 const VIEW_H = 1280;
+const VIEW_TOP_L = 210;
+const VIEW_H_L = 1540;
 
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
@@ -419,19 +447,21 @@ export function computeLayout(vw: number, vh: number) {
     : 0;
   const availW = vw - sideW * 2;
   const availH = vh - hudH - (landscape ? 0 : 6);
+  const viewTop = landscape ? VIEW_TOP_L : VIEW_TOP;
+  const viewH = landscape ? VIEW_H_L : VIEW_H;
   let scale = landscape
-    ? Math.min(availW / W.worldW, availH / VIEW_H)
+    ? Math.min(availW / W.worldW, availH / viewH)
     : availW / W.worldW;
-  let fh = VIEW_H * scale;
-  if (fh > availH) scale = availH / VIEW_H;
-  fh = VIEW_H * scale;
+  let fh = viewH * scale;
+  if (fh > availH) scale = availH / viewH;
+  fh = viewH * scale;
   const fw = W.worldW * scale;
   const fx = (vw - fw) / 2;
   const fy = landscape ? (vh - fh) / 2 : hudH;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
     : Math.max(1, Math.min(1.2, vw / 430));
-  const fieldY = fy - VIEW_TOP * scale;
+  const fieldY = fy - viewTop * scale;
   return {
     landscape,
     hudH,
@@ -440,8 +470,8 @@ export function computeLayout(vw: number, vh: number) {
     fx,
     fy,
     fieldY,
-    viewTop: VIEW_TOP,
-    viewH: VIEW_H,
+    viewTop,
+    viewH,
     fw,
     fh,
     uiScale,

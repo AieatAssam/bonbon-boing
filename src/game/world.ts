@@ -87,9 +87,10 @@ export class GameWorld {
   }
 
   emptyShare(): number {
-    if (this.stage < 6) return 0.24;
-    const drop = Math.floor((this.stage - 5) / 2) * 0.02;
-    return Math.max(0.08, 0.18 - drop);
+    if (this.stage < 4) return 0.26;
+    if (this.stage < 6) return 0.22;
+    const drop = Math.floor((this.stage - 5) / 2) * 0.03;
+    return Math.max(0.1, 0.2 - drop);
   }
 
   bonbonMap(): Map<string, Bonbon> {
@@ -160,7 +161,7 @@ export class GameWorld {
       this.streakMult = 1;
     }
     this.score += this.shotScore;
-    if (this.stage < 6 && this.shots % 12 === 0) this.stage += 1;
+    if (this.stage < 6 && this.shots % 14 === 0) this.stage += 1;
     if (!caught && this.mode !== 'trail' && this.shouldRiseAfterShot()) {
       this.startRise();
     } else if (caught) {
@@ -233,18 +234,33 @@ export class GameWorld {
     return warn;
   }
 
-  shouldRiseAfterShot(): boolean {
+  wouldRiseAtShot(shots: number): boolean {
     if (this.mode !== 'rise') return true;
-    if (this.shots <= 18) return this.shots % 2 === 0;
-    if (this.shots <= 28) return this.shots % 2 === 1 || this.shots % 3 === 0;
+    if (shots <= 18) return false;
+    if (shots <= 38) return shots % 4 === 0;
+    if (shots <= 58) return shots % 3 === 0;
+    if (shots <= 80) return shots % 2 === 0;
     return true;
+  }
+
+  shouldRiseAfterShot(): boolean {
+    return this.wouldRiseAtShot(this.shots);
+  }
+
+  shotsUntilRise(): number {
+    if (this.mode !== 'rise') return 1;
+    for (let n = 1; n <= 6; n++) {
+      if (this.wouldRiseAtShot(this.shots + n)) return n;
+    }
+    return 1;
   }
 
   icingMargin(): number {
     if (this.mode !== 'rise') return FROSTING_MARGIN;
     if (this.shots < 12) return FROSTING_MARGIN + 560;
-    if (this.shots < 25) return FROSTING_MARGIN + 340;
-    if (this.shots < 40) return FROSTING_MARGIN + 180;
+    if (this.shots < 32) return FROSTING_MARGIN + 380;
+    if (this.shots < 48) return FROSTING_MARGIN + 260;
+    if (this.shots < 62) return FROSTING_MARGIN + 150;
     return FROSTING_MARGIN;
   }
 

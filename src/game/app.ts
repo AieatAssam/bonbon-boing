@@ -198,7 +198,7 @@ export class GameApp {
     if (!this.world || this.world.score === this.lastHudScore) return;
     this.lastHudScore = this.world.score;
     const el = this.uiRoot.querySelector(
-      '[data-hud="score"] .sticker',
+      '[data-hud="score"] .score-sticker',
     ) as HTMLElement | null;
     if (el) el.textContent = this.world.score.toLocaleString();
   }
@@ -235,6 +235,15 @@ export class GameApp {
 
   private onShotDone(caught: boolean): void {
     if (!this.world) return;
+    if (this.world.shots >= 1 && this.toast.includes('Drag to aim')) {
+      this.toast = '';
+      this.toastT = 0;
+      if (!this.store.tipsSeen.includes('aim')) {
+        this.store.tipsSeen.push('aim');
+        saveStore(this.store);
+      }
+      this.syncHud();
+    }
     if (this.world.mode === 'rise') {
       if (this.world.gameOver && !this.world.sugarRushUsed) {
         this.world.sugarRushOffered = true;
@@ -351,8 +360,17 @@ export class GameApp {
           this.world.stage,
           this.world.shots,
           this.world.nextCoat,
+          this.world,
         );
-        if (this.toastT > 0) renderTip(this.uiRoot, this.toast);
+        const tipLayout = computeLayout(innerWidth, innerHeight);
+        if (
+          this.toastT > 0 &&
+          this.world.shots === 0 &&
+          !tipLayout.landscape &&
+          this.toast.includes('Drag to aim')
+        ) {
+          renderTip(this.uiRoot, this.toast);
+        }
       }
     } else if (this.screen === 'results' && this.world) {
       renderResultsHud(
@@ -402,7 +420,10 @@ export class GameApp {
       this.pipSquash = { x: 0.72, y: 1.39 };
       this.audio.playLaunch();
       this.shot.launch(this.aimAngle);
-      if (!this.store.tipsSeen.includes('colour')) {
+      if (
+        this.store.tipsSeen.includes('aim') &&
+        !this.store.tipsSeen.includes('colour')
+      ) {
         this.store.tipsSeen.push('colour');
         this.toast = 'Bump friends to borrow colour!';
         this.toastT = 5;
@@ -572,6 +593,7 @@ export class GameApp {
       puffMouthO: this.aiming,
       puffScale: this.puffScale,
       aiming: this.aiming,
+      hideNextBubble: L.landscape,
     });
     ctx.save();
     ctx.translate(L.fx, fieldY);

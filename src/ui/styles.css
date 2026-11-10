@@ -57,15 +57,53 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.sticker {
+.sticker,
+.score-sticker {
   color: #fff;
+  -webkit-text-fill-color: #fff;
   paint-order: stroke fill;
-  -webkit-text-stroke: 0.14em var(--bb-color-ui-ink);
-  text-shadow:
-    0.06em 0 0 #fff,
-    -0.06em 0 0 #fff,
-    0 0.06em 0 #fff,
-    0 -0.06em 0 #fff;
+  -webkit-text-stroke: 0.11em var(--bb-color-ui-ink);
+  filter: drop-shadow(0 5px 0 rgba(58, 31, 77, 0.28))
+    drop-shadow(0 2px 10px rgba(58, 31, 77, 0.12));
+}
+
+.best-chip {
+  background: var(--bb-color-ui-paper);
+  color: var(--bb-color-ui-ink);
+  box-shadow:
+    0 4px 0 var(--bb-color-ui-paper-shade),
+    0 6px 16px rgba(58, 31, 77, 0.1);
+}
+
+.best-star {
+  color: var(--bb-color-ui-ink);
+  font-size: 1.05em;
+}
+
+.tip-milk {
+  background: #fff;
+  color: var(--bb-color-ui-ink);
+  border-radius: 16px;
+  padding: 10px 16px;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: nowrap;
+  max-width: min(92vw, 360px);
+  text-align: center;
+  box-shadow:
+    0 4px 0 #e0cae8,
+    0 10px 24px rgba(58, 31, 77, 0.18);
+}
+
+.btn.swap-badge {
+  background: linear-gradient(180deg, #ff6fb5, #ff3f8a);
+  color: #fff;
+  border: none;
+  box-shadow: 0 3px 0 #cc1f5f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .label {

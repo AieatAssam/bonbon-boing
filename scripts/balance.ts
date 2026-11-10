@@ -6,8 +6,9 @@ import { GameWorld } from '../src/game/world';
 import { cupXAtTime, simulateShot } from '../src/sim/shot';
 import { greedyBestAngle } from '../src/sim/bot';
 import type { Flavour } from '../src/sim/types';
+import { tokens } from '../src/tokens';
 
-const SPAWN = { x: 500, y: 235 };
+const SPAWN = tokens.layout.pipSpawn;
 
 function median(nums: number[]): number {
   const s = [...nums].sort((a, b) => a - b);
