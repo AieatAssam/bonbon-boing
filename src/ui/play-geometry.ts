@@ -4,6 +4,7 @@ import {
   MILK_BAND_U,
   computeLayout,
   cupScreenRect,
+  nextPreviewLayout,
   puffScreenRect,
 } from '../render/scene';
 import { cupXAtTime } from '../sim/shot';
@@ -13,7 +14,6 @@ import {
   mockupPuffCyPx,
 } from '../render/layout-mockup';
 import type { GameApp } from '../game/app';
-import { paintBonbonPreview } from '../render/preview';
 
 const W = tokens.layout;
 const PITCH = W.lattice.rowPitch;
@@ -61,59 +61,31 @@ function pixelLooksBonbon(d: Uint8ClampedArray): boolean {
   return chroma > 22 && !white;
 }
 
-function scanColour(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  ox: number,
-  oy: number,
-  rw: number,
-  rh: number,
-): boolean {
-  const step = Math.max(4, Math.floor(Math.min(rw, rh) / 14));
-  for (let y = oy; y < oy + rh; y += step) {
-    for (let x = ox; x < ox + rw; x += step) {
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
-      if (pixelLooksBonbon(ctx.getImageData(x, y, 1, 1).data)) return true;
-    }
-  }
-  return false;
-}
-
-function sampleBubbleHasColour(
-  L: ReturnType<typeof computeLayout>,
-  landscape: boolean,
-): boolean {
-  if (landscape) {
-    const prev = document.querySelector(
-      '#next-preview',
-    ) as HTMLCanvasElement | null;
-    if (!prev) return false;
-    const app = (window as unknown as { __bbApp?: GameApp }).__bbApp;
-    if (app?.world) paintBonbonPreview(prev, app.world.nextCoat, 58);
-    const ctx = prev.getContext('2d');
-    if (!ctx || !prev.width) return false;
-    const pad = Math.floor(prev.width * 0.12);
-    return scanColour(ctx, prev.width, prev.height, pad, pad, prev.width - pad * 2, prev.height - pad * 2);
-  }
+/** Bonbon at disc centre and white rim on the same canvas layer. */
+function sampleNextPreviewPixels(vw: number, vh: number): boolean {
   const canvas = document.getElementById('field') as HTMLCanvasElement | null;
   if (!canvas) return false;
   const ctx = canvas.getContext('2d');
   if (!ctx) return false;
-  const nb = W.nextBubblePortrait;
+  const p = nextPreviewLayout(vw, vh);
   const dpr = canvasDpr();
-  const cx = (L.fx + nb.x * L.scale) * dpr;
-  const cy = (L.fieldY + L.nextWorldY * L.scale) * dpr;
-  const r = nb.r * L.scale * dpr;
-  return scanColour(
-    ctx,
-    canvas.width,
-    canvas.height,
-    Math.floor(cx - r * 0.92),
-    Math.floor(cy - r * 0.92),
-    Math.floor(r * 1.84),
-    Math.floor(r * 1.84),
-  );
+  const cx = Math.round(p.cx * dpr);
+  const cy = Math.round(p.cy * dpr);
+  const rPx = Math.round(p.r * dpr);
+  const innerR = Math.round(rPx * 0.62);
+  let colourAtCore = false;
+  for (let dy = -innerR; dy <= innerR; dy += Math.max(2, Math.floor(innerR / 4))) {
+    for (let dx = -innerR; dx <= innerR; dx += Math.max(2, Math.floor(innerR / 4))) {
+      if (dx * dx + dy * dy > innerR * innerR) continue;
+      const d = ctx.getImageData(cx + dx, cy + dy, 1, 1).data;
+      if (pixelLooksBonbon(d)) colourAtCore = true;
+    }
+  }
+  const padFrac = p.card ? 0.38 : 0.2;
+  const dTop = ctx.getImageData(cx, cy - Math.round(rPx * padFrac), 1, 1).data;
+  const whitePad =
+    dTop[0] > 232 && dTop[1] > 232 && dTop[2] > 232 && dTop[3] > 200;
+  return colourAtCore && whitePad;
 }
 
 export function checkPlayGeometry(app: GameApp): string[] {
@@ -155,15 +127,13 @@ export function checkPlayGeometry(app: GameApp): string[] {
   }
 
   if (!L.landscape) {
-    const nb = W.nextBubblePortrait;
-    const ncx = fx + nb.x * sc;
-    const nr = nb.r * sc;
-    if (ncx + nr > rightWall - 3) v.push('next:right-wall');
-    if (ncx + nr > vw - 2) v.push('next:offscreen');
-    if (ncx - nr < leftWall + 3) v.push('next:left-wall');
+    const prev = nextPreviewLayout(vw, vh);
+    if (prev.cx + prev.r > rightWall - 3) v.push('next:right-wall');
+    if (prev.cx + prev.r > vw - 2) v.push('next:offscreen');
+    if (prev.cx - prev.r < leftWall + 3) v.push('next:left-wall');
   }
 
-  if (!sampleBubbleHasColour(L, L.landscape)) v.push('next:empty-bubble');
+  if (!sampleNextPreviewPixels(vw, vh)) v.push('next:empty-bubble');
 
   const tip = document.querySelector('.tip-tutorial');
   if (tip && world.shots === 0) {

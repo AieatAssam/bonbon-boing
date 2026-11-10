@@ -427,28 +427,128 @@ function drawCloudFace(
   ctx.restore();
 }
 
-/** Next preview in CSS pixel space (same transform as sky/field overlay). */
+export type NextPreviewLayout = {
+  cx: number;
+  cy: number;
+  r: number;
+  card: boolean;
+};
+
+/** Card centre inside the landscape HUD “Next” panel (matches renderPlayHud). */
+function landscapeNextCardCenter(
+  vw: number,
+  vh: number,
+  r: number,
+): { cx: number; cy: number } {
+  const L = computeLayout(vw, vh);
+  const sw = Math.min(L.sideW, Math.max(148, L.fx - 10));
+  const rx = Math.max(12, vw - L.fx - L.fw - sw);
+  const panelW = Math.min(140, sw);
+  const cx = vw - rx - panelW / 2;
+  const colTop = 14;
+  const soundH = 52;
+  const gap = 10;
+  const panelPadTop = 10;
+  const labelBlock = 16;
+  const cardH = r * 2.2;
+  const cy = colTop + soundH + gap + panelPadTop + labelBlock + cardH / 2;
+  return { cx, cy };
+}
+
+/** CSS-pixel anchor for Next disc + bonbon (portrait circle, landscape card). */
+export function nextPreviewLayout(vw: number, vh: number): NextPreviewLayout {
+  const L = computeLayout(vw, vh);
+  if (L.landscape) {
+    const sw = Math.min(L.sideW, Math.max(148, L.fx - 10));
+    const r = Math.min(34, sw * 0.24);
+    const { cx, cy } = landscapeNextCardCenter(vw, vh, r);
+    return { cx, cy, r, card: true };
+  }
+  const nb = W.nextBubblePortrait;
+  return {
+    cx: L.fx + nb.x * L.scale,
+    cy: mockupPuffCyPx(vh) + 4,
+    r: nb.r * L.scale,
+    card: false,
+  };
+}
+
+export function swapBadgeScreenRect(
+  vw: number,
+  vh: number,
+): { left: number; top: number; size: number } {
+  const p = nextPreviewLayout(vw, vh);
+  const size = Math.max(38, Math.min(44, p.r * 0.92));
+  let left = p.cx + p.r + 6;
+  if (left + size > vw - 6) left = p.cx - p.r - size - 6;
+  left = Math.max(8, Math.min(vw - size - 6, left));
+  return {
+    left,
+    top: Math.max(10, p.cy - p.r - size * 0.85),
+    size,
+  };
+}
+
+function roundRectScreen(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rad: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.lineTo(x + w - rad, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+  ctx.lineTo(x + w, y + h - rad);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+  ctx.lineTo(x + rad, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+  ctx.lineTo(x, y + rad);
+  ctx.quadraticCurveTo(x, y, x + rad, y);
+  ctx.closePath();
+}
+
+/** Next preview in CSS pixel space — disc/card + bonbon share one centre. */
 export function drawNextPreviewScreen(
   ctx: CanvasRenderingContext2D,
-  L: ReturnType<typeof computeLayout>,
+  _L: ReturnType<typeof computeLayout>,
   coat: Flavour,
 ): void {
-  if (L.landscape) return;
   const vw = typeof window !== 'undefined' ? innerWidth : 390;
   const vh = typeof window !== 'undefined' ? innerHeight : 844;
-  const { cx, cy, r } = nextBubbleScreenRect(vw, vh, false);
+  const { cx, cy, r, card } = nextPreviewLayout(vw, vh);
+  const bonW = 2 * r * 0.7;
+  // drawBonbon foot lands at (ox + w/2, oy + w*0.94); body centroid ≈ (ox + w/2, oy + w*0.5).
+  const anchorY = cy - bonW * 0.5;
   ctx.save();
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = tokens.color.ui.paperBorder;
-  ctx.lineWidth = 4.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  const innerW = r * 1.28;
-  drawBonbon(ctx, cx, cy + r * 0.26, {
+  if (card) {
+    const side = r * 2.2;
+    roundRectScreen(ctx, cx - side / 2, cy - side / 2, side, side, r * 0.52);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = tokens.color.ui.paperBorder;
+    ctx.lineWidth = 3;
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    roundRectScreen(ctx, cx - side / 2 + 2, cy - side / 2 + 2, side - 4, side - 4, r * 0.48);
+    ctx.clip();
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = tokens.color.ui.paperBorder;
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(1, r - 2), 0, Math.PI * 2);
+    ctx.clip();
+  }
+  drawBonbon(ctx, cx - bonW / 2, anchorY, {
     flavour: coat,
-    w: innerW,
+    w: bonW,
     expr: 'idle',
     shadow: false,
   });
@@ -608,17 +708,10 @@ export function puffScreenRect(
 export function nextBubbleScreenRect(
   vw: number,
   vh: number,
-  landscape: boolean,
+  _landscape?: boolean,
 ): { cx: number; cy: number; r: number } {
-  const L = computeLayout(vw, vh);
-  const nb = landscape ? W.nextBubbleLandscape : W.nextBubblePortrait;
-  const sc = L.scale;
-  const cy = landscape ? nb.y : L.nextWorldY;
-  return {
-    cx: L.fx + nb.x * sc,
-    cy: L.fieldY + cy * sc,
-    r: nb.r * sc,
-  };
+  const p = nextPreviewLayout(vw, vh);
+  return { cx: p.cx, cy: p.cy, r: p.r };
 }
 
 /** Screen Y of the preview bonbon centroid (main canvas). */

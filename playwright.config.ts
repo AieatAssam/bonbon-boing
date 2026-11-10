@@ -10,6 +10,7 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   use: {
+    serviceWorkers: 'block',
     baseURL: 'http://127.0.0.1:4173/bonbon-boing/',
     trace: 'off',
     video: 'retain-on-failure',

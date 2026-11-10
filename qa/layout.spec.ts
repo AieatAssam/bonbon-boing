@@ -54,7 +54,10 @@ for (const [w, h] of viewports) {
         });
         await page.waitForTimeout(80);
         await page.evaluate(() => {
-          const a = (window as unknown as { __bbApp?: { draw: () => void } }).__bbApp;
+          const a = (window as unknown as {
+            __bbApp?: { draw: () => void; resize?: () => void };
+          }).__bbApp;
+          a?.resize?.();
           a?.draw();
         });
         await page.waitForTimeout(40);

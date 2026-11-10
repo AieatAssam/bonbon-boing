@@ -1,5 +1,10 @@
 import { tokens } from '../tokens';
-import { computeLayout, puffScreenRect } from '../render/scene';
+import {
+  computeLayout,
+  nextPreviewLayout,
+  puffScreenRect,
+  swapBadgeScreenRect,
+} from '../render/scene';
 import type { Settings, StoreData } from '../store';
 import type { GameWorld } from '../game/world';
 import type { GameApp } from '../game/app';
@@ -117,6 +122,10 @@ export function renderPlayHud(
   if (L.landscape) {
     const sw = Math.min(L.sideW, Math.max(148, L.fx - 10));
     const rx = Math.max(12, innerWidth - L.fx - L.fw - sw);
+    const preview = nextPreviewLayout(innerWidth, innerHeight);
+    const cardH = preview.r * 2.2;
+    const swapSize = 40;
+    const swapBtn = `<button class="btn swap-badge gloss" data-nozoom data-action="swap" aria-label="Swap colours" style="position:absolute;right:6px;top:26px;width:${swapSize}px;height:${swapSize}px;padding:0;box-sizing:border-box;border-radius:50%">${SWAP_SVG}</button>`;
     root.innerHTML = `
       <div class="ui ui-abs" style="left:14px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:8px;align-items:stretch">
         <button class="btn icon gloss ui" aria-label="Pause" data-action="pause" style="align-self:flex-start">${ICON_PAUSE}</button>
@@ -127,15 +136,16 @@ export function renderPlayHud(
       </div>
       <div class="ui ui-abs" style="right:${rx}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
         <button class="btn icon gloss ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
-        <div class="panel ui" style="width:min(140px,100%);padding:10px 12px 12px;text-align:center">
+        <div class="panel ui" style="position:relative;width:min(140px,100%);padding:10px 12px 12px;text-align:center;min-height:${cardH + 28}px;background:transparent;box-shadow:none">
           <div class="label ui" style="font-size:10px;margin-bottom:6px">Next</div>
-          <div class="ui" style="width:76px;height:76px;margin:0 auto 10px;border-radius:22px;background:#fff;box-shadow:inset 0 0 0 3px #E8D6F8;display:flex;align-items:center;justify-content:center"><canvas id="next-preview" class="ui" aria-hidden="true"></canvas></div>
-          <button class="ui btn swap-badge" style="width:44px;height:44px;padding:0;margin:0 auto 8px;border-radius:50%" data-action="swap" aria-label="Swap colours">${SWAP_SVG}</button>
+          ${swapBtn}
         </div>
         <div class="chip ui" style="width:min(140px,100%);justify-content:center">RISE IN <span class="num">${riseIn}</span></div>
         <div class="chip ui" style="width:min(140px,100%);justify-content:center">CATCHES <span class="num">${catches}</span></div>
       </div>`;
   } else {
+    const swap = swapBadgeScreenRect(innerWidth, innerHeight);
+    const swapBtn = `<button class="ui ui-abs btn swap-badge gloss" data-nozoom data-action="swap" aria-label="Swap colours" style="left:${swap.left}px;top:${swap.top}px;width:${swap.size}px;height:${swap.size}px;padding:0;box-sizing:border-box;border-radius:50%">${SWAP_SVG}</button>`;
     const fs = innerWidth < 375 ? 36 : 42;
     root.innerHTML = `
       <button class="ui ui-abs btn icon gloss" style="left:12px;top:${top}px;width:58px;height:58px" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
@@ -144,7 +154,8 @@ export function renderPlayHud(
         <div class="chip best-chip ui" style="display:inline-flex;margin-top:3px;font-size:11px;padding:4px 12px"><span class="best-star">★</span> BEST <span class="num">${best.toLocaleString()}</span></div>
         ${combo ? `<div class="chip ui" style="display:inline-flex;margin-top:4px;font-size:11px;background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
-      <button class="ui ui-abs btn icon gloss" style="right:12px;top:${top}px;width:58px;height:58px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>`;
+      <button class="ui ui-abs btn icon gloss" style="right:12px;top:${top}px;width:58px;height:58px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
+      ${swapBtn}`;
   }
   applyUiScale(L);
 }
@@ -248,7 +259,7 @@ export function renderTip(root: HTMLElement, text: string): void {
   }
   const tipH = 56;
   const gap = Math.max(40, topRow - icing);
-  const puffClear = puff.bottom + (innerHeight < 720 ? 46 : 16);
+  const puffClear = puff.bottom + (innerHeight < 720 ? 86 : 16);
   const top = Math.min(
     Math.max(icing + gap * 0.48, puffClear),
     topRow - tipH - 8,

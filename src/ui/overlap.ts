@@ -1,4 +1,4 @@
-import { puffScreenRect } from '../render/scene';
+import { nextPreviewLayout, puffScreenRect } from '../render/scene';
 import { checkPlayGeometry } from './play-geometry';
 import type { GameApp } from '../game/app';
 
@@ -98,6 +98,16 @@ export function installOverlapChecker(): void {
     if (!app) return { violations: [] as string[] };
     return { violations: checkPlayGeometry(app) };
   };
+
+  window.__nextPreviewCrop = () => {
+    const p = nextPreviewLayout(innerWidth, innerHeight);
+    const size = 120;
+    return {
+      x: p.cx - size / 2,
+      y: p.cy - size / 2,
+      size,
+    };
+  };
 }
 
 declare global {
@@ -114,5 +124,6 @@ declare global {
     __uiScale?: () => number;
     __bbApp?: GameApp;
     __checkPlayGeometry?: () => { violations: string[] };
+    __nextPreviewCrop?: () => { x: number; y: number; size: number };
   }
 }
