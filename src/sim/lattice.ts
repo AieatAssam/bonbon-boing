@@ -121,7 +121,7 @@ export function generateRow(
     const ul = above.get(`${row + 1},${c}`);
     const ur = above.get(`${row + 1},${c + (odd ? 0 : 1)}`);
     let flavour: Flavour;
-    if ((ul || ur) && rng() < 0.45) {
+    if ((ul || ur) && rng() < 0.52) {
       const pick = ul && ur ? (rng() < 0.5 ? ul : ur) : ul || ur!;
       flavour = pick.flavour;
     } else {
@@ -167,7 +167,7 @@ export function initialField(
       map,
       START_FLAVOURS,
       1,
-      0.18,
+      0.22,
       rng,
       baseY,
     );

@@ -154,6 +154,10 @@ export class GameApp {
 
   startMode(mode: ModeKind, seed: string): void {
     this.world = new GameWorld(seed, mode);
+    this.world.onLifetimePop = (fl) => {
+      this.store.book[fl] = (this.store.book[fl] ?? 0) + 1;
+      saveStore(this.store);
+    };
     this.shot = new ShotRuntime(
       this.world,
       this.clocks,
@@ -181,6 +185,7 @@ export class GameApp {
       if (e.pop) {
         this.fx.emitPop(b.x, b.y, b.flavour, this.world.popsThisShot);
         this.audio.playPopRung(this.store.settings);
+        this.audio.duckMusic(180);
         if (e.chain && e.chain.length >= 4) {
           this.fx.showBigWord(`HUG ×${e.chain.length}!`, true);
           this.fx.emitConfetti(b.x, b.y, 40);
@@ -514,7 +519,7 @@ export class GameApp {
       }
     }
     drawField(ctx, L.scale, L.fx, L.fy, {
-      bonbons: this.world.bonbons,
+      bonbons: this.world.living(),
       pipCoat: this.world.currentCoat,
       nextCoat: this.world.nextCoat,
       cupX,
@@ -524,6 +529,25 @@ export class GameApp {
       puffMouthO: this.aiming,
       puffScale: this.puffScale,
     });
+    ctx.save();
+    ctx.translate(L.fx, L.fy);
+    ctx.scale(L.scale, L.scale);
+    for (const b of this.world.living()) {
+      const ring = this.rings.get(b.id);
+      if (!ring || ring.awakeMs <= 0) continue;
+      const fl = tokens.color.flavour[b.flavour];
+      ring.path(ctx);
+      ctx.fillStyle = fl.light;
+      ctx.fill();
+      ctx.strokeStyle = fl.dark;
+      ctx.lineWidth = 4;
+      ring.path(ctx);
+      ctx.stroke();
+    }
+    ctx.restore();
+    for (const id of [...this.rings.keys()]) {
+      if (!this.world.living().some((b) => b.id === id)) this.rings.delete(id);
+    }
   if (this.shot.pip && this.shot.phase === 'flying') {
       const p = this.shot.pip;
       drawBonbon(ctx, L.fx + p.x * L.scale, L.fy + p.y * L.scale, {

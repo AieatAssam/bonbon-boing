@@ -103,9 +103,12 @@ export function drawField(
     }
   }
 
+  const ps = o.puffScale ?? { x: 1, y: 1 };
   drawCloud(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, {
     face: true,
     mouthO: o.puffMouthO,
+    sx: ps.x,
+    sy: ps.y,
   });
   if (o.pipInCloud !== false) {
     drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y, {
@@ -289,12 +292,12 @@ function drawCloud(
   x: number,
   y: number,
   w: number,
-  o: { face?: boolean; mouthO?: boolean },
+  o: { face?: boolean; mouthO?: boolean; sx?: number; sy?: number },
 ): void {
   const s = w / 200;
   ctx.save();
   ctx.translate(x - w / 2, y - w * 0.3);
-  ctx.scale(s, s);
+  ctx.scale(s * (o.sx ?? 1), s * (o.sy ?? 1));
   ctx.fillStyle = C.cloudShade;
   ctx.beginPath();
   ctx.moveTo(30, 116);

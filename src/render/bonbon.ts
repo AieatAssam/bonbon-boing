@@ -386,6 +386,7 @@ export function drawBonbon(
   const sy = o.sy ?? 1 / sx;
   const rot = o.rot ?? 0;
   ctx.save();
+  ctx.filter = 'saturate(1.16) contrast(1.05)';
   ctx.translate(ox, oy);
   ctx.translate(w / 2, w * 0.94);
   ctx.rotate(rot);

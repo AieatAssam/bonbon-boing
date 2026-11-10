@@ -39,15 +39,30 @@ export class AudioEngine {
   playMusic(id: MusicId): void {
     if (this.qa) return;
     if (this.musicId === id) return;
+  const prevVol = this.musicEl?.volume ?? this.musicGain * 0.35;
     this.musicId = id;
     const file =
       id === 'title'
         ? `${import.meta.env.BASE_URL}audio/music-title.ogg`
         : `${import.meta.env.BASE_URL}audio/music-play.ogg`;
-    if (!this.musicEl) this.musicEl = new Audio(file);
-    this.musicEl.src = file;
-    this.musicEl.volume = this.musicGain * 0.35;
-    void this.musicEl.play().catch(() => {});
+    const next = new Audio(file);
+    next.loop = true;
+    next.volume = 0;
+    void next.play().catch(() => {});
+    const fadeMs = 420;
+    const target = this.musicGain * 0.35;
+    let t0 = performance.now();
+    const fade = () => {
+      const k = Math.min(1, (performance.now() - t0) / fadeMs);
+      next.volume = target * k;
+      if (this.musicEl) this.musicEl.volume = prevVol * (1 - k);
+      if (k < 1) requestAnimationFrame(fade);
+      else {
+        this.musicEl?.pause();
+        this.musicEl = next;
+      }
+    };
+    requestAnimationFrame(fade);
   }
 
   playUiClick(): void {
@@ -59,8 +74,18 @@ export class AudioEngine {
     const hz = tokens.sound.ladder.rungHz[this.ladderIdx % 12];
     this.ladderIdx++;
     this.playSynthFallback(hz * settings.sfx, 0.14, -8);
-    this.playSynthFallback(hz * 2, 0.1, -14);
+    this.playSynthFallback(hz * 2 * settings.sfx, 0.1, -14);
     this.playSample('pop', 0.05, settings.sfx);
+  }
+
+  duckMusic(ms = 200): void {
+    if (this.qa || !this.musicEl) return;
+    const peak = this.musicGain * 0.35;
+    const low = peak * 0.28;
+    this.musicEl.volume = low;
+    window.setTimeout(() => {
+      if (this.musicEl) this.musicEl.volume = peak;
+    }, ms);
   }
 
   playLaunch(): void {
