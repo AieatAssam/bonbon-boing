@@ -93,6 +93,9 @@ export function renderTitleHud(root: HTMLElement, best: number): void {
   applyUiScale(L);
 }
 
+const ICON_PAUSE = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/><rect x="14" y="4" width="5" height="16" rx="2" fill="#3A1F4D"/></svg>`;
+const ICON_SOUND = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z" fill="#3A1F4D" stroke="#3A1F4D" stroke-width="1.5"/><path d="M16 8.5a5 5 0 010 7" stroke="#3A1F4D" stroke-width="2" stroke-linecap="round"/></svg>`;
+
 export function renderPlayHud(
   root: HTMLElement,
   score: number,
@@ -103,18 +106,18 @@ export function renderPlayHud(
   _next?: string,
 ): void {
   const L = computeLayout(innerWidth, innerHeight);
-  const top = 10;
+  const top = Math.max(8, L.hudH * 0.12);
   if (L.landscape) {
     const sw = L.sideW;
     root.innerHTML = `
       <div class="ui ui-abs" style="left:${Math.max(12, (L.fx - sw) / 2)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px">
-        <button class="btn icon tertiary ui" aria-label="Pause" data-action="pause"></button>
+        <button class="btn icon tertiary ui" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
         <div class="ui"><div class="label">Score</div><div class="disp sticker num" style="font-size:40px;line-height:1">${score.toLocaleString()}</div></div>
         <div class="chip ui">★ BEST <span class="num">${best.toLocaleString()}</span></div>
         ${combo ? `<div class="chip ui" style="background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
       <div class="ui ui-abs" style="right:${Math.max(12, innerWidth - L.fx - L.fw - sw)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px;align-items:flex-end">
-        <button class="btn icon tertiary ui" aria-label="Sound" data-action="mute"></button>
+        <button class="btn icon tertiary ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
         <button class="ui btn tertiary" style="height:44px;font-size:16px" data-action="swap">⇄ Swap</button>
         <div class="chip ui">STAGE <span class="num">${stage}</span></div>
         <div class="chip ui">SHOT <span class="num">${shots}</span></div>
@@ -122,12 +125,13 @@ export function renderPlayHud(
   } else {
     const fs = innerWidth < 375 ? 34 : 40;
     root.innerHTML = `
-      <button class="ui ui-abs btn icon tertiary" style="left:12px;top:${top}px" aria-label="Pause" data-action="pause"></button>
-      <div class="ui ui-abs" style="left:50%;transform:translateX(-50%);top:${top - 4}px;text-align:center;pointer-events:none">
+      <button class="ui ui-abs btn icon tertiary" style="left:12px;top:${top}px" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
+      <div class="ui ui-abs" data-hud="score" style="left:50%;transform:translateX(-50%);top:${top - 4}px;text-align:center;pointer-events:none">
         <div class="disp sticker num ui" style="font-size:${fs}px;line-height:1.05">${score.toLocaleString()}</div>
         <div class="chip ui" style="display:inline-flex;margin-top:3px;font-size:11px;padding:3px 10px">★ BEST <span class="num">${best.toLocaleString()}</span></div>
+        ${combo ? `<div class="chip ui" style="display:inline-flex;margin-top:4px;font-size:11px;background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
-      <button class="ui ui-abs btn tertiary" style="right:12px;top:${top + 2}px;height:40px;padding:0 14px;font-size:14px" data-action="swap">⇄</button>`;
+      <button class="ui ui-abs btn icon tertiary" style="right:12px;top:${top}px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>`;
   }
   applyUiScale(L);
 }

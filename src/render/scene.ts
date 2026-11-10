@@ -17,6 +17,7 @@ export interface SceneDrawOpts {
   warn?: boolean;
   puffMouthO?: boolean;
   puffScale?: { x: number; y: number };
+  aiming?: boolean;
 }
 
 export function drawSky(
@@ -68,17 +69,20 @@ export function drawField(
   drawMilk(ctx, o.cupX);
   drawCup(ctx, o.cupX, W.cup.y);
 
-  if (o.aimDots) {
-    for (const d of o.aimDots) {
+  if (o.aimDots?.length) {
+    for (let i = 0; i < o.aimDots.length; i++) {
+      const d = o.aimDots[i];
       ctx.globalAlpha = d.a;
-      ctx.fillStyle = tokens.color.fx.aimDot;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
       ctx.strokeStyle = tokens.color.fx.aimDotStroke;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash(i > 12 ? [6, 10] : []);
       ctx.beginPath();
-      ctx.arc(d.x, d.y, 8, 0, Math.PI * 2);
+      ctx.arc(d.x, d.y, i < 3 ? 9 : 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
+    ctx.setLineDash([]);
     ctx.globalAlpha = 1;
   }
 
@@ -89,11 +93,14 @@ export function drawField(
     const expr: Expression =
       b.expr ??
       (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
-    drawBonbon(ctx, b.x, b.y + r * 0.94, {
+    const drawY = (b.falling ? b.y : b.y) + r * 0.94;
+    drawBonbon(ctx, b.x, drawY, {
       flavour: b.flavour,
       w,
       expr,
       type: b.type,
+      sx: b.sx,
+      sy: b.sy,
     });
     if (b.heart) {
       ctx.save();
@@ -111,29 +118,47 @@ export function drawField(
     sy: ps.y,
   });
   if (o.pipInCloud !== false) {
-    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y, {
+    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y + 6, {
       pip: true,
       coat: o.pipCoat ?? 'berry',
-      w: tokens.physics.pipRadiusU * 2.3,
-      expr: 'wow',
-      sx: 0.86,
+      w: tokens.physics.pipRadiusU * 2.35,
+      expr: o.aiming ? 'wow' : 'happy',
+      sx: 0.9,
+      sy: 1.02,
     });
   }
 
   const nb = W.nextBubblePortrait;
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.strokeStyle = tokens.color.ui.paperBorder;
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.arc(nb.x, nb.y, nb.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  drawBonbon(ctx, nb.x, nb.y + 24, {
+  drawBonbon(ctx, nb.x, nb.y + 4, {
     pip: true,
     coat: o.nextCoat ?? 'mint',
-    w: 52,
-    shadow: false,
+    w: nb.r * 1.35,
+    shadow: true,
+    expr: 'idle',
   });
+  ctx.fillStyle = tokens.color.ui.primaryTop;
+  ctx.strokeStyle = tokens.color.ui.ink;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(nb.x + nb.r * 0.62, nb.y - nb.r * 0.55, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(nb.x + nb.r * 0.62 - 6, nb.y - nb.r * 0.58);
+  ctx.lineTo(nb.x + nb.r * 0.62 + 6, nb.y - nb.r * 0.52);
+  ctx.moveTo(nb.x + nb.r * 0.62 + 6, nb.y - nb.r * 0.58);
+  ctx.lineTo(nb.x + nb.r * 0.62 - 6, nb.y - nb.r * 0.52);
+  ctx.stroke();
 
   if (o.comboFx) {
     ctx.save();
@@ -353,6 +378,10 @@ function drawCloud(
   ctx.restore();
 }
 
+/** Visible play slice (u): thin milk band at bottom per DESIGN-SYSTEM §6. */
+const VIEW_TOP = 200;
+const VIEW_H = 1340;
+
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
   const hudH = landscape ? 0 : Math.max(60, Math.min(76, vh * 0.08));
@@ -361,15 +390,31 @@ export function computeLayout(vw: number, vh: number) {
     : 0;
   const availW = vw - sideW * 2;
   const availH = vh - hudH - (landscape ? 0 : 6);
-  const scale = Math.min(availW / W.worldW, availH / W.worldH);
+  let scale = landscape
+    ? Math.min(availW / W.worldW, availH / VIEW_H)
+    : availW / W.worldW;
+  let fh = VIEW_H * scale;
+  if (fh > availH) scale = availH / VIEW_H;
+  fh = VIEW_H * scale;
   const fw = W.worldW * scale;
-  const fh = W.worldH * scale;
   const fx = (vw - fw) / 2;
-  const fy = landscape
-    ? (vh - fh) / 2
-    : hudH + Math.max(0, Math.min(24, (availH - fh) * 0.25));
+  const fy = landscape ? (vh - fh) / 2 : hudH;
   const uiScale = landscape
     ? Math.max(1, Math.min(1.6, vh / 430))
     : Math.max(1, Math.min(1.2, vw / 430));
-  return { landscape, hudH, sideW, scale, fx, fy, fw, fh, uiScale };
+  const fieldY = fy - VIEW_TOP * scale;
+  return {
+    landscape,
+    hudH,
+    sideW,
+    scale,
+    fx,
+    fy,
+    fieldY,
+    viewTop: VIEW_TOP,
+    viewH: VIEW_H,
+    fw,
+    fh,
+    uiScale,
+  };
 }

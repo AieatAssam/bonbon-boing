@@ -90,6 +90,26 @@ export function resetBonbonIds(): void {
 }
 
 const START_FLAVOURS: Flavour[] = ['berry', 'mint', 'lemon', 'blueberry'];
+export function initialRiseField(
+  seed: string,
+): { bonbons: Bonbon[]; baseY: number } {
+  const { bonbons, baseY } = initialField(seed, 5);
+  const rng = makeRng(`${seed}-rise-tut`);
+  const top = [...bonbons].filter((b) => b.row >= 3).sort(() => rng() - 0.5);
+  for (let i = 0; i < Math.min(8, top.length); i++) {
+    top[i].flavour = i % 2 === 0 ? 'berry' : 'mint';
+    top[i].size = i < 4 ? 's2' : 's1';
+  }
+  for (const b of bonbons) {
+    if (b.row === 4 && b.col === 2) b.flavour = 'lemon';
+    if (b.row === 4 && b.col === 3) b.flavour = 'blueberry';
+    if (b.row === 3 && b.col === 1) b.flavour = 'peach';
+    if (b.row === 3 && b.col === 4) b.flavour = 'grape';
+    if (rng() < 0.08) b.type = 'jelly';
+    if (rng() < 0.06) b.type = 'marshmallow';
+  }
+  return { bonbons, baseY };
+}
 
 export function pickSize(rng: () => number, stage: number): Size {
   const r = rng();

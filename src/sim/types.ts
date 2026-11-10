@@ -45,6 +45,7 @@ export interface Bonbon {
   wowT?: number;
   tickleT?: number;
   vy?: number;
+  falling?: boolean;
   woken?: boolean;
 }
 

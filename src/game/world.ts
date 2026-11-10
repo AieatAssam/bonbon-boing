@@ -3,6 +3,7 @@ import {
   bonbonRadius,
   generateRow,
   initialField,
+  initialRiseField,
   resetBonbonIds,
 } from '../sim/lattice';
 import { LEVELS, generateLevelBoard } from '../sim/levels';
@@ -65,7 +66,10 @@ export class GameWorld {
       const lvl = Number(String(seed).replace(/[^\d]/g, '')) || 1;
       this.loadTrail(lvl);
     } else {
-      const { bonbons } = initialField(seed, 5);
+      const { bonbons } =
+        mode === 'rise'
+          ? initialRiseField(seed)
+          : initialField(seed, 5);
       this.bonbons = bonbons.map((b) => ({ ...b, homeX: b.x, homeY: b.y }));
       this.pickPipQueue();
     }
@@ -99,7 +103,8 @@ export class GameWorld {
     if (!live.length) return this.activeFlavours()[0];
     const weights = new Map<Flavour, number>();
     for (const b of live) {
-      weights.set(b.flavour, (weights.get(b.flavour) ?? 0) + 1);
+      const topW = b.row >= 3 ? 4 : 1;
+      weights.set(b.flavour, (weights.get(b.flavour) ?? 0) + topW);
     }
     const entries = [...weights.entries()];
     const total = entries.reduce((s, [, w]) => s + w, 0);
@@ -150,7 +155,7 @@ export class GameWorld {
     }
     this.score += this.shotScore;
     if (this.stage < 6 && this.shots % 12 === 0) this.stage += 1;
-    if (!caught && this.mode !== 'trail') {
+    if (!caught && this.mode !== 'trail' && this.shouldRiseAfterShot()) {
       this.startRise();
     } else if (caught) {
       this.pipsLeft = Math.min(this.pipsLeft + 1, 15);
@@ -195,7 +200,7 @@ export class GameWorld {
         new Map(),
         this.activeFlavours(),
         this.stage,
-        this.emptyShare(),
+        Math.min(0.32, this.emptyShare()),
         this.rng,
         BASE_Y,
       );
@@ -222,10 +227,27 @@ export class GameWorld {
     return warn;
   }
 
+  shouldRiseAfterShot(): boolean {
+    if (this.mode !== 'rise') return true;
+    if (this.shots <= 18) return this.shots % 2 === 0;
+    if (this.shots <= 28) return this.shots % 2 === 1 || this.shots % 3 === 0;
+    return true;
+  }
+
+  icingMargin(): number {
+    if (this.mode !== 'rise') return FROSTING_MARGIN;
+    if (this.shots < 12) return FROSTING_MARGIN + 560;
+    if (this.shots < 25) return FROSTING_MARGIN + 340;
+    if (this.shots < 40) return FROSTING_MARGIN + 180;
+    return FROSTING_MARGIN;
+  }
+
   checkGameOver(): boolean {
+    if (this.mode === 'rise' && this.shots < 25) return false;
     const live = this.living();
+    const margin = this.icingMargin();
     const badY = live.some(
-      (b) => b.y - bonbonRadius(b.size) < FROSTING - FROSTING_MARGIN,
+      (b) => b.y - bonbonRadius(b.size) < FROSTING - margin,
     );
     if (badY) this.gameOver = true;
     return this.gameOver;

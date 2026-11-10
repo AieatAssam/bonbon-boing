@@ -24,6 +24,7 @@ import { GameClocks } from './clocks';
 import { GameWorld, type ModeKind } from './world';
 import { ShotRuntime } from './shot-runtime';
 import { cupXAtTime } from '../sim/shot';
+import { tickFalling } from '../sim/gravity';
 import { dailySeed } from '../sim/levels';
 
 const SPAWN = tokens.layout.pipSpawn;
@@ -121,6 +122,10 @@ export class GameApp {
     if (scr === 'play' || scr === 'combo') {
       this.startMode('rise', this.qa ? 'qa-tut' : 'tut-1');
       this.screen = 'play';
+      if (params.has('aim')) {
+        this.aiming = true;
+        this.aimAngle = -0.72;
+      }
       const n = this.qaAutoplay || (scr === 'combo' ? 4 : scr === 'play' ? 2 : 0);
       if (n === 0) {
         this.syncHud();
@@ -182,6 +187,17 @@ export class GameApp {
     this.audio.playMusic('play');
   }
 
+  private lastHudScore = -1;
+
+  private refreshHudScore(): void {
+    if (!this.world || this.world.score === this.lastHudScore) return;
+    this.lastHudScore = this.world.score;
+    const el = this.uiRoot.querySelector(
+      '[data-hud="score"] .sticker',
+    ) as HTMLElement | null;
+    if (el) el.textContent = this.world.score.toLocaleString();
+  }
+
   private onContactFx(e: import('../sim/shot').ContactEvent): void {
     if (!this.world) return;
     if (e.kind === 'bonbon' && e.bonbon) {
@@ -197,7 +213,9 @@ export class GameApp {
           this.fx.showBigWord(`HUG ×${e.chain.length}!`, true);
           this.fx.emitConfetti(b.x, b.y, 40);
         }
-        this.fx.scorePop(b.x, b.y - 40, `+${popPts(e)}`);
+        if (e.bonbon && e.bonbon.x > 40) {
+          this.fx.scorePop(e.bonbon.x, e.bonbon.y - 48, `+${popPts(e)}`);
+        }
         this.clocks.addTrauma(
           tokens.motion.shake.add.sweetPop,
           this.store.settings.shake,
@@ -266,6 +284,12 @@ export class GameApp {
         break;
       case 'pause':
         this.screen = this.screen === 'pause' ? 'play' : 'pause';
+        break;
+      case 'mute':
+        this.store.settings.music = this.store.settings.music > 0.01 ? 0 : 0.85;
+        this.store.settings.sfx = this.store.settings.sfx > 0.01 ? 0 : 1;
+        this.audio.applySettings(this.store.settings);
+        saveStore(this.store);
         break;
       case 'settings':
         this.screen = 'settings';
@@ -358,6 +382,7 @@ export class GameApp {
       if (e.clientY < hudH()) return;
       if (!this.shot.canAim()) return;
       this.aiming = true;
+      this.fx.particles = this.fx.particles.filter((p) => p.kind !== 'score');
       updateAim(e.clientX, e.clientY);
     });
     this.canvas.addEventListener('pointermove', (e) => {
@@ -446,6 +471,11 @@ export class GameApp {
   tick(dt: number): void {
     this.toastT = Math.max(0, this.toastT - dt);
     if (this.world) {
+      const splashes = tickFalling(this.world.bonbons, dt);
+      for (const b of splashes) {
+        this.fx.emitPop(b.x, b.y, b.flavour, 1);
+        this.audio.playTickle();
+      }
       if (this.world.rising) {
         const over = this.world.tickRise(dt);
         if (over && this.world.gameOver) this.onShotDone(false);
@@ -514,7 +544,7 @@ export class GameApp {
       this.world.shots + performance.now() * 0.001,
     );
     let aimDots: Array<{ x: number; y: number; a: number }> | undefined;
-    if (this.aiming && this.shot.canAim()) {
+    if (this.shot.canAim()) {
       this.shot.angle = this.aimAngle;
       aimDots = this.shot.buildPreview();
       const prev = aimDots[aimDots.length - 1];
@@ -525,19 +555,21 @@ export class GameApp {
         }
       }
     }
-    drawField(ctx, L.scale, L.fx, L.fy, {
+    const fieldY = L.fieldY ?? L.fy;
+    drawField(ctx, L.scale, L.fx, fieldY, {
       bonbons: this.world.living(),
       pipCoat: this.world.currentCoat,
       nextCoat: this.world.nextCoat,
       cupX,
       aimDots,
       warn: this.world.warned,
-      pipInCloud: this.shot.phase === 'idle' && !this.aiming,
+      pipInCloud: this.shot.phase === 'idle',
       puffMouthO: this.aiming,
       puffScale: this.puffScale,
+      aiming: this.aiming,
     });
     ctx.save();
-    ctx.translate(L.fx, L.fy);
+    ctx.translate(L.fx, fieldY);
     ctx.scale(L.scale, L.scale);
     for (const b of this.world.living()) {
       const ring = this.rings.get(b.id);
@@ -557,7 +589,7 @@ export class GameApp {
     }
   if (this.shot.pip && this.shot.phase === 'flying') {
       const p = this.shot.pip;
-      drawBonbon(ctx, L.fx + p.x * L.scale, L.fy + p.y * L.scale, {
+      drawBonbon(ctx, L.fx + p.x * L.scale, fieldY + p.y * L.scale, {
         pip: true,
         coat: p.coat,
         w: tokens.physics.pipRadiusU * 2.3 * L.scale,
@@ -567,7 +599,8 @@ export class GameApp {
         shadow: true,
       });
     }
-    this.fx.draw(ctx, L.fx, L.fy, L.scale);
+    this.fx.draw(ctx, L.fx, fieldY, L.scale);
+    if (this.screen === 'play') this.refreshHudScore();
   }
 
   drawTitle(): void {

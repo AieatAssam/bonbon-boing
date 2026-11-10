@@ -31,7 +31,10 @@ for (const [w, h] of viewports) {
         page.on('console', (msg) => {
           if (msg.type() === 'error') errors.push(msg.text());
         });
-        const mid = screen === 'play' || screen === 'combo' ? '&autoplay=2' : '';
+        const mid =
+          screen === 'play' || screen === 'combo'
+            ? '&autoplay=2&aim=1'
+            : '';
         const freeze =
           screen === 'play' || screen === 'combo' ? '' : '&freeze=1';
         await page.goto(`/?qa&screen=${screen}${freeze}${mid}`, {
@@ -71,7 +74,7 @@ for (const [w, h] of viewports) {
         expect(errors).toEqual([]);
         await page.screenshot({
           path: `qa/shots/${screen}_${w}x${h}.png`,
-          fullPage: screen !== 'play' && screen !== 'combo',
+          fullPage: true,
           timeout: 30_000,
           animations: 'disabled',
           caret: 'hide',

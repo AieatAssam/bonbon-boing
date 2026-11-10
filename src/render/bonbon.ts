@@ -470,7 +470,7 @@ export function drawBonbon(
     g.lineJoin = 'round';
     g.stroke(p);
     g.save();
-    g.globalAlpha = T.color.light.specularAlpha;
+    g.globalAlpha = Math.min(1, T.color.light.specularAlpha * 1.35);
     g.fillStyle = '#fff';
     g.beginPath();
     g.ellipse(29, 25, 16, 7.5, -0.49, 0, Math.PI * 2);

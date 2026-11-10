@@ -10,7 +10,7 @@ test.describe.configure({ mode: 'serial' });
 test('gameplay video 390x844', async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?qa&screen=play&autoplay=3', { timeout: 60_000 });
+  await page.goto('/?qa&screen=play&autoplay=4&aim=1', { timeout: 60_000 });
   await page.waitForFunction(() => (window as { __ready?: boolean }).__ready === true, {
     timeout: 40_000,
   });

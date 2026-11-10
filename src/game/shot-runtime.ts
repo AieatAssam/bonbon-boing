@@ -12,6 +12,7 @@ import type { PipState } from '../sim/types';
 import type { Bonbon } from '../sim/types';
 import { GameClocks } from './clocks';
 import type { GameWorld } from './world';
+import { refreshSupportFlags } from '../sim/gravity';
 import {
   BANK_BOING,
   CATCH_POINTS,
@@ -135,6 +136,7 @@ export class ShotRuntime {
         }
       }
       this.chainQueue = [];
+      refreshSupportFlags(this.world.bonbons);
     }
   }
 
@@ -236,6 +238,7 @@ export class ShotRuntime {
         }
         this.world.trackPop(hit.flavour, chain.length);
         this.clocks.addHitstop(tokens.motion.hitstop.sweetPop);
+        refreshSupportFlags(this.world.bonbons);
       } else if (tickle) {
         hit.puffs -= 1;
         if (hit.size === 's3') hit.size = 's2';
