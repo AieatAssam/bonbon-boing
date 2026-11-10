@@ -381,7 +381,7 @@ function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
   ctx.fill();
   ctx.stroke();
   const innerW = r * 1.55;
-  drawBonbon(ctx, nb.x, nb.y + innerW * 0.05, {
+  drawBonbon(ctx, nb.x, nb.y - innerW * 0.02, {
     flavour: coat,
     w: innerW,
     expr: 'idle',
