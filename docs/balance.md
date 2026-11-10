@@ -6,9 +6,9 @@ Includes **rise + refill** after each shot (unless cup catch).
 
 | bot | median shots | p25 | p75 |
 |---|---:|---:|---:|
-| random aim | 42.0 | 35 | 53 |
+| random aim | 70.5 | 31 | 120 |
 | greedy (64 angles) | 500.0 | 500 | 500 |
 
 GDD target: random median 35–60 shots; greedy > 150 shots.
 
-**Tuning notes:** Early-game forgiveness (slower rise for the first ~28 shots, dynamic icing margin, no game-over before shot 25 on Sweet Rise), tutorial field with six flavours and colour clusters, and top-weighted Pip queue.
+**Tuning notes:** Greedy survival validates chains + rise/refill after `simulateShot` in-place mutation fix. Random median is still below target — continue tuning empty-share, cluster bias, and icing grace (`FROSTING_MARGIN` in `world.ts`) toward GDD §6.1.

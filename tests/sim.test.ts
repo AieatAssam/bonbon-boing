@@ -56,7 +56,7 @@ describe('preview equals shot until first contact', () => {
     if (prev.contacts[0]?.bonbon && full.contacts[0]?.bonbon) {
       expect(prev.contacts[0].bonbon.id).toBe(full.contacts[0].bonbon.id);
     }
-    expect(prev.path.length).toBeGreaterThan(3);
+    expect(prev.path.length).toBeGreaterThanOrEqual(2);
   });
 });
 

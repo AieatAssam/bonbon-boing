@@ -120,9 +120,10 @@ function drawAccent(
       ctx.stroke();
       break;
     case 'floppyEars':
+      if (behind) return;
       ctx.fillStyle = c.dark;
       ctx.lineWidth = sw;
-      if (behind) {
+      {
         ctx.beginPath();
         ctx.moveTo(22, 16);
         ctx.bezierCurveTo(6, 14, -4, 36, 2, 56);
@@ -470,17 +471,24 @@ export function drawBonbon(
     g.lineJoin = 'round';
     g.stroke(p);
     g.save();
-    g.globalAlpha = Math.min(1, T.color.light.specularAlpha * 1.35);
+    g.globalAlpha = Math.min(1, T.color.light.specularAlpha * 1.5);
     g.fillStyle = '#fff';
     g.beginPath();
-    g.ellipse(29, 25, 16, 7.5, -0.49, 0, Math.PI * 2);
+    g.ellipse(28, 24, 22, 11, -0.42, 0, Math.PI * 2);
     g.fill();
     g.beginPath();
-    g.arc(51, 15, 3.6, 0, Math.PI * 2);
+    g.arc(52, 14, 4.2, 0, Math.PI * 2);
     g.fill();
-    g.globalAlpha = 0.7;
+    g.globalAlpha = 0.85;
     g.beginPath();
-    g.arc(16, 42, 2.2, 0, Math.PI * 2);
+    g.moveTo(18, 38);
+    g.lineTo(22, 44);
+    g.lineTo(14, 44);
+    g.closePath();
+    g.fill();
+    g.globalAlpha = 0.65;
+    g.beginPath();
+    g.arc(16, 42, 2.5, 0, Math.PI * 2);
     g.fill();
     g.restore();
     drawAccent(g, acc, c, false);

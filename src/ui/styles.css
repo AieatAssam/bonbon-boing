@@ -149,6 +149,19 @@ body {
   padding: 0;
 }
 
+.btn.gloss {
+  background: linear-gradient(180deg, #ffffff 0%, #f3ecff 100%);
+  color: var(--bb-color-ui-ink);
+  box-shadow:
+    0 4px 0 #ddd1ee,
+    0 10px 24px rgba(58, 31, 77, 0.14);
+  --lip: #ddd1ee;
+}
+
+.btn.gloss:active {
+  box-shadow: 0 1px 0 #ddd1ee;
+}
+
 .panel {
   background: var(--bb-color-ui-paper);
   border-radius: 30px;

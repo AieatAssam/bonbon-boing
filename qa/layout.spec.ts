@@ -37,15 +37,17 @@ for (const [w, h] of viewports) {
             : screen === 'combo'
               ? '&autoplay=2&aim=1'
               : '';
-        const freeze =
-          screen === 'play' || screen === 'combo' ? '' : '&freeze=1';
+        const freeze = screen === 'combo' ? '' : '&freeze=1';
         await page.goto(`/?qa&screen=${screen}${freeze}${mid}`, {
           timeout: 90_000,
         });
         await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true, {
           timeout: 90_000,
         });
-        await page.evaluate(() => document.fonts.ready);
+        await Promise.race([
+          page.evaluate(() => document.fonts.ready),
+          page.waitForTimeout(8_000),
+        ]);
         await page.evaluate(() => {
           const a = (window as unknown as { __bbApp?: { freeze: boolean } }).__bbApp;
           if (a) a.freeze = true;

@@ -96,6 +96,7 @@ function integrateShot(
 
   for (let step = 0; step < maxSteps && t < maxT; step++) {
     if (step % 4 === 0) path.push({ x: pip.x, y: pip.y });
+    if (previewOnly && path.length >= 40) break;
     if (t < marshmallowUntil) {
       /* slow sink */
     }
@@ -212,13 +213,7 @@ function integrateShot(
         speed: Math.hypot(pip.vx, pip.vy),
       });
       if (previewOnly) {
-        return {
-          contacts,
-          ended: 'sea',
-          path,
-          final: { ...pip },
-          wallBounces,
-        };
+        continue;
       }
     }
 
@@ -279,15 +274,7 @@ export function previewShot(
   _cupX: number,
 ): ShotResult {
   const clone = bonbons.map((b) => ({ ...b }));
-  return integrateShot(
-    input,
-    clone,
-    0,
-    0,
-    0,
-    3000,
-    true,
-  );
+  return integrateShot(input, clone, 0, 0, 0, 220, true);
 }
 
 export function cupXAtTime(seed: string, tSec: number): number {

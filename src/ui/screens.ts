@@ -106,18 +106,18 @@ export function renderPlayHud(
   _next?: string,
 ): void {
   const L = computeLayout(innerWidth, innerHeight);
-  const top = Math.max(8, L.hudH * 0.12);
+  const top = Math.max(10, L.hudH * 0.14);
   if (L.landscape) {
     const sw = L.sideW;
     root.innerHTML = `
       <div class="ui ui-abs" style="left:${Math.max(12, (L.fx - sw) / 2)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px">
-        <button class="btn icon tertiary ui" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
+        <button class="btn icon gloss ui" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
         <div class="ui"><div class="label">Score</div><div class="disp sticker num" style="font-size:40px;line-height:1">${score.toLocaleString()}</div></div>
         <div class="chip ui">★ BEST <span class="num">${best.toLocaleString()}</span></div>
         ${combo ? `<div class="chip ui" style="background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
       <div class="ui ui-abs" style="right:${Math.max(12, innerWidth - L.fx - L.fw - sw)}px;top:14px;width:${sw}px;display:flex;flex-direction:column;gap:12px;align-items:flex-end">
-        <button class="btn icon tertiary ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
+        <button class="btn icon gloss ui" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>
         <button class="ui btn tertiary" style="height:44px;font-size:16px" data-action="swap">⇄ Swap</button>
         <div class="chip ui">STAGE <span class="num">${stage}</span></div>
         <div class="chip ui">SHOT <span class="num">${shots}</span></div>
@@ -125,13 +125,13 @@ export function renderPlayHud(
   } else {
     const fs = innerWidth < 375 ? 34 : 40;
     root.innerHTML = `
-      <button class="ui ui-abs btn icon tertiary" style="left:12px;top:${top}px" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
-      <div class="ui ui-abs" data-hud="score" style="left:50%;transform:translateX(-50%);top:${top - 4}px;text-align:center;pointer-events:none">
-        <div class="disp sticker num ui" style="font-size:${fs}px;line-height:1.05">${score.toLocaleString()}</div>
-        <div class="chip ui" style="display:inline-flex;margin-top:3px;font-size:11px;padding:3px 10px">★ BEST <span class="num">${best.toLocaleString()}</span></div>
+      <button class="ui ui-abs btn icon gloss" style="left:12px;top:${top}px;width:58px;height:58px" aria-label="Pause" data-action="pause">${ICON_PAUSE}</button>
+      <div class="ui ui-abs" data-hud="score" style="left:50%;transform:translateX(-50%);top:${top}px;max-height:${L.hudH - 6}px;text-align:center;pointer-events:none;overflow:hidden">
+        <div class="disp sticker num ui" style="font-size:${fs}px;line-height:1">${score.toLocaleString()}</div>
+        <div class="chip ui" style="display:inline-flex;margin-top:2px;font-size:11px;padding:2px 10px">★ BEST <span class="num">${best.toLocaleString()}</span></div>
         ${combo ? `<div class="chip ui" style="display:inline-flex;margin-top:4px;font-size:11px;background:#FFE36B">CHAIN ×${combo}</div>` : ''}
       </div>
-      <button class="ui ui-abs btn icon tertiary" style="right:12px;top:${top}px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>`;
+      <button class="ui ui-abs btn icon gloss" style="right:12px;top:${top}px;width:58px;height:58px" aria-label="Sound" data-action="mute">${ICON_SOUND}</button>`;
   }
   applyUiScale(L);
 }
@@ -222,7 +222,7 @@ export function renderSettingsHud(root: HTMLElement, s: Settings): void {
 export function renderTip(root: HTMLElement, text: string): void {
   root.insertAdjacentHTML(
     'beforeend',
-    `<div class="ui ui-abs panel" style="left:50%;bottom:18%;transform:translateX(-50%);padding:12px 18px;font-weight:800;max-width:90vw;text-align:center">${text}</div>`,
+    `<div class="ui ui-abs panel" style="left:50%;bottom:max(108px,22vh);transform:translateX(-50%);padding:10px 16px;font-weight:800;max-width:86vw;text-align:center;font-size:15px">${text}</div>`,
   );
   applyUiScale();
 }

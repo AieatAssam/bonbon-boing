@@ -67,29 +67,11 @@ export function drawField(
   ctx.globalAlpha = 1;
 
   drawMilk(ctx, o.cupX);
-  drawCup(ctx, o.cupX, W.cup.y);
-
-  if (o.aimDots?.length) {
-    for (let i = 0; i < o.aimDots.length; i++) {
-      const d = o.aimDots[i];
-      ctx.globalAlpha = d.a;
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.strokeStyle = tokens.color.fx.aimDotStroke;
-      ctx.lineWidth = 3.5;
-      ctx.setLineDash(i > 12 ? [6, 10] : []);
-      ctx.beginPath();
-      ctx.arc(d.x, d.y, i < 3 ? 9 : 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-  }
 
   for (const b of o.bonbons) {
     if (b.popped) continue;
     const r = bonbonRadius(b.size);
-    const w = r * 2.05;
+    const w = r * 2.18;
     const expr: Expression =
       b.expr ??
       (b.asleep ? 'sleepy' : b.size === 's3' && b.type === 'chonk' ? 'sleepy' : 'idle');
@@ -110,55 +92,43 @@ export function drawField(
     }
   }
 
+  drawCup(ctx, o.cupX, W.cup.y);
+
   const ps = o.puffScale ?? { x: 1, y: 1 };
-  drawCloud(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, {
-    face: true,
+  drawCloudBody(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, ps);
+  if (o.pipInCloud !== false) {
+    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y, {
+      pip: true,
+      coat: o.pipCoat ?? 'berry',
+      w: tokens.physics.pipRadiusU * 2.45,
+      expr: o.aiming ? 'wow' : 'happy',
+      sx: 0.92,
+      sy: 1.04,
+    });
+  }
+  drawCloudFace(ctx, W.puffCloud.x, W.puffCloud.y, W.puffCloud.w, {
     mouthO: o.puffMouthO,
     sx: ps.x,
     sy: ps.y,
   });
-  if (o.pipInCloud !== false) {
-    drawBonbon(ctx, W.pipSpawn.x, W.pipSpawn.y - 8, {
-      pip: true,
-      coat: o.pipCoat ?? 'berry',
-      w: tokens.physics.pipRadiusU * 2.35,
-      expr: o.aiming ? 'wow' : 'happy',
-      sx: 0.9,
-      sy: 1.02,
-    });
-  }
+  drawNextBonbon(ctx, o.nextCoat ?? 'mint');
 
-  const nb = W.nextBubblePortrait;
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.strokeStyle = tokens.color.ui.paperBorder;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.arc(nb.x, nb.y, nb.r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  drawBonbon(ctx, nb.x, nb.y + 4, {
-    pip: true,
-    coat: o.nextCoat ?? 'mint',
-    w: nb.r * 1.35,
-    shadow: true,
-    expr: 'idle',
-  });
-  ctx.fillStyle = tokens.color.ui.primaryTop;
-  ctx.strokeStyle = tokens.color.ui.ink;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(nb.x + nb.r * 0.62, nb.y - nb.r * 0.55, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(nb.x + nb.r * 0.62 - 6, nb.y - nb.r * 0.58);
-  ctx.lineTo(nb.x + nb.r * 0.62 + 6, nb.y - nb.r * 0.52);
-  ctx.moveTo(nb.x + nb.r * 0.62 + 6, nb.y - nb.r * 0.58);
-  ctx.lineTo(nb.x + nb.r * 0.62 - 6, nb.y - nb.r * 0.52);
-  ctx.stroke();
+  if (o.aimDots?.length) {
+    for (let i = 0; i < o.aimDots.length; i++) {
+      const d = o.aimDots[i];
+      ctx.globalAlpha = d.a;
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.96)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash(i > 12 ? [6, 10] : []);
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, i < 3 ? 9 : 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
 
   if (o.comboFx) {
     ctx.save();
@@ -312,17 +282,17 @@ function drawHeart(
   ctx.restore();
 }
 
-function drawCloud(
+function drawCloudBody(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
-  o: { face?: boolean; mouthO?: boolean; sx?: number; sy?: number },
+  ps: { x: number; y: number },
 ): void {
   const s = w / 200;
   ctx.save();
   ctx.translate(x - w / 2, y - w * 0.3);
-  ctx.scale(s * (o.sx ?? 1), s * (o.sy ?? 1));
+  ctx.scale(s * ps.x, s * ps.y);
   ctx.fillStyle = C.cloudShade;
   ctx.beginPath();
   ctx.moveTo(30, 116);
@@ -335,8 +305,6 @@ function drawCloud(
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#fff';
-  ctx.strokeStyle = tokens.color.face.ink;
-  ctx.lineWidth = o.face ? 4 : 0;
   ctx.beginPath();
   ctx.moveTo(30, 110);
   ctx.bezierCurveTo(6, 110, 4, 78, 30, 74);
@@ -346,8 +314,32 @@ function drawCloud(
   ctx.bezierCurveTo(200, 92, 192, 116, 168, 114);
   ctx.closePath();
   ctx.fill();
-  if (o.face) ctx.stroke();
-  if (o.face) {
+  ctx.restore();
+}
+
+function drawCloudFace(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  o: { mouthO?: boolean; sx?: number; sy?: number },
+): void {
+  const s = w / 200;
+  ctx.save();
+  ctx.translate(x - w / 2, y - w * 0.3);
+  ctx.scale(s * (o.sx ?? 1), s * (o.sy ?? 1));
+  ctx.strokeStyle = tokens.color.face.ink;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(30, 110);
+  ctx.bezierCurveTo(6, 110, 4, 78, 30, 74);
+  ctx.bezierCurveTo(26, 46, 62, 36, 76, 56);
+  ctx.bezierCurveTo(84, 26, 130, 24, 138, 56);
+  ctx.bezierCurveTo(160, 40, 192, 58, 178, 84);
+  ctx.bezierCurveTo(200, 92, 192, 116, 168, 114);
+  ctx.closePath();
+  ctx.stroke();
+  {
     const ink = tokens.color.face.ink;
     for (const cx of [80, 120]) {
       ctx.fillStyle = ink;
@@ -378,9 +370,46 @@ function drawCloud(
   ctx.restore();
 }
 
+function drawNextBonbon(ctx: CanvasRenderingContext2D, coat: Flavour): void {
+  const nb = W.nextBubblePortrait;
+  const r = nb.r;
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.strokeStyle = tokens.color.ui.paperBorder;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.arc(nb.x, nb.y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  const innerW = r * 1.55;
+  drawBonbon(ctx, nb.x, nb.y + innerW * 0.05, {
+    flavour: coat,
+    w: innerW,
+    expr: 'idle',
+    shadow: false,
+  });
+  const bx = nb.x + r * 0.58;
+  const by = nb.y - r * 0.62;
+  ctx.fillStyle = tokens.color.ui.primaryTop;
+  ctx.strokeStyle = tokens.color.ui.ink;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(bx, by, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(bx, by, 7, 0.4 * Math.PI, 1.45 * Math.PI);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(bx, by, 7, 1.15 * Math.PI, 2.2 * Math.PI);
+  ctx.stroke();
+}
+
 /** Visible play slice (u): thin milk band at bottom per DESIGN-SYSTEM §6. */
-const VIEW_TOP = 200;
-const VIEW_H = 1340;
+const VIEW_TOP = 275;
+const VIEW_H = 1280;
 
 export function computeLayout(vw: number, vh: number) {
   const landscape = vw / vh > 1.15;
@@ -416,5 +445,25 @@ export function computeLayout(vw: number, vh: number) {
     fw,
     fh,
     uiScale,
+  };
+}
+
+export function puffScreenRect(
+  vw: number,
+  vh: number,
+): { left: number; top: number; right: number; bottom: number } {
+  const L = computeLayout(vw, vh);
+  const fieldY = L.fieldY ?? L.fy;
+  const puff = W.puffCloud;
+  const sc = L.scale;
+  const cx = L.fx + puff.x * sc;
+  const cy = fieldY + (puff.y - puff.w * 0.28) * sc;
+  const ww = puff.w * sc;
+  const hh = puff.w * 0.52 * sc;
+  return {
+    left: cx - ww / 2,
+    top: cy,
+    right: cx + ww / 2,
+    bottom: cy + hh,
   };
 }

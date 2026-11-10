@@ -10,7 +10,7 @@ import { LEVELS, generateLevelBoard } from '../sim/levels';
 import { makeRng } from '../sim/rng';
 import type { Bonbon, Flavour } from '../sim/types';
 
-const BASE_Y = 1340;
+const DEFAULT_BASE_Y = 1254;
 /** Extra vertical clearance before icing game over (u). */
 const FROSTING_MARGIN = 122;
 const FROSTING = tokens.layout.frostingY;
@@ -56,6 +56,7 @@ export class GameWorld {
   heartsLeft = 0;
   dailyCap = 40;
   bankWallThisShot = false;
+  baseRowY = DEFAULT_BASE_Y;
 
   constructor(seed: string, mode: ModeKind) {
     this.seed = seed;
@@ -66,11 +67,16 @@ export class GameWorld {
       const lvl = Number(String(seed).replace(/[^\d]/g, '')) || 1;
       this.loadTrail(lvl);
     } else {
-      const { bonbons } =
+      const init =
         mode === 'rise'
           ? initialRiseField(seed)
           : initialField(seed, 5);
-      this.bonbons = bonbons.map((b) => ({ ...b, homeX: b.x, homeY: b.y }));
+      this.baseRowY = init.baseY;
+      this.bonbons = init.bonbons.map((b) => ({
+        ...b,
+        homeX: b.x,
+        homeY: b.y,
+      }));
       this.pickPipQueue();
     }
   }
@@ -202,11 +208,11 @@ export class GameWorld {
         this.stage,
         Math.min(0.32, this.emptyShare()),
         this.rng,
-        BASE_Y,
+        this.baseRowY,
       );
       for (const b of newRow) {
         b.row = 0;
-        b.y = BASE_Y;
+        b.y = this.baseRowY;
         b.homeY = b.y;
         b.homeX = b.x;
         b.asleep = true;

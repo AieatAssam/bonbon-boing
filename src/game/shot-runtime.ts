@@ -298,7 +298,8 @@ export class ShotRuntime {
       spawnY: SPAWN.y,
     };
     const prev = previewShot(input, this.world.bonbons, 0);
-    return prev.path.map((p, i) => ({
+    const sparse = prev.path.filter((_, i) => i % 3 === 0).slice(0, 28);
+    return sparse.map((p, i) => ({
       ...p,
       a: Math.max(0.35, 0.95 - i * 0.04),
     }));

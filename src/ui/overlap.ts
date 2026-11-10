@@ -1,4 +1,43 @@
+import { puffScreenRect } from '../render/scene';
+
+function intersects(
+  a: { left: number; top: number; right: number; bottom: number },
+  b: { left: number; top: number; right: number; bottom: number },
+): boolean {
+  const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return ix > 2 && iy > 2;
+}
+
 export function installOverlapChecker(): void {
+  window.__checkLayoutZones = () => {
+    const puff = puffScreenRect(innerWidth, innerHeight);
+    const scoreEl = document.querySelector('[data-hud="score"]');
+    const scoreR = scoreEl?.getBoundingClientRect();
+    const puffHitsScore =
+      scoreR &&
+      scoreR.width > 0 &&
+      intersects(puff, {
+        left: scoreR.left,
+        top: scoreR.top,
+        right: scoreR.right,
+        bottom: scoreR.bottom,
+      });
+  const pauseR = document
+      .querySelector('[aria-label="Pause"]')
+      ?.getBoundingClientRect();
+    const puffHitsPause =
+      pauseR &&
+      pauseR.width > 0 &&
+      intersects(puff, {
+        left: pauseR.left,
+        top: pauseR.top,
+        right: pauseR.right,
+        bottom: pauseR.bottom,
+      });
+    return { puffHitsScore: !!puffHitsScore, puffHitsPause: !!puffHitsPause };
+  };
+
   window.__checkOverlaps = () => {
     const els = [...document.querySelectorAll('.ui')].filter(
       (e) =>
@@ -33,6 +72,13 @@ export function installOverlapChecker(): void {
           ]);
       }
     }
+    const zones = window.__checkLayoutZones?.();
+    if (zones?.puffHitsScore) {
+      bad.push(['hud-score', 'puff-cloud', 99, 99]);
+    }
+    if (zones?.puffHitsPause) {
+      bad.push(['pause', 'puff-cloud', 88, 88]);
+    }
     const off = rects
       .filter(
         (x) =>
@@ -51,6 +97,10 @@ declare global {
     __checkOverlaps?: () => {
       overlaps: Array<[string, string, number, number]>;
       offscreen: string[];
+    };
+    __checkLayoutZones?: () => {
+      puffHitsScore: boolean;
+      puffHitsPause: boolean;
     };
     __ready?: boolean;
     __uiScale?: () => number;

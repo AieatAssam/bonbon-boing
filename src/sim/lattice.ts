@@ -3,16 +3,13 @@ import type { Bonbon, Flavour, Size, BonbonType } from './types';
 import { makeRng } from './rng';
 
 const L = tokens.layout.lattice;
+const PITCH = L.rowPitch;
 
 export function slotX(row: number, col: number): number {
   const odd = row % 2 === 1;
   const slots = odd ? L.oddRowSlots : L.evenRowSlots;
   if (col < 0 || col >= slots) return NaN;
-  return (
-    L.x0 +
-    col * L.colPitch +
-    (odd ? L.oddRowOffset : 0)
-  );
+  return L.x0 + col * L.colPitch + (odd ? L.oddRowOffset : 0);
 }
 
 export function rowY(row: number, baseY: number): number {
@@ -54,6 +51,12 @@ export function neighbours(row: number, col: number): Array<[number, number]> {
 
 let nextId = 1;
 
+function clampX(x: number, r: number): number {
+  const left = tokens.layout.walls.leftX + r + 6;
+  const right = tokens.layout.walls.rightX - r - 6;
+  return Math.max(left, Math.min(right, x));
+}
+
 export function createBonbon(
   row: number,
   col: number,
@@ -66,7 +69,8 @@ export function createBonbon(
 ): Bonbon {
   const jx = (jitterRng() - 0.5) * L.jitterX * 2;
   const jy = (jitterRng() - 0.5) * L.jitterY * 2;
-  const x = slotX(row, col) + jx;
+  const r = tokens.physics.bonbonRadiusU[size];
+  const x = clampX(slotX(row, col) + jx, r);
   const y = rowY(row, baseY) + jy;
   const puffs = size === 's1' ? 1 : size === 's2' ? 2 : 3;
   return {
@@ -90,33 +94,13 @@ export function resetBonbonIds(): void {
 }
 
 const START_FLAVOURS: Flavour[] = ['berry', 'mint', 'lemon', 'blueberry'];
-export function initialRiseField(
-  seed: string,
-): { bonbons: Bonbon[]; baseY: number } {
-  const { bonbons, baseY } = initialField(seed, 5);
-  const rng = makeRng(`${seed}-rise-tut`);
-  const top = [...bonbons].filter((b) => b.row >= 3).sort(() => rng() - 0.5);
-  for (let i = 0; i < Math.min(8, top.length); i++) {
-    top[i].flavour = i % 2 === 0 ? 'berry' : 'mint';
-    top[i].size = i < 4 ? 's2' : 's1';
-  }
-  for (const b of bonbons) {
-    if (b.row === 4 && b.col === 2) b.flavour = 'lemon';
-    if (b.row === 4 && b.col === 3) b.flavour = 'blueberry';
-    if (b.row === 3 && b.col === 1) b.flavour = 'peach';
-    if (b.row === 3 && b.col === 4) b.flavour = 'grape';
-    if (rng() < 0.08) b.type = 'jelly';
-    if (rng() < 0.06) b.type = 'marshmallow';
-  }
-  return { bonbons, baseY };
-}
 
 export function pickSize(rng: () => number, stage: number): Size {
   const r = rng();
   if (stage < 4) {
-    if (r < 0.22) return 's1';
-    if (r < 0.92) return 's2';
-    return 's1';
+    if (r < 0.18) return 's1';
+    if (r < 0.9) return 's2';
+    return 's3';
   }
   if (r < 0.22) return 's1';
   if (r < 0.92) return 's2';
@@ -141,7 +125,7 @@ export function generateRow(
     const ul = above.get(`${row + 1},${c}`);
     const ur = above.get(`${row + 1},${c + (odd ? 0 : 1)}`);
     let flavour: Flavour;
-    if ((ul || ur) && rng() < 0.52) {
+    if ((ul || ur) && rng() < 0.58) {
       const pick = ul && ur ? (rng() < 0.5 ? ul : ur) : ul || ur!;
       flavour = pick.flavour;
     } else {
@@ -160,9 +144,7 @@ export function generateRow(
     if (stage >= 4 && size === 's3' && rng() < 0.4) type = 'chonk';
     if (stage >= 5 && rng() < 0.05) type = 'bubble';
     colours.push(flavour);
-    out.push(
-      createBonbon(row, c, flavour, size, type, baseY, rng, false),
-    );
+    out.push(createBonbon(row, c, flavour, size, type, baseY, rng, false));
   }
   const uniq = new Set(colours);
   if (colours.length > 1 && uniq.size === 1) {
@@ -172,13 +154,61 @@ export function generateRow(
   return out;
 }
 
+const CAST_ROW: Flavour[][] = [
+  ['berry', 'mint', 'lemon', 'blueberry', 'peach', 'grape'],
+  ['grape', 'berry', 'mint', 'lemon', 'blueberry', 'peach'],
+  ['blueberry', 'peach', 'berry', 'mint', 'lemon', 'grape'],
+  ['mint', 'lemon', 'grape', 'berry', 'peach', 'blueberry'],
+  ['lemon', 'blueberry', 'peach', 'grape', 'berry', 'mint'],
+];
+
+export function initialRiseField(
+  seed: string,
+): { bonbons: Bonbon[]; baseY: number } {
+  const rows = 8;
+  const targetTopY = 722;
+  const baseY = targetTopY + (rows - 1) * PITCH;
+  resetBonbonIds();
+  const rng = makeRng(seed);
+  const bonbons: Bonbon[] = [];
+  const map = new Map<string, Bonbon>();
+  const all: Flavour[] = [
+    'berry',
+    'mint',
+    'lemon',
+    'blueberry',
+    'peach',
+    'grape',
+  ];
+  for (let r = 0; r < rows; r++) {
+    const row = generateRow(
+      r,
+      map,
+      all,
+      2,
+      r < 2 ? 0.04 : 0.08,
+      rng,
+      baseY,
+    );
+    const pattern = CAST_ROW[r % CAST_ROW.length];
+    row.forEach((b, i) => {
+      b.flavour = pattern[i % pattern.length] ?? b.flavour;
+      if (r === 0 && i === 2) b.asleep = true;
+      bonbons.push(b);
+      map.set(`${b.row},${b.col}`, b);
+    });
+  }
+  return { bonbons, baseY };
+}
+
 export function initialField(
   seed: string,
   rows = 5,
 ): { bonbons: Bonbon[]; baseY: number } {
   resetBonbonIds();
   const rng = makeRng(seed);
-  const baseY = 1340;
+  const targetTopY = 400;
+  const baseY = targetTopY + (rows - 1) * PITCH;
   const bonbons: Bonbon[] = [];
   const map = new Map<string, Bonbon>();
   for (let r = 0; r < rows; r++) {
@@ -187,7 +217,7 @@ export function initialField(
       map,
       START_FLAVOURS,
       1,
-      0.22,
+      0.2,
       rng,
       baseY,
     );

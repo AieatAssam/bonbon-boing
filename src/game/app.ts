@@ -94,6 +94,7 @@ export class GameApp {
     });
     if (this.qa) {
       this.runQaBootstrap();
+      this.draw();
     } else {
       this.audio.playMusic('title');
       window.__ready = true;
@@ -124,7 +125,8 @@ export class GameApp {
       this.screen = 'play';
       if (params.has('aim')) {
         this.aiming = true;
-        this.aimAngle = -0.72;
+        this.aimAngle = -0.78;
+        this.puffScale = { x: 0.96, y: 1.04 };
       }
       const n = this.qaAutoplay || (scr === 'combo' ? 4 : 0);
       if (n === 0) {
