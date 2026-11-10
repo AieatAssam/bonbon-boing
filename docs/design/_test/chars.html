@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:linear-gradient(#B9E4FF,#E7D5FF 55%,#FFD6EC)}</style><script src="../lib/bonbon.js"></script></head><body><svg id="s" width="900" height="520" viewBox="0 0 900 520"></svg>
+<script>(async()=>{await BB.loadTokens('../tokens.json');let h='';const fl=['berry','peach','lemon','mint','blueberry','grape'];const ex=['idle','happy','tickled','wow','love','worried','sleepy'];
+fl.forEach((f,i)=>{h+=BB.bonbon({flavour:f,x:80+i*140,y:130,w:110});});
+ex.forEach((e,i)=>{h+=BB.bonbon({flavour:fl[i%6],x:70+i*120,y:280,w:90,expr:e});});
+h+=BB.bonbon({pip:true,x:80,y:440,w:70});h+=BB.bonbon({pip:true,coat:'berry',x:180,y:440,w:70,expr:'happy'});
+h+=BB.bonbon({flavour:'mint',x:320,y:440,w:100,sx:1.35,expr:'tickled'});h+=BB.bonbon({flavour:'blueberry',x:470,y:440,w:100,sx:0.75,expr:'wow'});
+h+=BB.cloud(720,430,220,{face:true,mouth:'o'});
+document.getElementById('s').innerHTML=h;window.__ready=true;})()</script></body></html>

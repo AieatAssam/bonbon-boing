@@ -1,0 +1,131 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Bonbon Boing! Design system sheet</title>
+<link rel="stylesheet" href="../mockups/html/mock.css">
+<style>
+html,body{height:auto;overflow:auto}body{background:linear-gradient(#B9E4FF,#E7D5FF 40%,#FFD6EC);padding:28px 36px 60px;width:1280px}
+h1{font-family:Fredoka;font-size:54px;margin:0}h2{font-family:Fredoka;font-size:30px;margin:34px 0 12px}h3{font-family:Fredoka;font-size:20px;margin:6px 0}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}.card{background:rgba(255,249,243,.94);border-radius:22px;padding:14px;box-shadow:0 5px 0 #E3CDEF,0 14px 30px rgba(58,31,77,.12)}
+.sw{width:96px;border-radius:14px;overflow:hidden;font-size:11px;font-weight:800;background:#fff;box-shadow:0 3px 0 #E3CDEF}.sw div{height:52px}.sw span{display:block;padding:4px 6px}
+table{border-collapse:collapse;font-size:13px}td,th{padding:4px 10px;text-align:left;border-bottom:1px solid #EADCF5}th{font-weight:900;color:#6E5487;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+code{font-size:12px;background:#F3E6F7;border-radius:6px;padding:1px 5px}
+.ui{position:relative!important}
+</style>
+<script src="lib/bonbon.js"></script></head><body>
+<h1 class="disp">Bonbon Boing! <span style="font-size:24px;color:#6E5487">design system v1 · 10 Nov 2026</span></h1>
+<div style="font-weight:800;color:#6E5487">Pillars: <b>Pastel world, saturated friends</b> · <b>Everything is squishy</b> (squash, never sharp) · <b>Faces never stretch</b> · <b>Every bounce is a note</b> · <b>The first shot is a party</b></div>
+<div id="root"></div>
+<script>
+(async()=>{
+const T=await BB.loadTokens('tokens.json'); const C=T.color; const root=document.getElementById('root'); let H='';
+const lum=h=>{const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+const cr=(a,b)=>{const x=lum(a),y=lum(b);return ((Math.max(x,y)+.05)/(Math.min(x,y)+.05)).toFixed(2)};
+const svg=(w,h,inner)=>`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`;
+// 1 Flavours
+H+='<h2>1 · Bonbon friends (flavours)</h2><div class="row">';
+Object.entries(C.flavour).forEach(([k,f])=>{H+=`<div class="card" style="width:178px">${svg(150,130,BB.bonbon({flavour:k,x:75,y:124,w:112}))}<h3>${f.name}</h3><div style="font-size:12px;font-weight:800;color:#6E5487">accent: ${f.accent}</div>
+<div class="row" style="gap:4px;margin-top:6px">${['light','base','dark','outline','blush'].map(r=>`<div title="${r}" style="width:30px;height:30px;border-radius:9px;background:${f[r]};box-shadow:inset 0 0 0 2px #fff"></div>`).join('')}</div>
+<div style="font-size:11px;font-weight:800;margin-top:4px">${f.base} · ${f.outline}<br>outline/base ${cr(f.outline,f.base)}:1<br>outline/sky ${cr(f.outline,C.world.skyMid)}:1</div></div>`});
+H+='</div>';
+// 2 World + UI palette
+H+='<h2>2 · World & UI palette</h2><div class="row">';
+const sw=(n,h)=>`<div class="sw"><div style="background:${h}"></div><span>${n}<br>${h}</span></div>`;
+Object.entries(C.world).filter(([k,v])=>typeof v==='string').forEach(([k,v])=>H+=sw(k,v));
+H+='</div><div class="row" style="margin-top:10px">';
+Object.entries(C.ui).filter(([k,v])=>typeof v==='string').forEach(([k,v])=>H+=sw(k,v));
+H+=`</div><div style="font-weight:800;margin-top:8px">ui.ink on ui.paper: ${cr(C.ui.ink,C.ui.paper)}:1 · ink on skyTop: ${cr(C.ui.ink,C.world.skyTop)}:1 · white on primaryBottom: ${cr('#FFFFFF',C.ui.primaryBottom)}:1 (display text adds an ink stroke)</div>`;
+// 3 Construction
+const g=(x1,y1,x2,y2,c='#FF3F8A')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+const lab=(x,y,t,a='start')=>`<text x="${x}" y="${y}" font-family="Nunito" font-weight="900" font-size="12" fill="#3A1F4D" text-anchor="${a}">${t}</text>`;
+let con=`<g transform="translate(250 40)">${BB.bonbon({flavour:'mint',x:150,y:282,w:300,shadow:true})}</g>`;
+// guides in body box coords: box 300 -> scale 3, origin (60+0, 40+282-282)
+const X=v=>250+v*3, Y=v=>40+282-300*0.94+v*3;
+con+=g(X(0),Y(57),X(100),Y(57))+lab(X(101),Y(57)+4,'eye line 0.57 (below centre: big forehead)');
+con+=g(X(32),Y(20),X(32),Y(90),'#3F8CFF')+g(X(68),Y(20),X(68),Y(90),'#3F8CFF')+lab(X(50),Y(100)+4,'eye centres ±0.18w · eye 0.14w × 0.18w','middle');
+con+=g(X(0),Y(66),X(100),Y(66),'#A262FF')+lab(X(101),Y(66)+8,'mouth 0.66: tiny, close to eyes');
+con+=g(X(0),Y(6),X(100),Y(6),'#999')+g(X(0),Y(94),X(100),Y(94),'#999')+lab(X(101),Y(8),'body top 0.06')+lab(X(101),Y(96),'body bottom 0.94 (w : h = 1 : 0.88)');
+con+=`<circle cx="${X(29)}" cy="${Y(25)}" r="30" fill="none" stroke="#FFB420" stroke-width="2"/>`+lab(X(-2),Y(14),'gloss window','end')+lab(X(-2),Y(14)+14,'(0.29,0.25) 0.32×0.15 @ −28°','end');
+con+=lab(X(-2),Y(66),'blush ±0.29w, y .68','end')+lab(X(-2),Y(80),'outline 0.045w flavour.outline','end')+lab(X(-2),Y(94),'rim light bottom-right','end');
+H+=`<h2>3 · Character construction (unit box 100)</h2><div class="row"><div class="card">${svg(900,350,con)}</div><div class="card" style="width:1160px;font-size:14px;font-weight:700;line-height:1.45">
+<b>Body</b>: one mochi-egg path for every friend: <code>M50,6 C80,6 98,28 98,56 C98,80 78,94 50,94 C22,94 2,80 2,56 C2,28 20,6 50,6 Z</code>. Widest at y 0.56, so it sits heavy at the bottom.<br>
+<b>Layers</b> (back→front): contact shadow → accent (ears etc.) → vertical gradient light→base(.45)→dark → inner glow radial (.46,.38) → bottom shade radial → rim light stroke (bottom-right) → outline 4.5 → gloss window ellipse → gloss dot (.51,.15) r .036 → tiny sparkle dot (.16,.42) → <b>face (live)</b>. Floppy ears draw in front of the body.<br>
+<b>Kirby rule</b>: squash/stretch is applied to body + accent around bottom-centre with sx·sy = 1. The face is a rigid decal: it moves with the squash (dy = 0.34·(1−sy)) and scales uniformly within 0.92–1.08. Never stretch the eye spacing or eye→mouth distance.<br>
+<b>Gloss slides</b>: under squash the gloss window keeps its size and shifts 0.06w towards the impact side, so the highlight reads as a wet surface.<br>
+<b>Pip</b> (hero): white mochi, eyes 1.15× bigger, green sprout. When coated, the body uses the coat's flavour colours plus a <b>white cream cap</b> (wavy, top 36–52%), so Pip is always readable against the same colour.
+</div></div>`;
+// 4 Expressions + squash
+H+='<h2>4 · Expressions & squash</h2><div class="row"><div class="card">';
+let ex='';['idle','happy','wow','tickled','love','worried','sleepy'].forEach((e,i)=>{ex+=BB.bonbon({flavour:['berry','peach','lemon','mint','blueberry','grape','berry'][i],x:70+i*130,y:122,w:104,expr:e})+lab(70+i*130,150,e,'middle')});
+H+=svg(920,160,ex)+'<div style="font-size:13px;font-weight:800;color:#6E5487">idle (blink 70/110ms every 2.4–5.2s, eyes look at the aim point) · happy (hit by matching Pip, about to pop) · wow (Pip passes within 160u) · tickled (wrong-colour hit, shrinks a size) · love (hug-chain target, 140ms before it pops) · worried (row is 1 rise from the icing line) · sleepy (Chonks, and new rows in the milk)</div></div>';
+let sq='';[[1,'rest'],[1.38,'impact squash'],[0.74,'launch stretch'],[1.15,'settle'],[0.94,'overshoot']].forEach(([s,n],i)=>{sq+=BB.bonbon({flavour:'peach',x:70+i*128,y:120,w:92,sx:s,expr:i==1?'tickled':i==2?'wow':'idle'})+lab(70+i*128,150,n,'middle')+lab(70+i*128,166,'sx '+s,'middle')});
+sq+=BB.bonbon({pip:true,x:680,y:120,w:70})+BB.bonbon({pip:true,coat:'berry',x:760,y:120,w:70,expr:'happy'})+BB.bonbon({pip:true,coat:'mint',x:840,y:120,w:70,sx:1.4})+BB.bonbon({pip:true,coat:'blueberry',x:910,y:120,w:70,sx:0.72,expr:'wow'});
+sq+=lab(795,150,'Pip: plain · coated · hit · launch','middle');
+H+=`<div class="card">${svg(960,175,sq)}</div></div>`;
+// 5 Special types
+H+='<h2>5 · Bonbon types (soft-body properties are the puzzle)</h2><div class="row"><div class="card">';
+let ty='';
+ty+=BB.bonbon({flavour:'berry',x:80,y:120,w:100})+lab(80,150,'Plush (default)','middle')+lab(80,166,'e 0.80','middle');
+ty+=BB.bonbon({flavour:'lemon',x:240,y:120,w:100})+`<circle cx="240" cy="78" r="62" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="3 12" stroke-linecap="round"/>`+lab(240,150,'Jelly: super bounce','middle')+lab(240,166,'e 1.18, sparkle ring','middle');
+ty+=`<g opacity="1">${BB.bonbon({flavour:'mint',x:400,y:120,w:100})}</g>`+[[-24,-16],[10,-28],[22,4],[-8,10],[-30,6]].map(([dx,dy])=>`<circle cx="${400+dx}" cy="${78+dy}" r="4" fill="#fff" opacity=".85"/>`).join('')+lab(400,150,'Marshmallow: absorbs','middle')+lab(400,166,'e 0.42 + 110ms sink, powder dots','middle');
+ty+=BB.bonbon({flavour:'grape',x:570,y:124,w:136,expr:'sleepy'})+lab(570,150,'Chonk (size 3)','middle')+lab(570,166,'3 puffs, e 0.72, heavy','middle');
+ty+=`<circle cx="730" cy="80" r="48" fill="url(#bub)" stroke="#fff" stroke-width="4"/><ellipse cx="712" cy="62" rx="14" ry="7" fill="#fff" opacity=".9" transform="rotate(-30 712 62)"/>${BB.bonbon({flavour:'blueberry',x:730,y:112,w:62,expr:'wow',shadow:false})}<defs><radialGradient id="bub"><stop offset=".6" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#B9E4FF" stop-opacity=".8"/></radialGradient></defs>`+lab(730,150,'Bubble: pops on any hit','middle')+lab(730,166,'frees a trapped friend','middle');
+ty+=BB.bonbon({flavour:'peach',x:890,y:120,w:100})+BB.heart(924,46,18)+lab(890,150,'Heart target (Trail)','middle')+lab(890,166,'pop all to clear','middle');
+H+=svg(980,180,ty)+'</div></div>';
+// 6 UI components
+H+=`<h2>6 · UI components (squishy, glossy, 48px min targets)</h2><div class="row">
+<div class="card" style="display:flex;flex-direction:column;gap:14px;width:330px">
+<button class="btn primary" style="height:66px;font-size:28px">▶&nbsp;Play</button>
+<button class="btn primary" style="height:66px;font-size:28px;transform:scale(1.06,.9);box-shadow:0 1px 0 #C2185E">Pressed</button>
+<div style="display:flex;gap:12px"><button class="btn gold" style="flex:1;height:54px;font-size:18px">Daily</button><button class="btn secondary" style="flex:1;height:54px;font-size:18px">Trail</button></div>
+<div style="display:flex;gap:12px;align-items:center"><button class="btn tertiary" style="flex:1;height:52px;font-size:18px">Home</button><button class="btn icon tertiary">${'<svg width="22" height="22" viewBox="0 0 22 22"><rect x="4" y="3" width="5" height="16" rx="2.5" fill="#3A1F4D"/><rect x="13" y="3" width="5" height="16" rx="2.5" fill="#3A1F4D"/></svg>'}</button><button class="btn icon primary" style="font-size:22px">⇄</button></div>
+<div style="font-size:12px;font-weight:800;color:#6E5487">Pill radius 999 · lip 6px (pressed 1px) · glossy top band 28% height · press: scale (1.06, 0.90) over 70ms; release: spring uiPress (ω30 ζ.42) to 1 with 1.08 overshoot · each button plays a marimba note from the ladder (Peggle menu trick).</div></div>
+<div class="card" style="width:360px">
+<div class="panel" style="padding:22px;position:relative"><div class="disp" style="font-size:30px;text-align:center">Paused</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0"><b>Sound effects</b><div style="width:58px;height:34px;border-radius:99px;background:#2ED69A;position:relative;box-shadow:inset 0 3px 0 rgba(0,0,0,.12)"><div style="position:absolute;right:3px;top:3px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 3px 0 #0B5A4155"></div></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0"><b>Screen shake</b><div style="width:58px;height:34px;border-radius:99px;background:#D9CBEA;position:relative"><div style="position:absolute;left:3px;top:3px;width:28px;height:28px;border-radius:50%;background:#fff"></div></div></div>
+<div class="label">Music volume</div><div style="height:14px;border-radius:99px;background:#EADCF5;margin:6px 0 16px;position:relative"><div style="width:62%;height:100%;border-radius:99px;background:linear-gradient(#7FE3FF,#3FB8F5)"></div><div style="position:absolute;left:calc(62% - 14px);top:-7px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 3px 0 #C9B3E8,0 0 0 3px #3FB8F5"></div></div>
+<button class="btn primary" style="width:100%;height:58px;font-size:24px">Resume</button></div>
+<div style="font-size:12px;font-weight:800;color:#6E5487;margin-top:10px">Panel: paper #FFF9F3, 3px white border, radius 34, lip 8px #E3CDEF. Modal in: scale .86→1 with outBack 420ms + 3 sparkles; scrim pink-lilac gradient at 30% (never grey).</div></div>
+<div class="card" style="width:430px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+<div class="disp sticker num" style="font-size:44px">12,480</div><div class="chip">★ BEST 18,200</div><div class="chip" style="background:#FFE36B">CHAIN ×4</div>
+${svg(400,120,`<text x="70" y="60" text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="34" fill="#fff" stroke="#3A1F4D" stroke-width="9" paint-order="stroke" stroke-linejoin="round">+400</text>
+<g transform="translate(260 70) rotate(-6)"><text text-anchor="middle" font-family="Fredoka" font-weight="700" font-size="60" fill="url(#rb)" stroke="#3A1F4D" stroke-width="12" paint-order="stroke" stroke-linejoin="round">HUG ×4!</text></g>
+<defs><linearGradient id="rb" x1="0" x2="1">${C.fx.rainbow.map((c,i)=>`<stop offset="${i/5}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`)}
+<div style="font-size:12px;font-weight:800;color:#6E5487">Score pop: Fredoka 700 26px, white with 0.3em ink stroke, appears AFTER hitstop, rises 46px over 650ms outCubic, scale 0.6→1.15→1 (uiPop spring), fades the last 30%. Big word: rainbow fill, 900ms, tilt −6°, wobbly spring in, inBack out. Score counter ticks up 450ms with a 1.12 punch on each pop.</div></div>
+</div>`;
+// 7 Typography
+H+=`<h2>7 · Typography</h2><div class="row"><div class="card" style="width:600px">
+<div class="disp" style="font-size:60px;line-height:1">Bonbon Boing!</div><div style="font-weight:800;color:#6E5487;font-size:12px">Fredoka 700 · logo / display / numbers (tabular) · OFL · @fontsource-variable/fredoka</div>
+<div class="disp" style="font-size:34px">Sweet chain! So squishy!</div><div style="font-size:16px;font-weight:700">Nunito 700 body: Bounce Pip into friends of the same colour and they pop with a squishy hug.</div>
+<div class="label" style="margin-top:6px">NUNITO 900 LABEL · 12PX · 0.08EM</div></div>
+<div class="card" style="width:560px"><table><tr><th>role</th><th>font</th><th>phone</th><th>desktop</th></tr>
+${Object.entries(T.typography.scale).map(([k,v])=>`<tr><td>${k}</td><td>${T.typography[v.font].family} ${v.weight}</td><td>${v.phone}px</td><td>${v.desktop}px</td></tr>`).join('')}</table></div></div>`;
+// 8 Motion: plot spring responses
+const spring=(om,ze,col)=>{let p='';for(let i=0;i<=120;i++){const t=i/120*0.9;let y;const wd=om*Math.sqrt(Math.max(1e-6,1-ze*ze));y=1-Math.exp(-ze*om*t)*(Math.cos(wd*t)+ze*om/wd*Math.sin(wd*t));p+=(i?'L':'M')+(10+i*3)+','+(110-y*70)}return `<path d="${p}" fill="none" stroke="${col}" stroke-width="3"/>`};
+let mo='<line x1="10" y1="40" x2="370" y2="40" stroke="#ddd" stroke-dasharray="4 4"/><line x1="10" y1="110" x2="370" y2="110" stroke="#ccc"/>';const cols=['#FF3F8A','#3FB8F5','#2ED69A','#FFB420','#A262FF','#FF8A3D'];
+Object.entries(T.motion.spring).filter(([k])=>k[0]!=='$').slice(0,6).forEach(([k,v],i)=>{mo+=spring(v.omega,v.zeta,cols[i])+`<text x="380" y="${24+i*18}" font-family="Nunito" font-weight="900" font-size="12" fill="${cols[i]}">${k} ω${v.omega} ζ${v.zeta}</text>`});
+H+=`<h2>8 · Motion tokens</h2><div class="row"><div class="card">${svg(560,130,mo)}<div style="font-size:12px;font-weight:800;color:#6E5487">Step response over 900ms. Bonbon jiggle (ζ .16) rings ~5 times; Pip squash (ω38) snaps back in ~120ms.</div></div>
+<div class="card" style="width:560px"><table><tr><th>event</th><th>hitstop</th><th>shake add</th><th>other</th></tr>
+<tr><td>tickle (wrong colour)</td><td>0</td><td>0</td><td>bonbon dent .30, jiggle, giggle</td></tr>
+<tr><td>sweet pop</td><td>45ms</td><td>.06</td><td>puff ring 280ms, 8 drops, 8 sparkles</td></tr>
+<tr><td>hug chain end (≥4)</td><td>70ms</td><td>.20</td><td>big word, confetti 40</td></tr>
+<tr><td>chonk pop</td><td>90ms</td><td>.14</td><td>screen flash 8% white 90ms</td></tr>
+<tr><td>bank boing (wall then pop)</td><td>50ms</td><td>—</td><td>"Bank Boing!" label</td></tr>
+<tr><td>last heart (Trail)</td><td>160ms</td><td>.45</td><td>slow-mo .25× from 260u, zoom 1.12</td></tr>
+<tr><td>new best</td><td>120ms</td><td>—</td><td>gold banner, stinger</td></tr></table>
+<div style="font-size:12px;font-weight:800;color:#6E5487">Freeze the bodies, never the particles, shake or input. Numbers show after the freeze. Hitstop total capped at 400ms per shot.</div></div></div>`;
+// 9 Particles
+let pa='';const r=(a,b)=>a+Math.random()*(b-a);
+pa+=`<g transform="translate(80 70)">${[...Array(9)].map((_,k)=>BB.sparkle(Math.cos(k*.7)*r(20,60),Math.sin(k*.7)*r(20,60),r(5,11),k%2?'#fff':'#FFE36B')).join('')}</g>`+lab(80,150,'sugar sparkle','middle');
+pa+=`<g transform="translate(230 70)">${[...Array(8)].map((_,k)=>`<ellipse cx="${Math.cos(k*.8)*r(25,55)}" cy="${Math.sin(k*.8)*r(25,55)}" rx="${r(5,9)*1.5}" ry="${r(4,7)}" fill="#FF4F93" stroke="#7A1446" stroke-width="2" transform="rotate(${k*45})"/>`).join('')}</g>`+lab(230,150,'juice drops (stretch)','middle');
+pa+=`<g transform="translate(380 70)">${[...Array(16)].map((_,k)=>`<rect x="${r(-55,55)}" y="${r(-50,50)}" width="14" height="8" rx="3" fill="${C.fx.rainbow[k%6]}" transform="rotate(${r(0,180)})"/>`).join('')}</g>`+lab(380,150,'candy confetti','middle');
+pa+=`<g transform="translate(530 70)">${BB.heart(-30,10,14)}${BB.heart(20,-20,18)}<path d="M-40,30 Q0,-40 40,-10" fill="none" stroke="#FF3D86" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round"/></g>`+lab(530,150,'heart spark (hug chain)','middle');
+pa+=`<g transform="translate(680 70)"><circle r="30" fill="none" stroke="#fff" stroke-width="9" opacity=".95"/><circle r="52" fill="none" stroke="#fff" stroke-width="3" opacity=".5"/></g>`+lab(680,150,'puff ring','middle');
+pa+=`<g transform="translate(830 70)">${[[0,0,30],[-26,8,20],[26,8,22],[-12,-16,18],[14,-18,16]].map(([x,y,rr])=>`<circle cx="${x}" cy="${y}" r="${rr}" fill="#fff" stroke="#E9DCFF" stroke-width="3"/>`).join('')}</g>`+lab(830,150,'cloud poof (launch, catch)','middle');
+H+=`<h2>9 · Particle recipes</h2><div class="card">${svg(920,165,pa)}<div style="font-size:12px;font-weight:800;color:#6E5487">All values in tokens.json → particles. Round shapes only (sparkles are the one pointy thing). Max 260 live particles, 120 in low-power mode.</div></div>`;
+// 10 Sound
+H+=`<h2>10 · Sound tokens</h2><div class="row"><div class="card" style="width:560px"><b>Pop ladder: G major pentatonic</b> (in key with the play loop <i>Cozy Puzzle In-Game 1</i>, G major, 118 BPM)
+<div style="display:flex;gap:6px;margin:10px 0">${T.sound.ladder.rungs.map((n,i)=>`<div style="width:38px;height:${40+i*6}px;border-radius:12px;align-self:flex-end;background:${C.fx.rainbow[i%6]};color:#fff;font-weight:900;font-size:11px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;box-shadow:0 3px 0 #3A1F4D33">${n}</div>`).join('')}</div>
+<div style="font-size:12px;font-weight:800;color:#6E5487">Pop k of a shot plays rung min(k,11): sampled wet pop (transient) + synth marimba body (sine + triangle at 2×, 4ms attack, 220ms decay) + an octave-up sine at −10dB for phone speakers. Rising means good, falling means "no".</div></div>
+<div class="card" style="width:600px"><table><tr><th>event</th><th>source (CC0)</th><th>dB</th></tr>${Object.entries(T.sound.events).map(([k,v])=>`<tr><td>${k}</td><td>${v.src}</td><td>${v.db}</td></tr>`).join('')}</table></div></div>`;
+root.innerHTML=H; window.__ready=true;
+})();
+</script></body></html>
