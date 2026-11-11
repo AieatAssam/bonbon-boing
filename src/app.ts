@@ -973,8 +973,19 @@ export function boot(): void {
         freeze = true
         pose = 'pop'
       }
-    } else if (want === 'bomb' || want === 'bomb-piece') {
+    } else if (want === 'bomb' || want === 'bomb-piece' || want === 'bomb-board') {
       settleChain(5)
+      particles = []
+      waves = []
+      beams = []
+      state.showIds = []
+      if (!state.pieces.some((p) => !p.dead && p.kind === 'bomb')) {
+        const anchor = state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
+        if (anchor) {
+          anchor.kind = 'bomb'
+          anchor.color = state.chainColor || anchor.color
+        }
+      }
       freeze = true
     } else if (want === 'bomb-blast') {
       settleChain(5)
