@@ -416,14 +416,34 @@ function blit(
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh)
 }
 
-function drawSky(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+/** Cached static sky + tray; clouds drift on top each frame. */
+let bgKey = ''
+let bgCanvas: HTMLCanvasElement | null = null
+
+export function invalidateBgCache(): void {
+  bgKey = ''
+  bgCanvas = null
+}
+
+function drawSkyStatic(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const sky = ctx.createLinearGradient(0, 0, 0, h)
   sky.addColorStop(0, '#9AD8FF')
   sky.addColorStop(0.45, '#DDF3FF')
   sky.addColorStop(1, '#FFD9EE')
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, w, h)
-  for (let i = 0; i < 7; i++) {
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  for (let i = 0; i < 16; i++) {
+    const sx = (i * 97 + 40) % w
+    const sy = (i * 61 + 30) % h
+    ctx.beginPath()
+    ctx.arc(sx, sy, 2 + (i % 3), 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawSkyClouds(ctx: CanvasRenderingContext2D, w: number, _h: number, t: number) {
+  for (let i = 0; i < 5; i++) {
     const cx = ((i * 173 + t * 0.008) % (w + 120)) - 60
     const cy = 40 + (i % 3) * 50 + Math.sin(t / 900 + i) * 8
     ctx.fillStyle = 'rgba(255,255,255,0.55)'
@@ -433,14 +453,27 @@ function drawSky(ctx: CanvasRenderingContext2D, w: number, h: number, t: number)
     ctx.ellipse(cx - 28, cy + 8, 28, 16, 0, 0, Math.PI * 2)
     ctx.fill()
   }
-  ctx.fillStyle = 'rgba(255,255,255,0.28)'
-  for (let i = 0; i < 16; i++) {
-    const sx = (i * 97 + 40) % w
-    const sy = (i * 61 + 30) % h
-    ctx.beginPath()
-    ctx.arc(sx, sy, 2 + (i % 3), 0, Math.PI * 2)
-    ctx.fill()
-  }
+}
+
+function ensureBgCache(
+  w: number,
+  h: number,
+  dpr: number,
+  mat: { x: number; y: number; w: number; h: number } | null,
+  D: number,
+  screen: Scene['screen'],
+): HTMLCanvasElement {
+  const matKey = mat ? `${mat.x},${mat.y},${mat.w},${mat.h}` : 'none'
+  const key = `${w}x${h}@${dpr}:${screen}:${matKey}:${D}`
+  if (bgCanvas && key === bgKey) return bgCanvas
+  const c = canvas(Math.max(1, Math.round(w * dpr)), Math.max(1, Math.round(h * dpr)))
+  const ctx = c.getContext('2d')!
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  drawSkyStatic(ctx, w, h)
+  if (screen !== 'title' && mat) drawTray(ctx, mat, D)
+  bgCanvas = c
+  bgKey = key
+  return c
 }
 
 function drawTray(ctx: CanvasRenderingContext2D, m: { x: number; y: number; w: number; h: number }, D: number) {
@@ -491,7 +524,7 @@ function drawChainBubble(
   rainbow: boolean,
 ) {
   const gold = bomb || rainbow
-  const s = D * (gold ? 0.5 : 0.42) * (1 + Math.min(0.12, n * 0.02))
+  const s = D * (gold ? 0.44 : 0.36) * (1 + Math.min(0.1, n * 0.018))
   ctx.fillStyle = gold ? 'rgba(255, 214, 92, 0.95)' : 'rgba(255,255,255,0.94)'
   ctx.strokeStyle = gold ? '#E8A400' : '#FF8CB8'
   ctx.lineWidth = 3
@@ -511,10 +544,13 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   const dpr = scene.dpr
   const px = Math.max(32, Math.round(D * dpr))
   const pieceD = D * 0.88
-  drawSky(ctx, w, h, scene.t)
+  const bg = ensureBgCache(w, h, dpr, scene.mat, D, scene.screen)
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.drawImage(bg, 0, 0)
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  drawSkyClouds(ctx, w, h, scene.t)
   ctx.save()
   ctx.translate(scene.bumpX, scene.bumpY)
-  if (scene.mat) drawTray(ctx, scene.mat, D)
   const ox = scene.bumpX
   const oy = scene.bumpY
   for (const h of scene.heap) {
@@ -565,9 +601,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     }
     if (!p.popping && (p.kind === 'bomb' || p.kind === 'rainbow')) {
       ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
-      const pulse = 0.82 + Math.sin(scene.t / 180 + p.id) * 0.08
-      ctx.strokeStyle = p.kind === 'bomb' ? 'rgba(255, 120, 220, 0.75)' : 'rgba(120, 220, 255, 0.65)'
-      ctx.lineWidth = Math.max(3, D * 0.09) * pulse
+      const pulse =
+        0.74 +
+        Math.sin(scene.t / (p.kind === 'bomb' ? 130 : 180) + p.id) * (p.kind === 'bomb' ? 0.16 : 0.1)
+      ctx.strokeStyle = p.kind === 'bomb' ? 'rgba(255, 120, 220, 0.82)' : 'rgba(120, 220, 255, 0.65)'
+      ctx.lineWidth = Math.max(3, D * 0.1) * pulse
       ctx.beginPath()
       ctx.arc(p.x, p.y, pieceD * 0.58 * pulse, 0, Math.PI * 2)
       ctx.stroke()
@@ -694,6 +732,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   ctx.font = `800 ${Math.round(D * (scene.floats.some((f) => f.big) ? 0.56 : 0.46))}px "Fredoka Variable", system-ui`
   ctx.textAlign = 'center'
   ctx.lineWidth = 5
+  const floatPad = D * 0.4
   for (const f of scene.floats) {
     const u = f.age / 900
     const bounce = Math.sin(u * Math.PI) * D * 0.12
@@ -702,8 +741,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     ctx.strokeStyle = '#FFFFFF'
     ctx.fillStyle = f.big ? '#FF9A00' : '#E2186E'
     const y = f.y - bounce
-    ctx.strokeText(f.text, f.x, y)
-    ctx.fillText(f.text, f.x, y)
+    const x = Math.min(w - floatPad, Math.max(floatPad, f.x))
+    ctx.strokeText(f.text, x, y)
+    ctx.fillText(f.text, x, y)
   }
   ctx.globalAlpha = 1
 }

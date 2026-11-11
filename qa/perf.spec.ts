@@ -29,9 +29,10 @@ async function chainBurst(page: import('@playwright/test').Page, ms: number) {
   }
 }
 
+test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true })
+
 test('meets fps target at 4x cpu throttle', async ({ page, context }) => {
   test.setTimeout(90_000)
-  await page.setViewportSize({ width: 390, height: 844 })
   const client = await context.newCDPSession(page)
   await client.send('Emulation.setCPUThrottlingRate', { rate: 4 })
   await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })

@@ -244,20 +244,38 @@ function gridChainCount(colors: number[][], cols: number, rows: number, min: num
   return n
 }
 
+function colorShareLive(state: GameState, color: number): number {
+  const live = state.pieces.filter((p) => !p.dead && p.kind === 'bonbon')
+  if (!live.length) return 0
+  return live.filter((p) => p.color === color).length / live.length
+}
+
 function pickSpawnColor(state: GameState, colors: number[][], c: number, r: number): number {
   const n = activeColorCount(state)
   const below = r + 1 < state.rows ? colors[r + 1][c] : -1
   const side = c > 0 ? colors[r][c - 1] : -1
   const buddy = below >= 0 ? below : side
-  if (buddy >= 0 && buddy < n && state.rng() < 0.42) {
+  if (
+    state.lastChainLen >= 4 &&
+    state.chainColor >= 0 &&
+    colorShareLive(state, state.chainColor) < 0.3 &&
+    state.rng() < (state.lastChainLen >= 6 ? 0.52 : 0.38)
+  ) {
+    colors[r][c] = state.chainColor
+    const cap = state.rng() < 0.38 ? 7 : 6
+    if (gridMaxCluster(colors, state.cols, state.rows) <= cap) return state.chainColor
+  }
+  const buddyPull = state.lastChainLen >= 5 ? 0.58 : 0.42
+  if (buddy >= 0 && buddy < n && state.rng() < buddyPull && colorShareLive(state, buddy) < 0.32) {
     colors[r][c] = buddy
     const cap = state.rng() < 0.38 ? 7 : 6
     if (gridMaxCluster(colors, state.cols, state.rows) <= cap) return buddy
   }
   let best = Math.floor(state.rng() * n)
   let bestScore = 1e9
-  for (let t = 0; t < 7; t++) {
+  for (let t = 0; t < 9; t++) {
     const color = Math.floor(state.rng() * n)
+    if (colorShareLive(state, color) > 0.32) continue
     colors[r][c] = color
     const cap = state.rng() < 0.35 ? 7 : 6
     const score = gridMaxCluster(colors, state.cols, state.rows)
@@ -713,6 +731,7 @@ export function gridSignature(state: GameState): string {
   return lines.join('|')
 }
 
+/** Boot-only line seed (board not yet shown). */
 function boostChains(state: GameState) {
   if (state.rng() > 0.42) return
   const n = activeColorCount(state)
@@ -765,8 +784,21 @@ function beginFall(state: GameState) {
       spawned.push(p)
     }
   }
+  if (state.lastChainLen >= 4 && state.chainColor >= 0 && spawned.length && colorShareLive(state, state.chainColor) < 0.3) {
+    const byCol = new Map<number, Piece[]>()
+    for (const p of spawned) {
+      if (!byCol.has(p.c)) byCol.set(p.c, [])
+      byCol.get(p.c)!.push(p)
+    }
+    let tallest: Piece[] = []
+    for (const col of byCol.values()) if (col.length > tallest.length) tallest = col
+    tallest.sort((a, b) => a.r - b.r)
+    const run = Math.min(tallest.length, Math.max(3, state.lastChainLen - 1))
+    for (let i = 0; i < run; i++) tallest[i]!.color = state.chainColor
+  }
   state.pieces = [...live, ...spawned, ...dead]
-  if (state.special && state.specialAt) {
+  const liveSpecials = state.pieces.filter((p) => !p.dead && (p.kind === 'bomb' || p.kind === 'rainbow')).length
+  if (state.special && state.specialAt && liveSpecials < 2) {
     let target = at(state, state.specialAt.c, state.specialAt.r)
     if (!target || target.dead) {
       const col = state.pieces.filter((p) => !p.dead && p.c === state.specialAt!.c)
@@ -776,6 +808,9 @@ function beginFall(state: GameState) {
       target.kind = state.special === 'rainbow' ? 'rainbow' : 'bomb'
       if (target.kind === 'bomb') target.color = state.chainColor
     }
+    state.special = null
+    state.specialAt = null
+  } else if (state.special) {
     state.special = null
     state.specialAt = null
   }
@@ -818,7 +853,9 @@ export function release(state: GameState): number[] {
   state.phase = 'clearing'
   state.settled = false
   state.fallStart = lastAt + FALL_DELAY
-  state.special = path.length >= RAINBOW_AT ? 'rainbow' : path.length >= BOMB_AT ? 'bomb' : null
+  const wantSpecial = path.length >= RAINBOW_AT ? 'rainbow' : path.length >= BOMB_AT ? 'bomb' : null
+  const onBoard = state.pieces.filter((p) => !p.dead && (p.kind === 'bomb' || p.kind === 'rainbow')).length
+  state.special = wantSpecial && onBoard < 2 ? wantSpecial : null
   state.hitstopTotal = big ? HITSTOP_MS : 0
   state.hitstopLeft = 0
   state.hitstopPending = big
@@ -828,10 +865,10 @@ export function release(state: GameState): number[] {
   state.combo = comboFresh ? 1 : Math.min(COMBO_CAP, state.combo + 1)
   let pts = 0
   clears.forEach((_, i) => {
-    pts += 4 * (i + 1)
+    pts += 16 * (i + 1)
   })
-  if (clears.some((p) => p.kind === 'bomb')) pts += 45
-  if (clears.some((p) => p.kind === 'rainbow')) pts += 120
+  if (clears.some((p) => p.kind === 'bomb')) pts += 180
+  if (clears.some((p) => p.kind === 'rainbow')) pts += 480
   state.gained = Math.round(pts * state.combo)
   state.score += state.gained
   state.popAt = []
@@ -899,8 +936,6 @@ export function step(state: GameState, dt: number): number[] {
         p.fallT = -1
         p.landT = -1
       }
-      if (state.lastChainLen >= 5 && state.rng() < 0.72) boostChains(state)
-      else if (state.lastChainLen >= 3 && state.rng() < 0.48) boostChains(state)
       state.lastChainLen = 0
       state.phase = 'idle'
       state.settled = true

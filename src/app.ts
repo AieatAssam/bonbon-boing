@@ -1,4 +1,4 @@
-import { boardLayout, type Layout } from './layout'
+import { boardLayout, titleHeroScale, type Layout } from './layout'
 import {
   byId,
   canAppend,
@@ -23,7 +23,7 @@ import {
   type Mode,
   type Piece,
 } from './sim'
-import { renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
+import { invalidateBgCache, renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
 import { audioCreates, playLink, playPop, setAudioPaused, setAudioPrefs, unlockAudio } from './audio'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
@@ -305,6 +305,9 @@ export function boot(): void {
   let clockOn = false
   let clockRunMs = 0
   let clockTickAt = 0
+  let ghostDemoDone = false
+  let perfDprScale = 1
+  let canvasDpr = 0
   let fpsBuf: number[] = []
   let bumpX = 0
   let bumpY = 0
@@ -320,20 +323,37 @@ export function boot(): void {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
   }
 
+  /** Star bands: greedy ~24k → 2★; skilled combos ~30k+ → 3★ */
+  const STAR2_SCORE = 12_000
+  const STAR3_SCORE = 28_000
+
   function viewDpr(): number {
     const native = Math.min(2, devicePixelRatio || 1)
     const area = Math.max(1, innerWidth * innerHeight)
-    return Math.max(1, Math.min(native, Math.sqrt(1_400_000 / area)))
+    const areaCap = Math.sqrt(1_400_000 / area)
+    if (fpsBuf.length >= 24) {
+      const fps = fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
+      if (fps < 45) perfDprScale = Math.max(0.72, perfDprScale - 0.02)
+      else if (fps > 52) perfDprScale = Math.min(1, perfDprScale + 0.008)
+    }
+    return Math.max(1, Math.min(native, areaCap * perfDprScale))
   }
 
   function resize() {
     const next = boardLayout(innerWidth, innerHeight, insetTop())
     const dpr = viewDpr()
+    if (dpr !== canvasDpr) {
+      canvasDpr = dpr
+      invalidateBgCache()
+    }
     canvas.width = Math.max(1, Math.round(innerWidth * dpr))
     canvas.height = Math.max(1, Math.round(innerHeight * dpr))
     canvas.style.width = `${innerWidth}px`
     canvas.style.height = `${innerHeight}px`
     gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    if (next.cols !== layout.cols || next.rows !== layout.rows || next.D !== layout.D) {
+      invalidateBgCache()
+    }
     if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
       const score = state.score
       const timeLeft = state.timeLeft
@@ -467,20 +487,24 @@ export function boot(): void {
   }
 
   function armRelease() {
+    const dragPts = state.drag
+      .map((id) => byId(state, id))
+      .filter((p): p is Piece => !!p)
+      .map((p) => center(p))
     const t0 = performance.now()
     const ids = release(state)
     popWallMs = performance.now() - t0
     if (!ids.length) return
     const spot = center(byId(state, ids[0]) ?? state.pieces[0])
+    const margin = layout.D * 0.35
     floats.push({
-      x: spot.x,
+      x: Math.min(innerWidth - margin, Math.max(margin, spot.x)),
       y: Math.max(layout.hud + layout.D * 0.2, spot.y - layout.D * 0.15),
       text: `+${state.gained}`,
       age: 0,
       big: true,
     })
-    const path = state.queue.map((q) => byId(state, q.id)).filter((p): p is Piece => !!p).map((p) => center(p))
-    ropeTrail = path.length > 1 ? path : ropeTrail
+    ropeTrail = dragPts.length > 1 ? dragPts : ropeTrail
     ropeFadeColor = state.chainColor
     ropeFadeLen = Math.max(ropeFadeLen, state.queue.length)
     ropeFadeMs = 80
@@ -504,16 +528,23 @@ export function boot(): void {
       const isNew = state.score > prior
       rememberBest()
       const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-      bestEl.innerHTML = `${ICONS.star}<span>${best}</span>`
-      const n = state.score >= 18_000 ? 3 : state.score >= 12_000 ? 2 : 1
+      const n = state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1
       stars.innerHTML = [0, 1, 2]
         .map(
           (i) =>
             `<span class="star${i < n ? ' on' : ''}" style="transition-delay:${i * 180}ms" aria-hidden="true">${ICONS.star.replace('width="18"', 'width="44"').replace('height="18"', 'height="44"')}</span>`,
         )
         .join('')
-      newBestEl.hidden = !isNew
-      newBestEl.textContent = isNew ? 'New best!' : ''
+      if (isNew) {
+        bestEl.hidden = true
+        newBestEl.hidden = false
+        newBestEl.textContent = 'New best!'
+      } else {
+        bestEl.hidden = false
+        bestEl.innerHTML = `${ICONS.star}<span>${best}</span>`
+        newBestEl.hidden = true
+        newBestEl.textContent = ''
+      }
     }
     syncHud()
     syncTitleBest()
@@ -560,6 +591,7 @@ export function boot(): void {
     clockOn = false
     clockRunMs = 0
     clockTickAt = 0
+    ghostDemoDone = save.tut || qaMode
   }
 
   function showPlay() {
@@ -666,6 +698,9 @@ export function boot(): void {
   function titleHeapHit(x: number, y: number): number | null {
     const D = layout.D
     const landscape = innerWidth > innerHeight
+    const hero = titleHeroScale(innerWidth, innerHeight, D)
+    const cx = landscape ? innerWidth * 0.38 : innerWidth * 0.5
+    const cy = landscape ? innerHeight * 0.55 : innerHeight * 0.48
     const spots = [
       [-1, 1],
       [0, 1],
@@ -675,8 +710,8 @@ export function boot(): void {
       [0, -0.95],
     ].map(([gx, gy], i) => ({
       id: i,
-      x: (landscape ? innerWidth * 0.38 : innerWidth * 0.5) + gx * D * 0.92,
-      y: (landscape ? innerHeight * 0.55 : innerHeight * 0.48) + gy * D * 0.78,
+      x: cx + gx * D * 0.92 * hero,
+      y: cy + gy * D * 0.78 * hero,
     }))
     let best: number | null = null
     let bestD = D * 0.62
@@ -815,13 +850,9 @@ export function boot(): void {
       return
     }
     if (screen !== 'play') return
-    if (!clockOn) {
-      if (!ghostOn || save.tut) clockOn = true
-      else {
-        const u = (now % 2600) / 2600
-        if (u > 0.94) clockOn = true
-      }
-      if (clockOn) clockTickAt = now
+    if (!clockOn && ghostDemoDone) {
+      clockOn = true
+      clockTickAt = now
     }
     syncWallClock(now)
     if (
@@ -843,12 +874,13 @@ export function boot(): void {
   function ghostPose(now: number): { x: number; y: number; down: boolean; alpha: number; prefix: number } | null {
     if (!ghostOn || screen !== 'play' || state.drag.length > 0 || state.phase !== 'idle') return null
     if (!ghostPath.length) {
-      ghostPath = findPath(state, 3) ?? []
+      ghostPath = findPath(state, 3) ?? findPath(state, 2) ?? []
       if (!ghostPath.length) return null
     }
     const u = (now % 2600) / 2600
     const travel = Math.min(1, Math.max(0, (u - 0.1) / 0.62))
     const idx = Math.min(ghostPath.length - 1, Math.floor(travel * ghostPath.length))
+    if (idx >= ghostPath.length - 1 && u > 0.86) ghostDemoDone = true
     const c = center(ghostPath[idx])
     const alpha = u < 0.08 ? u / 0.08 : u > 0.88 ? (1 - u) / 0.12 : 1
     const towardX = c.x < innerWidth / 2 ? layout.D * 0.28 : -layout.D * 0.28
@@ -957,6 +989,7 @@ export function boot(): void {
       }
     }
     const landscape = innerWidth > innerHeight
+    const hero = titleHeroScale(innerWidth, innerHeight, D)
     const dragPath = state.drag.map((id) => byId(state, id)).filter((p): p is Piece => !!p)
     const ropeColor = dragPath.length
       ? (pathColor(dragPath) ?? dragPath[0].color)
@@ -973,6 +1006,10 @@ export function boot(): void {
           ? rope[rope.length - 1]
           : null
     let titleHint: Scene['titleHint'] = null
+    const heapCenterX = landscape ? innerWidth * 0.38 : innerWidth * 0.5
+    const heapCenterY = landscape ? innerHeight * 0.55 : innerHeight * 0.48
+    const hintColor = 1
+    const hintSlots = new Set([0, 1, 2])
     if (screen === 'title') {
       const u = (now % 2800) / 2800
       const travel = Math.min(1, Math.max(0, (u - 0.12) / 0.58))
@@ -986,11 +1023,10 @@ export function boot(): void {
         [0, -0.95],
       ].map(([gx, gy], i) => ({
         color: i % 6,
-        x: (landscape ? innerWidth * 0.38 : innerWidth * 0.5) + gx * D * 0.92,
-        y: (landscape ? innerHeight * 0.55 : innerHeight * 0.48) + gy * D * 0.78,
+        x: heapCenterX + gx * D * 0.92 * hero,
+        y: heapCenterY + gy * D * 0.78 * hero,
       }))
-      const hintColor = 2
-      const pick = [1, 0, 4].map((i) => ({ ...heapPts[i]!, color: hintColor }))
+      const pick = [0, 1, 2].map((i) => ({ ...heapPts[i]!, color: hintColor }))
       const ropePts = pick.slice(0, idx + 1).map((p) => ({ x: p.x, y: p.y }))
       const tip = pick[idx]!
       titleHint = {
@@ -1017,42 +1053,40 @@ export function boot(): void {
             const tap = titleSquish.get(i) ?? 0
             const squash = tap ? Math.max(0, 1 - (now - tap) / 220) : 0
             const idle = freeze || reduced ? 0 : Math.sin(now / 360 + i) * 0.03
+            const hx = heapCenterX + gx * D * 0.92 * hero
+            const hy = heapCenterY + gy * D * 0.78 * hero + (freeze || reduced ? 0 : Math.sin(now / 380 + i) * 4)
             return {
               id: i,
-              color: i % 6,
+              color: hintSlots.has(i) ? hintColor : i % 6,
               kind: 'bonbon' as const,
-              x: (landscape ? innerWidth * 0.38 : innerWidth * 0.5) + gx * D * 0.92,
-              y:
-                (landscape ? innerHeight * 0.55 : innerHeight * 0.48) +
-                gy * D * 0.78 +
-                (freeze || reduced ? 0 : Math.sin(now / 380 + i) * 4),
-              sx: 1 + idle + squash * 0.08,
-              sy: 1 + idle - squash * 0.18,
+              x: hx,
+              y: hy,
+              sx: (1 + idle + squash * 0.08) * hero,
+              sy: (1 + idle - squash * 0.18) * hero,
             }
           })
         : []
     let bubble: Scene['bubble'] = null
-    if (screen === 'play' && chainLen > 1) {
-      const base =
-        fingerOn && state.drag.length
-          ? { x: fingerX, y: fingerY }
-          : rope.length
-            ? rope[rope.length - 1]!
-            : null
-      if (base) {
-        let bx = base.x
-        let by = base.y - D * 1.2
-        const mat = {
-          x: layout.ox - D * 0.1,
-          y: Math.max(layout.hud, layout.oy - D * 0.08),
-          w: layout.cols * D + D * 0.2,
-          h: layout.padTop + layout.rows * D + D * 0.12,
-        }
-        const pad = D * 0.35
-        bx = Math.min(mat.x + mat.w - pad, Math.max(mat.x + pad, bx))
-        by = Math.min(mat.y + mat.h - pad, Math.max(mat.y + pad, by))
-        bubble = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+    if (screen === 'play' && chainLen > 1 && rope.length > 1) {
+      const tip = rope[rope.length - 1]!
+      const prev = rope[rope.length - 2]!
+      const dx = tip.x - prev.x
+      const dy = tip.y - prev.y
+      const len = Math.hypot(dx, dy) || 1
+      const px = -dy / len
+      const py = dx / len
+      let bx = tip.x + px * D * 0.62 - (dx / len) * D * 0.2
+      let by = tip.y + py * D * 0.62 - (dy / len) * D * 0.2 - D * 0.35
+      const mat = {
+        x: layout.ox - D * 0.1,
+        y: Math.max(layout.hud, layout.oy - D * 0.08),
+        w: layout.cols * D + D * 0.2,
+        h: layout.padTop + layout.rows * D + D * 0.12,
       }
+      const pad = D * 0.35
+      bx = Math.min(mat.x + mat.w - pad, Math.max(mat.x + pad, bx))
+      by = Math.min(mat.y + mat.h - pad, Math.max(mat.y + pad, by))
+      bubble = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
     }
     return {
       w: innerWidth,

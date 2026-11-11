@@ -34,10 +34,56 @@ async function playChain(page: import('@playwright/test').Page, min: number) {
   return true
 }
 
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+test('30s gameplay touch clip', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
+  await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+  const video = await page.video()
+  await page.waitForTimeout(300)
+  const end = Date.now() + 30_000
+  const mins = [4, 5, 6, 5, 4, 6, 5, 4]
+  let i = 0
+  while (Date.now() < end) {
+    await playChain(page, mins[i % mins.length]!)
+    i += 1
+    await page.waitForTimeout(650)
+  }
+  await page.close()
+  const src = await video?.path()
+  expect(src).toBeTruthy()
+  if (src && existsSync(src)) copyFileSync(src, '/opt/cursor/artifacts/gameplay-30s-390x844.webm')
+})
+
+test('60s round wall-clock touch', async ({ page }) => {
+  test.setTimeout(150_000)
+  await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
+  await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+  const video = await page.video()
+  await page.evaluate(() => {
+    const q = (window as unknown as { __qa: Qa & { pointer: (p: string, x: number, y: number) => void } }).__qa
+    q.pointer('down', innerWidth / 2, innerHeight * 0.65)
+    q.pointer('up', innerWidth / 2, innerHeight * 0.65)
+  })
+  const end = Date.now() + 62_000
+  const mins = [3, 4, 5, 6, 5, 4, 6, 5, 4, 5, 6, 8]
+  let i = 0
+  while (Date.now() < end) {
+    await playChain(page, mins[i % mins.length]!)
+    i += 1
+    await page.waitForTimeout(520)
+  }
+  await page.waitForTimeout(2000)
+  await page.close()
+  const src = await video?.path()
+  expect(src).toBeTruthy()
+  if (src && existsSync(src)) copyFileSync(src, '/opt/cursor/artifacts/gameplay-60s-390x844.webm')
+})
+
 test('gameplay video portrait', async ({ page }) => {
   test.setTimeout(120_000)
   test.slow()
-  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
   await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
   const video = await page.video()

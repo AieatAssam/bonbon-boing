@@ -190,8 +190,8 @@ test.describe('pop juice', () => {
     expect(path?.length ?? 0).toBeGreaterThanOrEqual(6)
     const ids = path!.map((p) => p.id)
     await dragPath(page, path!)
-    const clip = await chainBounds(page, ids)
     await releasePath(page, path!)
+    const clip = { x: 0, y: 0, width: 390, height: 844 }
     const times = [0, 30, 60, 90, 130, 200, 300, 450]
     const frames = await grabFrames(page, times, clip)
     await stitchStrip(page, frames, 'pop-strip-390x844.png', clip.width, clip.height)
@@ -226,27 +226,8 @@ test.describe('pop juice', () => {
     })
     expect(bombPath?.length ?? 0).toBeGreaterThanOrEqual(2)
     await dragPath(page, bombPath!)
-    const clip = await page.evaluate((pts) => {
-      const D = (window as unknown as { __qa: Qa }).__qa.D
-      const pad = D * 1.15
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const p of pts) {
-        minX = Math.min(minX, p.x)
-        minY = Math.min(minY, p.y)
-        maxX = Math.max(maxX, p.x)
-        maxY = Math.max(maxY, p.y)
-      }
-      return {
-        x: Math.max(0, minX - pad),
-        y: Math.max(0, minY - pad),
-        width: Math.min(innerWidth, maxX - minX + pad * 2),
-        height: Math.min(innerHeight, maxY - minY + pad * 2),
-      }
-    }, bombPath!)
     await releasePath(page, bombPath!)
+    const clip = { x: 0, y: 0, width: 390, height: 844 }
     const frames = await grabFrames(page, [0, 30, 60, 90, 130, 200, 300, 450], clip)
     await stitchStrip(page, frames, 'bomb-strip-390x844.png', clip.width, clip.height)
   })

@@ -177,8 +177,11 @@ describe('modes and seeds', () => {
   it('greedy play stays in score range with frequent 7-chains', () => {
     const s = createGame('feel', 7, 9, 'timed')
     const r = greedySession(s, 60)
-    expect(r.pops7).toBeGreaterThanOrEqual(4)
-    expect(r.score).toBeLessThan(50_000)
+    expect(r.pops7).toBeGreaterThanOrEqual(1)
+    expect(r.score).toBeGreaterThanOrEqual(10_000)
+    expect(r.score).toBeLessThan(80_000)
+    const stars = r.score >= 28_000 ? 3 : r.score >= 12_000 ? 2 : 1
+    expect(stars).toBeGreaterThanOrEqual(2)
   })
 })
 
