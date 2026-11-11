@@ -41,13 +41,13 @@ test('gameplay video portrait', async ({ page }) => {
   await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
   await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
   const video = await page.video()
-  const seq = [3, 4, 4, 5, 5, 6, 6, 8, 4, 5, 6, 4, 5, 8, 4, 5, 6, 8, 4, 5]
+  const seq = [3, 4, 4, 5, 5, 6, 6, 8, 4, 5, 6, 4, 5, 8, 4, 5, 6, 8, 4, 5, 6, 5, 8]
   await page.waitForTimeout(400)
   for (const min of seq) {
     await playChain(page, min)
-    await page.waitForTimeout(650)
+    await page.waitForTimeout(720)
   }
-  await page.waitForTimeout(3500)
+  await page.waitForTimeout(4500)
   await page.close()
   const src = await video?.path()
   expect(src).toBeTruthy()
