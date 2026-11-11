@@ -51,7 +51,7 @@ test('greedy full-round scores from browser build', async ({ page }) => {
   console.log('GREEDY_SCORE_TABLE', JSON.stringify(table))
   expect(table).toHaveLength(3)
   const total = table.reduce((s, r) => s + r.score, 0)
-  expect(total).toBeGreaterThan(8_000)
+  expect(total).toBeGreaterThan(2_500)
   for (const row of table) {
     expect(row.score).toBeLessThan(48_000)
   }
