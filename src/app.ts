@@ -43,6 +43,7 @@ import { showTipCard } from './ui/tipCard'
 import { equip, purchase } from './meta/catalogue'
 import { PLUSH_ICONS } from './ui/plushIcons'
 import { getCosmetics } from './draw'
+import { setToastBlocked } from './ui/toastQueue'
 import type { SaveV3 } from './meta/save'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
@@ -59,8 +60,9 @@ export type Qa = {
   score: number
   combo: number
   timeLeft: number
+  movesLeft: number
   paused: boolean
-  inputLocked: false
+  inputLocked: boolean
   chain: number[]
   D: number
   cols: number
@@ -129,6 +131,8 @@ export type Qa = {
   closeMeta: () => void
   prepPromoSave: () => void
   prepMapLock: () => void
+  prepAdventureLevel: (levelId: number) => void
+  boardPieces: () => { spawning: boolean; spawnT: number; x: number; y: number }[]
   markTipsSeen: () => void
   playRealRound: () => void
   buySkin: (id: string) => void
@@ -138,6 +142,7 @@ export type Qa = {
   startAdventure: (levelId: number) => void
   capturePopBurst: () => void
   settleChain: (min: number) => boolean
+  greedyPlayLevel: () => { stars: number; won: boolean; score: number }
   hasBomb: () => boolean
   lastChainLen: number
 }
@@ -201,6 +206,32 @@ export function boot(): void {
   let lastFinishedAdventureLevel: AdventureLevelDef | null = null
   let lastRunRewards = { coins: 0, xp: 0 }
   let lastRunRewardNote = ''
+  type BonusFinale = { popsLeft: number; nextAt: number; endAt: number }
+  let bonusFinale: BonusFinale | null = null
+  const BONUS_POP_GAP_MS = 170
+  const BONUS_CAP_MS = 3000
+
+  function finishBonusFinale() {
+    bonusFinale = null
+    state.inputLocked = false
+    syncAdventureGoalsFromTrack()
+    showResults()
+  }
+
+  function doBonusSquish() {
+    const live = state.pieces.filter((p) => !p.dead && p.popT < 0 && (p.kind === 'bonbon' || p.kind === 'bomb'))
+    if (!live.length) return
+    const p = live[Math.floor(state.rng() * live.length)]!
+    const c = center(p)
+    const big = state.rng() < 0.14
+    const gain = 48 + Math.floor(state.rng() * 52) + (big ? 45 : 0)
+    state.score += gain
+    if (adventureGoals) adventureGoals.score = state.score
+    burst(c.x, c.y, p.color, big, p.kind === 'bomb')
+    if (!save.muteSfx) playPop(p.color, big)
+    state.gained = gain
+    p.landT = 0
+  }
 
   function syncAdventureGoalsFromTrack() {
     if (!adventureGoals) return
@@ -807,6 +838,7 @@ export function boot(): void {
 
   function show(next: Screen) {
     screen = next
+    setToastBlocked(next === 'results')
     title.hidden = next !== 'title'
     hud.hidden = next !== 'play'
     pauseMenu.hidden = next !== 'pause'
@@ -1159,6 +1191,10 @@ export function boot(): void {
       onTitleTap(x, y)
       return
     }
+    if (bonusFinale) {
+      finishBonusFinale()
+      return
+    }
     if (screen !== 'play') return
     if (!mayBeginChain(state)) {
       state.drag = []
@@ -1299,12 +1335,35 @@ export function boot(): void {
     }
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
-    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length) {
+    if (bonusFinale) {
+      const tNow = performance.now()
+      while (tNow >= bonusFinale.nextAt && bonusFinale.popsLeft > 0) {
+        doBonusSquish()
+        bonusFinale.popsLeft -= 1
+        bonusFinale.nextAt += BONUS_POP_GAP_MS
+      }
+      if (bonusFinale.popsLeft <= 0 || tNow >= bonusFinale.endAt) {
+        finishBonusFinale()
+        return
+      }
+    }
+    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length && !bonusFinale) {
       syncAdventureGoalsFromTrack()
       if (allGoalsMet(adventureGoals, adventureLevel.goals)) {
-        const bonus = Math.max(0, state.movesLeft) * 75
-        if (bonus > 0) state.score += bonus
-        state.movesLeft = 0
+        const left = state.movesLeft
+        if (left > 0) {
+          bonusFinale = {
+            popsLeft: left,
+            nextAt: performance.now() + BONUS_POP_GAP_MS,
+            endAt: performance.now() + BONUS_CAP_MS,
+          }
+          state.movesLeft = 0
+          state.inputLocked = true
+          doBonusSquish()
+          bonusFinale.popsLeft -= 1
+          syncHud()
+          return
+        }
         showResults()
         return
       }
@@ -1867,8 +1926,9 @@ export function boot(): void {
     get combo() { return state.combo },
     get lastChainLen() { return state.lastChainLen },
     get timeLeft() { return state.timeLeft },
+    get movesLeft() { return state.movesLeft },
     get paused() { return screen === 'pause' },
-    inputLocked: false,
+    get inputLocked() { return state.inputLocked },
     get chain() { return state.drag.slice() },
     get D() { return layout.D },
     get cols() { return state.cols },
@@ -1885,6 +1945,8 @@ export function boot(): void {
             color: p.color,
             kind: p.kind,
             popping: p.popT >= 0,
+            spawning: p.spawnT >= 0 && p.spawnT < 1,
+            spawnT: p.spawnT,
             falling: p.fallT >= 0 && p.fallT < 1,
             x: c.x,
             y: c.y,
@@ -2116,6 +2178,27 @@ export function boot(): void {
       save.adventure.frontier = 18
       meta.persist()
     },
+    prepAdventureLevel(levelId: number) {
+      save.adventure.frontier = Math.max(1, levelId)
+      save.adventure.chapterStars = { '1': 30, '2': 30, '3': 30, '4': 30 }
+      for (const t of ['ice', 'choco', 'jelly', 'sleepy', 'starburst']) {
+        if (!save.seenTips.includes(t)) save.seenTips.push(t)
+      }
+      meta.persist()
+    },
+    boardPieces() {
+      return state.pieces
+        .filter((p) => !p.dead)
+        .map((p) => {
+          const c = center(p)
+          return {
+            spawning: p.spawnT >= 0 && p.spawnT < 1,
+            spawnT: p.spawnT,
+            x: c.x,
+            y: c.y,
+          }
+        })
+    },
     markTipsSeen() {
       for (const t of ['ice', 'choco', 'jelly', 'sleepy', 'starburst']) {
         if (!save.seenTips.includes(t)) save.seenTips.push(t)
@@ -2164,6 +2247,57 @@ export function boot(): void {
     },
     settleChain(min: number) {
       return settleChain(min)
+    },
+    greedyPlayLevel() {
+      let guard = 0
+      while (screen === 'play' && guard++ < 500) {
+        if (bonusFinale) {
+          tick(24, performance.now())
+          continue
+        }
+        let played = false
+        for (let m = 8; m >= 2; m--) {
+          if (settleChain(m)) {
+            played = true
+            break
+          }
+        }
+        if (!played) {
+          tick(20, performance.now())
+          if (roundOver(state)) {
+            showResults()
+            break
+          }
+          continue
+        }
+        for (let t = 0; t < 800; t += 40) tick(40, performance.now())
+        if (roundOver(state)) {
+          showResults()
+          break
+        }
+      }
+      if (screen === 'play') {
+        for (let i = 0; i < 180; i++) tick(32, performance.now())
+        if (bonusFinale) finishBonusFinale()
+        else if (roundOver(state)) showResults()
+        else if (mode === 'adventure' && adventureGoals && adventureLevel && allGoalsMet(adventureGoals, adventureLevel.goals)) {
+          if (state.movesLeft > 0) {
+            bonusFinale = {
+              popsLeft: state.movesLeft,
+              nextAt: performance.now() + BONUS_POP_GAP_MS,
+              endAt: performance.now() + BONUS_CAP_MS,
+            }
+            state.movesLeft = 0
+            state.inputLocked = true
+            doBonusSquish()
+            bonusFinale.popsLeft -= 1
+            for (let i = 0; i < 120; i++) tick(32, performance.now())
+            finishBonusFinale()
+          } else showResults()
+        }
+      }
+      draw()
+      return { stars: lastResultStars ?? 0, won: lastAdventureWon, score: state.score, screen }
     },
     hasBomb() {
       return state.pieces.some((p) => !p.dead && p.kind === 'bomb')

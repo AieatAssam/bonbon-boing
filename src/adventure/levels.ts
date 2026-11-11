@@ -55,7 +55,11 @@ export function buildLevel(id: number): AdventureLevelDef {
 
   const goals: AdventureGoal[] = []
   const color = id % Math.max(3, colorCount)
-  goals.push({ type: 'clear_color', color, count: 8 + Math.floor(tier * 0.9) })
+  goals.push({
+    type: 'clear_color',
+    color,
+    count: id <= 3 ? 4 : id <= 8 ? 7 + Math.floor(tier * 0.5) : 8 + Math.floor(tier * 0.9),
+  })
   if (id >= 6) goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 10) })
   if (id >= 3) goals.push({ type: 'break_ice', count: Math.min(10, 2 + Math.floor(id / 5)) })
   if (id >= 20) goals.push({ type: 'clear_choco', count: Math.min(8, 2 + Math.floor((id - 19) / 6)) })
@@ -64,7 +68,13 @@ export function buildLevel(id: number): AdventureLevelDef {
   }
 
   const starMul: [number, number, number] =
-    id <= 3 ? [1, 1.22, 1.48] : chapter === 1 ? [1, 1.42, 1.95] : chapter === 2 ? [1, 1.55, 2.2] : [1, 1.48, 2.05]
+    id <= 8
+      ? [1, 1.06, 1.22]
+      : chapter === 1
+        ? [1, 1.32, 1.72]
+        : chapter === 2
+          ? [1, 1.48, 2.05]
+          : [1, 1.42, 1.88]
   const starScore: [number, number, number] = [
     baseScore,
     Math.floor(baseScore * starMul[1]),
@@ -95,8 +105,11 @@ export function buildLevel(id: number): AdventureLevelDef {
 type LevelsFile = { version: number; levels: AdventureLevelDef[] }
 
 const bundled = levelsBundle as LevelsFile
-export const ADVENTURE_LEVELS: AdventureLevelDef[] =
-  bundled.levels?.length === 60 ? bundled.levels : Array.from({ length: 60 }, (_, i) => buildLevel(i + 1))
+export const ADVENTURE_LEVELS: AdventureLevelDef[] = Array.from({ length: 60 }, (_, i) => {
+  const built = buildLevel(i + 1)
+  const saved = bundled.levels?.[i]
+  return saved?.id === built.id ? { ...built, seed: saved.seed } : built
+})
 
 export function levelById(id: number): AdventureLevelDef | undefined {
   return ADVENTURE_LEVELS.find((l) => l.id === id)

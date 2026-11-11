@@ -1,14 +1,7 @@
 import type { AdventureGoal, AdventureLevelDef } from './levels'
+import { goalPieceIconDataUrl } from '../draw'
 import { PLUSH_ICONS } from '../ui/plushIcons'
-
-const COLOR_DOT = [
-  `<span class="goal-dot" style="background:#FF3D8E"></span>`,
-  `<span class="goal-dot" style="background:#2FDB8E"></span>`,
-  `<span class="goal-dot" style="background:#FFD02A"></span>`,
-  `<span class="goal-dot" style="background:#5088FF"></span>`,
-  `<span class="goal-dot" style="background:#FF7A28"></span>`,
-  `<span class="goal-dot" style="background:#C070FF"></span>`,
-]
+import type { Kind } from '../sim'
 
 export type AdventureGoalState = {
   score: number
@@ -34,20 +27,43 @@ export type StarEval = {
   thresholds: [number, number, number]
 }
 
+function goalKind(goal: AdventureGoal): Kind | 'bomb' | 'rainbow' | 'starburst' {
+  switch (goal.type) {
+    case 'clear_color':
+      return 'bonbon'
+    case 'pop_bombs':
+      return 'bomb'
+    case 'break_ice':
+      return 'ice'
+    case 'clear_choco':
+      return 'choco'
+    default:
+      return 'bonbon'
+  }
+}
+
+function goalColor(goal: AdventureGoal): number {
+  if (goal.type === 'clear_color') return goal.color
+  if (goal.type === 'pop_bombs') return 4
+  if (goal.type === 'break_ice') return 3
+  if (goal.type === 'clear_choco') return 0
+  return 0
+}
+
 function goalIcon(goal: AdventureGoal): string {
   switch (goal.type) {
     case 'clear_color':
-      return COLOR_DOT[goal.color % COLOR_DOT.length] ?? COLOR_DOT[0]!
-    case 'pop_bombs':
-      return `<span class="goal-ico">${PLUSH_ICONS.starburst}</span>`
+    case 'break_ice':
+    case 'clear_choco':
+    case 'pop_bombs': {
+      const kind = goalKind(goal) as Kind
+      const src = goalPieceIconDataUrl(kind, goalColor(goal), 20)
+      return `<img class="goal-bonbon-ico" src="${src}" width="20" height="20" alt="" />`
+    }
     case 'score_moves':
       return `<span class="goal-ico">${PLUSH_ICONS.rush}</span>`
-    case 'break_ice':
-      return `<span class="goal-ico">${PLUSH_ICONS.ice}</span>`
-    case 'clear_choco':
-      return `<span class="goal-ico">${PLUSH_ICONS.choco}</span>`
     default:
-      return `<span class="goal-dot" style="background:#FF8CB8"></span>`
+      return `<span class="goal-ico">${PLUSH_ICONS.starburst}</span>`
   }
 }
 

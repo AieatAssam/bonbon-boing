@@ -76,8 +76,8 @@ export type GameState = {
   settleMs: number
   popAt: number[]
   settled: boolean
-  /** Always false. A new press rushes the clear instead of ignoring the finger. */
-  inputLocked: false
+  /** True during adventure bonus finale (tap to skip). */
+  inputLocked: boolean
   special: 'bomb' | 'rainbow' | 'starburst' | null
   specialAt: { c: number; r: number } | null
   chainColor: number
@@ -1181,6 +1181,7 @@ export function rush(state: GameState): number[] {
 }
 
 export function mayBeginChain(state: GameState): boolean {
+  if (state.inputLocked) return false
   if (state.mode === 'cuddle' || state.mode === 'adventure') {
     if (state.mode === 'adventure' && state.movesLeft === 0) return false
     return true

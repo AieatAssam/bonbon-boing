@@ -20,10 +20,10 @@ The first visit shows a glossy white-glove hint (no wall-of-text tutorial). Drag
 
 | Mode | Button | What it is |
 |------|--------|------------|
-| **Score Rush** | Play | 60-second scored round — the main hustle. |
-| **Cuddle** | Heart | Same juicy pops, no clock. |
-| **Daily** | Sun | One shared board per local day (`bonbon-YYYY-MM-DD`). |
-| **Adventure** | Map | 60 goal levels in four chapters — ice, choco, jelly, sleepy giants. |
+| **Score Rush** | Score Rush | 60-second scored round — the main hustle. |
+| **Cuddle** | Cuddle | Same juicy pops, no clock. |
+| **Daily** | Daily | One shared board per local day (`bonbon-YYYY-MM-DD`). |
+| **Adventure** | Adventure | 60 goal levels in four chapters — ice, choco, jelly, sleepy giants. |
 
 ## Meta & collection
 

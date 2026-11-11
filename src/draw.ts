@@ -415,9 +415,18 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
     ctx.ellipse(cx, cy - r * 0.05, r * 0.92, r * 0.55, 0, 0, Math.PI * 2)
     ctx.stroke()
   } else if (skin === 'gummy') {
-    ctx.fillStyle = 'rgba(255,255,255,0.25)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)'
+    ctx.lineWidth = Math.max(2.5, r * 0.09)
     ctx.beginPath()
-    ctx.ellipse(cx - r * 0.35, cy - r * 0.25, r * 0.22, r * 0.14, -0.4, 0, Math.PI * 2)
+    ctx.arc(cx, cy, r * 0.93, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(255,255,255,0.48)'
+    ctx.beginPath()
+    ctx.ellipse(cx - r * 0.32, cy - r * 0.38, r * 0.3, r * 0.17, -0.5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(200,255,240,0.25)'
+    ctx.beginPath()
+    ctx.ellipse(cx + r * 0.18, cy + r * 0.34, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2)
     ctx.fill()
   } else if (skin === 'mochi') {
     ctx.fillStyle = pal.rim
@@ -508,6 +517,33 @@ export function bodySprite(kind: Kind, color: number, px: number): HTMLCanvasEle
 
 export function faceSprite(blink: boolean, px: number): HTMLCanvasElement {
   return sprite(blink ? `f:1:${px}` : `f:0:${px}`, () => paintFace(blink, px))
+}
+
+const goalIconCache = new Map<string, string>()
+
+/** ~20px HUD bonbon / blocker art (body + face when bonbon). */
+export function goalPieceIconDataUrl(kind: Kind, color: number, size = 20): string {
+  const key = `goal:${kind}:${color}:${size}:${equippedSkin}`
+  const hit = goalIconCache.get(key)
+  if (hit) return hit
+  const px = Math.max(32, Math.round(size * 2.2))
+  const c = canvas(px, px)
+  const ctx = c.getContext('2d')
+  if (!ctx) return ''
+  const dpr = 1
+  const pieceD = size * 0.92
+  const cx = size / 2
+  const cy = size / 2
+  ctx.clearRect(0, 0, px, px)
+  const scale = px / size
+  ctx.scale(scale, scale)
+  blit(ctx, dpr, 0, 0, bodySprite(kind, color, px), cx, cy, pieceD, pieceD, 1, 1)
+  if (kind === 'bonbon') {
+    blit(ctx, dpr, 0, 0, faceSprite(false, px), cx, cy, pieceD, pieceD, 1, 1)
+  }
+  const url = c.toDataURL('image/png')
+  goalIconCache.set(key, url)
+  return url
 }
 
 function blit(
@@ -713,7 +749,22 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   }
   for (const h of scene.heap) {
     blit(ctx, dpr, ox, oy, bodySprite(h.kind, h.color, px), h.x, h.y, pieceD, pieceD, h.sx, h.sy)
-    blit(ctx, dpr, ox, oy, faceSprite(false, px), h.x, h.y + pieceD * (1 - h.sy) * 0.08, pieceD, pieceD, 1, 1)
+    if (h.kind === 'bonbon' && h.sx >= 0.12 && h.sy >= 0.12) {
+      blit(
+        ctx,
+        dpr,
+        ox,
+        oy,
+        faceSprite(false, px),
+        h.x,
+        h.y + pieceD * (1 - h.sy) * 0.1,
+        pieceD,
+        pieceD,
+        h.sx,
+        h.sy,
+        1,
+      )
+    }
   }
   for (const p of scene.peeks) {
     blit(ctx, dpr, ox, oy, bodySprite('bonbon', p.color, px), p.x, p.y, pieceD, pieceD, 1, 1)
@@ -741,7 +792,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.arc(p.x, p.y, pieceD * 0.54, 0, Math.PI * 2)
       ctx.stroke()
     }
-    if (!p.popping && p.kind === 'bonbon') {
+    if (!p.popping && p.kind === 'bonbon' && p.sx >= 0.12 && p.sy >= 0.12) {
+      const faceAlpha = alpha * Math.min(1, Math.max(p.sx, p.sy))
       blit(
         ctx,
         dpr,
@@ -752,9 +804,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
         p.y + pieceD * (1 - p.sy) * 0.1,
         pieceD,
         pieceD,
-        1,
-        1,
-        1,
+        p.sx,
+        p.sy,
+        faceAlpha,
       )
     }
     if (!p.popping && (p.kind === 'bomb' || p.kind === 'rainbow')) {
@@ -983,12 +1035,12 @@ function drawHand(
   ctx.roundRect(-16, 38, 34, 24, 12)
   ctx.fill()
   ctx.stroke()
-  // Thumb.
+  // Thumb tucked beside palm (not a second finger).
   ctx.beginPath()
-  ctx.moveTo(10, 44)
-  ctx.quadraticCurveTo(20, 38, 22, 28)
-  ctx.quadraticCurveTo(23, 22, 18, 20)
-  ctx.quadraticCurveTo(13, 22, 10, 30)
+  ctx.moveTo(8, 42)
+  ctx.quadraticCurveTo(18, 44, 20, 50)
+  ctx.quadraticCurveTo(21, 54, 14, 52)
+  ctx.quadraticCurveTo(6, 50, 8, 42)
   ctx.closePath()
   ctx.fill()
   ctx.stroke()

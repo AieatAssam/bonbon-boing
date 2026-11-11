@@ -192,7 +192,11 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
 }
 
 #title .meta-row .meta-label {
-  display: none;
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
 }
 
 #title .meta-row .meta-card {
@@ -247,6 +251,27 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   background: #fff;
   border: 2px solid var(--line);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.goal-bonbon-ico {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.goal-ico {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
 }
 
 .moves-lbl {
@@ -529,6 +554,19 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
     flex-direction: row;
     min-height: 46px;
   }
+  .meta-toast {
+    bottom: auto;
+    top: calc(10px + var(--sat));
+    transform: translateX(-50%);
+  }
+  #results.card {
+    top: auto;
+    bottom: calc(12px + var(--sab));
+    transform: translateX(-50%);
+    max-height: min(88vh, 360px);
+    overflow-y: auto;
+    padding-top: 18px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -637,7 +675,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   left: 50%;
   bottom: calc(16px + var(--sab));
   transform: translateX(-50%);
-  z-index: 20;
+  z-index: 5;
   pointer-events: none;
   padding: 12px 18px;
   border-radius: 999px;

@@ -94,7 +94,16 @@ export function renderMap(save: SaveV3, opts: MapRenderOpts = {}): HTMLElement {
   const chapterUnlockedOk = chapterUnlocked(save.adventure.chapterStars, chapter)
   if (!chapterUnlockedOk) {
     const need = CHAPTER_STAR_GATES[chapter]
-    const lock = el('p', 'meta-sub chapter-lock', `Need ${need} ★ — you have ${save.profile.stars}`)
+    const prev = (chapter - 1) as 1 | 2 | 3
+    const earnedCh = save.adventure.chapterStars[String(prev)] ?? 0
+    const short = need - earnedCh
+    const lock = el(
+      'p',
+      'meta-sub chapter-lock',
+      short > 0
+        ? `Earn ${short} more ★ in Ch ${prev} (${earnedCh}/${need}) to unlock`
+        : `Chapter ${chapter} unlocks when Ch ${prev} has ${need} ★`,
+    )
     panel.append(head, lock)
     const scrim = el('div', 'meta-scrim')
     scrim.append(panel)
@@ -172,16 +181,17 @@ export function renderShop(save: SaveV3, opts: ShopRenderOpts = {}): HTMLElement
     const em = el('span', 'meta-emoji', item.emoji)
     const body = el('div')
     body.append(el('div', 'meta-label', item.name))
-    const price = owned
-      ? equipped
-        ? 'Equipped'
-        : 'Owned'
-      : locked
-        ? 'Locked'
-        : item.priceCoins != null
-          ? `🪙 ${item.priceCoins}`
-          : `⭐ ${item.priceStars}`
-    body.append(el('div', 'meta-sub', price))
+    const price =
+      owned && equipped
+        ? ''
+        : owned
+          ? 'Owned'
+          : locked
+            ? 'Locked'
+            : item.priceCoins != null
+              ? `🪙 ${item.priceCoins}`
+              : `⭐ ${item.priceStars}`
+    if (price) body.append(el('div', 'meta-sub', price))
     const actions = el('div', 'meta-shop-actions')
     if (owned) {
       if (!equipped) {
@@ -323,7 +333,7 @@ export function renderMetaDock(save: SaveV3, onAction?: (action: string) => void
     iconBtn('Adventure', PLUSH_ICONS.map, 'map', onAction),
     iconBtn('Shop', PLUSH_ICONS.shop, 'shop', onAction),
     iconBtn('Stickers', PLUSH_ICONS.stickers, 'achievements', onAction),
-    iconBtn('Collection', PLUSH_ICONS.bag, 'collection', onAction),
+    iconBtn('Collection', PLUSH_ICONS.collection, 'collection', onAction),
   )
   dock.dataset.stars = String(save.profile.stars)
   dock.dataset.level = String(save.profile.level)
