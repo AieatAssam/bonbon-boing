@@ -192,9 +192,9 @@ for (const style of ['goal', 'chain'] as const) {
       }
     }
     console.log(`ROUND5_STAR_TABLE_${style}`, JSON.stringify(rows))
-    const goalRows = rows.filter((r) => r.style === 'goal')
-    console.log('ROUND5_STAR_TABLE_goal', JSON.stringify(goalRows))
-    expect(goalRows.find((r) => r.level === 1)?.stars ?? 0).toBeGreaterThanOrEqual(1)
+    if (style === 'goal') {
+      expect(rows.find((r) => r.level === 1)?.stars ?? 0).toBeGreaterThanOrEqual(1)
+    }
   })
 }
 

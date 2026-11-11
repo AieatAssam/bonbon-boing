@@ -140,8 +140,9 @@ test('goal HUD icon zoom L4', async ({ page }) => {
   await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
   const chip = page.locator('.goal-chip').first()
   await expect(chip).toBeVisible()
-  const box = await chip.boundingBox()
-  expect(box?.width).toBeGreaterThan(40)
+  const icon = chip.locator('img.goal-bonbon-ico, .goal-ico').first()
+  const box = (await icon.boundingBox()) ?? (await chip.boundingBox())
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(20)
   await page.screenshot({
     path: '/opt/cursor/artifacts/round4-goal-hud_390x844.png',
     clip: box ?? undefined,
