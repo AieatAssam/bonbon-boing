@@ -3,6 +3,7 @@ import {
   at,
   byId,
   canAppend,
+  createAdventureGame,
   createGame,
   COMBO_WINDOW_MS,
   dailySeed,
@@ -28,20 +29,18 @@ import {
 } from './sim'
 import { invalidateBgCache, renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
 import { audioCreates, playLink, playPop, setAudioPaused, setAudioPrefs, unlockAudio } from './audio'
+import { createMetaLayer } from './meta-shell'
+import type { AdventureLevelDef } from './adventure/levels'
+import {
+  emptyGoalState,
+  evaluateStars,
+  type AdventureGoalState,
+} from './adventure/goals'
+import { renderMetaDock } from './ui/metaDom'
+import type { SaveV3 } from './meta/save'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
 type Pose = 'idle' | 'chain' | 'pop'
-
-type Save = {
-  v: 2
-  tut: boolean
-  muteSfx: boolean
-  muteMusic: boolean
-  bestTimed: number
-  bestCuddle: number
-  dailyBest: number
-  dailyDay: string
-}
 
 export type ChainCell = { id: number; x: number; y: number; c: number; r: number }
 
@@ -122,7 +121,6 @@ export type Qa = {
   setMute: (sfx: boolean, music: boolean) => void
 }
 
-const KEY = 'bonbon-boing-v2'
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
 const CONFETTI = ['#FF3D8E', '#FFD02A', '#2FDB8E', '#5088FF', '#FFFFFF', '#FF7A28']
 
@@ -162,38 +160,7 @@ const ICONS = {
   star: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#FFB703" d="M12 3l2.4 5.6L20 9.2l-4.2 3.8L17 19l-5-3-5 3 1.2-6L4 9.2l5.6-.6z"/></svg>',
 }
 
-function loadSave(): Save {
-  const blank: Save = {
-    v: 2,
-    tut: false,
-    muteSfx: false,
-    muteMusic: false,
-    bestTimed: 0,
-    bestCuddle: 0,
-    dailyBest: 0,
-    dailyDay: '',
-  }
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return blank
-    const parsed = JSON.parse(raw) as Partial<Save>
-    return { ...blank, ...parsed, v: 2 }
-  } catch {
-    return blank
-  }
-}
-
-function storeSave(save: Save) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(save))
-  } catch {
-    /* private mode */
-  }
-}
-
 export function boot(): void {
-  const save = loadSave()
-  setAudioPrefs({ sfx: !save.muteSfx, music: !save.muteMusic })
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
   const root = document.getElementById('app')
   if (!root) return
@@ -204,6 +171,58 @@ export function boot(): void {
   if (!ctx || !root) return
   const gfx = ctx
   const appRoot = root
+
+  let adventureLevel: AdventureLevelDef | null = null
+  let adventureGoals: AdventureGoalState | null = null
+  let lastResultStars: number | null = null
+  let lastRunRewards = { coins: 0, xp: 0 }
+
+  function syncAdventureGoalsFromTrack() {
+    if (!adventureGoals) return
+    adventureGoals.score = state.score
+    adventureGoals.movesUsed = state.track.movesUsed
+    adventureGoals.bombsPopped = state.track.bombsPopped
+    adventureGoals.iceBroken = state.track.iceBroken
+    adventureGoals.chocoCleared = state.track.chocoCleared
+    adventureGoals.clearedByColor = {}
+    state.track.clearedByColor.forEach((n, i) => {
+      if (n > 0) adventureGoals!.clearedByColor[i] = n
+    })
+  }
+
+  function startAdventureLevel(level: AdventureLevelDef) {
+    perfLevel = 0
+    perfSlowStreak = 0
+    perfFastStreak = 0
+    perfFastNeed = 5
+    perfLastStep = null
+    adventureLevel = level
+    adventureGoals = emptyGoalState(level.moves)
+    mode = 'adventure'
+    pose = 'idle'
+    particles = []
+    waves = []
+    beams = []
+    floats = []
+    springs.clear()
+    ghostPath = []
+    state = createAdventureGame(level, layout.cols, layout.rows)
+    ghostOn = tutParam || (!meta.save.tut && !qaMode)
+    clockOn = false
+    clockRunMs = 0
+    clockTickAt = 0
+    ghostDemoDone = meta.save.tut || qaMode
+    ghostCycleStart = 0
+    pieceClipFrames = 0
+    lastSimPhase = 'idle'
+    showPlay()
+  }
+
+  const meta = createMetaLayer(appRoot, startAdventureLevel)
+  const save = meta.save as SaveV3
+  setAudioPrefs({ sfx: !save.muteSfx, music: !save.muteMusic })
+  meta.applyCosmetics()
+
   const probe = document.createElement('div')
   probe.style.cssText = 'position:fixed;left:0;top:0;padding-top:env(safe-area-inset-top);visibility:hidden'
   document.body.append(probe)
@@ -242,8 +261,10 @@ export function boot(): void {
   newBestEl.hidden = true
   const finalEl = el('div', 'ui final')
   const bestEl = el('div', 'ui best')
+  const rewardEl = el('p', 'ui reward-meta')
+  rewardEl.hidden = true
   const resultRow = el('div', 'row')
-  results.append(stars, newBestEl, finalEl, bestEl, resultRow)
+  results.append(stars, newBestEl, finalEl, bestEl, rewardEl, resultRow)
   root.append(title, hud, pauseMenu, results)
 
   const mk = (parent: HTMLElement, label: string, action: string, icon: string, tiny = false) => {
@@ -279,7 +300,9 @@ export function boot(): void {
   mkPill(dock, 'Play', 'timed', ICONS.play, 'primary')
   mkPill(dock, 'Cuddle', 'cuddle', ICONS.heart, 'relax')
   mkPill(dock, 'Daily', 'daily', ICONS.sun)
-  dock.append(titleCorner)
+  const metaRow = renderMetaDock(meta.save)
+  metaRow.classList.add('meta-row')
+  dock.append(metaRow, titleCorner)
   mk(titleCorner, 'Sound', 'sfx', ICONS.sound, true)
   mk(titleCorner, 'Music', 'music', ICONS.note, true)
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
@@ -413,13 +436,19 @@ export function boot(): void {
       invalidateBgCache()
     }
     if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
-      const score = state.score
-      const timeLeft = state.timeLeft
-      const seed = state.seed
-      const nextMode = state.mode
-      state = createGame(seed, next.cols, next.rows, nextMode)
-      state.score = score
-      state.timeLeft = timeLeft
+      if (adventureLevel) {
+        state = createAdventureGame(adventureLevel, next.cols, next.rows)
+        adventureGoals = emptyGoalState(adventureLevel.moves)
+        syncAdventureGoalsFromTrack()
+      } else {
+        const score = state.score
+        const timeLeft = state.timeLeft
+        const seed = state.seed
+        const nextMode = state.mode
+        state = createGame(seed, next.cols, next.rows, nextMode)
+        state.score = score
+        state.timeLeft = timeLeft
+      }
       ghostPath = []
     }
     layout = next
@@ -705,7 +734,7 @@ export function boot(): void {
     notePops(ids)
     ghostOn = false
     save.tut = true
-    storeSave(save)
+    meta.persist()
     syncHud()
   }
 
@@ -722,7 +751,16 @@ export function boot(): void {
       const isNew = state.score > prior
       rememberBest()
       const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-      const n = state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1
+      const n =
+        lastResultStars ??
+        (state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1)
+      if (lastRunRewards.coins > 0 || lastRunRewards.xp > 0) {
+        rewardEl.hidden = false
+        rewardEl.textContent = `+${lastRunRewards.xp} XP · +${lastRunRewards.coins} 🪙`
+      } else {
+        rewardEl.hidden = true
+        rewardEl.textContent = ''
+      }
       stars.innerHTML = [0, 1, 2]
         .map(
           (i) =>
@@ -763,6 +801,10 @@ export function boot(): void {
     if (mode === 'cuddle') {
       timeEl.classList.remove('pulse')
       timeEl.innerHTML = `<span aria-hidden="true">${ICONS.heart}</span>`
+    } else if (mode === 'adventure') {
+      timeEl.classList.remove('pulse')
+      const moves = Math.max(0, state.movesLeft)
+      timeEl.innerHTML = `<span class="moves-left" aria-label="Moves left">${moves}</span>`
     } else {
       const pct = Math.max(0, Math.min(1, state.timeLeft / 60_000))
       const dash = Math.max(0.02, pct) * 88
@@ -777,6 +819,10 @@ export function boot(): void {
     perfFastStreak = 0
     perfFastNeed = 5
     perfLastStep = null
+    if (nextMode !== 'adventure') {
+      adventureLevel = null
+      adventureGoals = null
+    }
     mode = nextMode
     pose = 'idle'
     particles = []
@@ -785,7 +831,13 @@ export function boot(): void {
     floats = []
     springs.clear()
     ghostPath = []
-    state = createGame(seed, layout.cols, layout.rows, nextMode)
+    if (adventureLevel) {
+      state = createAdventureGame(adventureLevel, layout.cols, layout.rows)
+      adventureGoals = emptyGoalState(adventureLevel.moves)
+    } else {
+      state = createGame(seed, layout.cols, layout.rows, nextMode)
+    }
+    if (nextMode === 'timed' || nextMode === 'daily') meta.touchStreak()
     ghostOn = tutParam || (!save.tut && !qaMode)
     clockOn = false
     clockRunMs = 0
@@ -810,7 +862,7 @@ export function boot(): void {
   }
 
   function syncWallClock(now: number) {
-    if (!clockOn || mode === 'cuddle') return
+    if (!clockOn || mode === 'cuddle' || mode === 'adventure') return
   const running = screen === 'play' && document.visibilityState === 'visible'
     if (running) {
       if (!clockTickAt) clockTickAt = now
@@ -825,6 +877,7 @@ export function boot(): void {
   }
 
   function rememberBest() {
+    if (mode === 'adventure') return
     if (mode === 'daily') {
       if (save.dailyDay !== state.seed) {
         save.dailyDay = state.seed
@@ -833,11 +886,37 @@ export function boot(): void {
       save.dailyBest = Math.max(save.dailyBest, state.score)
     } else if (mode === 'cuddle') save.bestCuddle = Math.max(save.bestCuddle, state.score)
     else save.bestTimed = Math.max(save.bestTimed, state.score)
-    storeSave(save)
+    meta.persist()
   }
 
   function showResults(score?: number) {
     if (score !== undefined) state.score = score
+    const coinsBefore = save.profile.coins
+    const xpBefore = save.profile.xp
+  const pops = state.track.clearedByColor.reduce((a, b) => a + b, 0)
+    if (mode === 'adventure' && adventureLevel && adventureGoals) {
+      syncAdventureGoalsFromTrack()
+      const ev = evaluateStars(adventureGoals, adventureLevel)
+      lastResultStars = ev.stars
+      meta.onAdventureEnd(adventureLevel, adventureGoals)
+    } else {
+      lastResultStars = null
+      meta.onRunEnd({
+        mode,
+        score: state.score,
+        chainLen: state.lastChainLen,
+        combo: state.combo,
+        bombs: state.track.bombsPopped,
+        rainbows: state.track.starbursts,
+        pops,
+      })
+    }
+    lastRunRewards = {
+      coins: save.profile.coins - coinsBefore,
+      xp: save.profile.xp - xpBefore,
+    }
+    adventureLevel = null
+    adventureGoals = null
     show('results')
   }
 
@@ -846,14 +925,14 @@ export function boot(): void {
     if (action === 'sfx') {
       save.muteSfx = !save.muteSfx
       setAudioPrefs({ sfx: !save.muteSfx })
-      storeSave(save)
+      meta.persist()
       paintMutes()
       return
     }
     if (action === 'music') {
       save.muteMusic = !save.muteMusic
       setAudioPrefs({ music: !save.muteMusic })
-      storeSave(save)
+      meta.persist()
       paintMutes()
       return
     }
@@ -864,7 +943,12 @@ export function boot(): void {
       showPlay()
     } else if (action === 'home') {
       if (screen === 'play') openPause()
-      else show('title')
+      else {
+        meta.close()
+        show('title')
+      }
+    } else if (action === 'map' || action === 'shop' || action === 'achievements' || action === 'collection') {
+      meta.open(action)
     }
     else if (action === 'restart') {
       const seed = qaMode ? state.seed : mode === 'daily' ? dailySeed() : `${mode}-${Date.now()}`
@@ -1082,6 +1166,7 @@ export function boot(): void {
     }
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
+    if (mode === 'adventure' && state.phase === 'idle' && state.settled) syncAdventureGoalsFromTrack()
     if (roundOver(state)) showResults()
     syncHud()
   }
@@ -1338,7 +1423,15 @@ export function boot(): void {
       dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
       mat,
-      pieceClip: screen === 'play' && pieceClipFrames > 0 && mat ? mat : null,
+      pieceClip:
+        screen === 'play' && pieceClipFrames > 0 && mat
+          ? {
+              x: mat.x - D * 0.08,
+              y: mat.y - D * 0.42,
+              w: mat.w + D * 0.16,
+              h: mat.h + D * 0.5,
+            }
+          : null,
       peeks,
       liteRibbon: perfLevel > 0,
     }
@@ -1843,7 +1936,7 @@ export function boot(): void {
       save.muteSfx = sfx
       save.muteMusic = music
       setAudioPrefs({ sfx: !sfx, music: !music })
-      storeSave(save)
+      meta.persist()
       paintMutes()
     },
   }
