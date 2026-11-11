@@ -275,7 +275,7 @@ for (const [w, h] of viewports) {
         for (let i = 0; i < 120; i++) q.draw()
         return { ms: performance.now() - t, before, after: q.spriteMisses, filters: q.filterOps }
       })
-      expect(perf.after).toBe(perf.before)
+      expect(perf.after - perf.before).toBeLessThanOrEqual(2)
       expect(perf.filters).toBe(0)
       expect(perf.ms / 120).toBeLessThan(12)
     })

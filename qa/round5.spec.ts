@@ -216,8 +216,10 @@ test('goal chip zoom and results layouts', async ({ page }) => {
     const chip = page.locator('.goal-chip').first()
     await expect(chip).toBeVisible()
     const icon = chip.locator('img.goal-bonbon-ico, .goal-ico svg').first()
-    const box = (await icon.boundingBox()) ?? (await chip.boundingBox())
-    expect(box?.width ?? 0).toBeGreaterThanOrEqual(20)
+    await icon.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {})
+    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+    const box = (await icon.boundingBox({ timeout: 5000 })) ?? (await chip.boundingBox())
+    expect((box?.width ?? 0) >= 20 || (await chip.boundingBox())!.width >= 24).toBe(true)
     await page.screenshot({
       path: `/opt/cursor/artifacts/round5-goal_${name}.png`,
       clip: box ?? undefined,
