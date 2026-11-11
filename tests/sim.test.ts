@@ -1,117 +1,155 @@
-import { describe, it, expect } from 'vitest';
-import { makeRng, seedFromString } from '../src/sim/rng';
-import { hugChainBfs } from '../src/sim/chain';
-import { createBonbon, initialField, neighbours } from '../src/sim/lattice';
-import { previewShot, simulateShot } from '../src/sim/shot';
+import { describe, expect, it } from 'vitest'
 import {
-  hugChainBonus,
-  popPoints,
-  ticklePoints,
-} from '../src/sim/scoring';
-import { dailySeed, generateLevelBoard, levelBoardHash } from '../src/sim/levels';
-import type { Bonbon, Flavour } from '../src/sim/types';
+  BOMB_AT,
+  HITSTOP_MS,
+  canAppend,
+  collectClears,
+  createGame,
+  dailySeed,
+  extendDrag,
+  findPath,
+  gridSignature,
+  ladderHz,
+  loadGrid,
+  release,
+  roundOver,
+  rush,
+  settleBudget,
+  step,
+  byId,
+} from '../src/sim'
+import { boardLayout } from '../src/layout'
 
-describe('rng', () => {
-  it('is deterministic for same seed string', () => {
-    const a = makeRng('test-seed');
-    const b = makeRng('test-seed');
-    const seqA = Array.from({ length: 20 }, () => a());
-    const seqB = Array.from({ length: 20 }, () => b());
-    expect(seqA).toEqual(seqB);
-  });
-});
-
-describe('simulateShot', () => {
-  it('mutates bonbon array in place (for balance harness)', () => {
-    const { bonbons } = initialField('mut-1', 5);
-    const field = bonbons.map((b) => ({ ...b }));
-    const coat = field[0].flavour;
-    simulateShot(
-      {
-        angleRad: (-15 * Math.PI) / 180,
-        coat,
-        spawnX: 500,
-        spawnY: 235,
-      },
-      field,
-      400,
-    );
-    expect(field.some((b) => b.popped)).toBe(true);
-  });
-});
-
-describe('preview equals shot until first contact', () => {
-  it('matches first bonbon contact', () => {
-    const { bonbons } = initialField('prev-1', 5);
-    const input = {
-      angleRad: (-40 * Math.PI) / 180,
-      coat: 'berry' as Flavour,
-      spawnX: 500,
-      spawnY: 235,
-    };
-    const cupX = 500;
-    const prev = previewShot(input, bonbons.map((b) => ({ ...b })), cupX);
-    const full = simulateShot(input, bonbons.map((b) => ({ ...b })), cupX);
-    expect(prev.contacts[0]?.kind).toBe(full.contacts[0]?.kind);
-    if (prev.contacts[0]?.bonbon && full.contacts[0]?.bonbon) {
-      expect(prev.contacts[0].bonbon.id).toBe(full.contacts[0].bonbon.id);
+describe('size unit D', () => {
+  it('uses one D for every viewport', () => {
+    for (const [w, h] of [
+      [360, 640],
+      [390, 844],
+      [430, 932],
+      [844, 390],
+      [932, 430],
+      [1280, 800],
+    ] as const) {
+      const L = boardLayout(w, h)
+      expect(L.D).toBeGreaterThanOrEqual(46)
+      expect(L.cols * L.D).toBeLessThanOrEqual(w)
+      expect(L.oy).toBeGreaterThanOrEqual(L.hud - 1)
+      expect(L.ox).toBeGreaterThanOrEqual(0)
     }
-    expect(prev.path.length).toBeGreaterThanOrEqual(2);
-  });
-});
+  })
+})
 
-describe('chain BFS', () => {
-  it('finds hex neighbours same colour', () => {
-    const baseY = 1000;
-    const rng = () => 0.5;
-    const a = createBonbon(0, 0, 'berry', 's2', 'plush', baseY, rng);
-    const b = createBonbon(0, 1, 'berry', 's2', 'plush', baseY, rng);
-    const c = createBonbon(1, 0, 'berry', 's2', 'plush', baseY, rng);
-    const d = createBonbon(2, 0, 'mint', 's2', 'plush', baseY, rng);
-    const map = new Map<string, Bonbon>();
-    for (const x of [a, b, c, d]) map.set(`${x.row},${x.col}`, x);
-    const chain = hugChainBfs(a, map, 'berry');
-    expect(chain.map((x) => x.id).sort()).toEqual([a.id, b.id, c.id].sort());
-    expect(neighbours(0, 0).length).toBeGreaterThan(2);
-  });
-});
+describe('chains', () => {
+  it('only walks orthogonal same-colour neighbours', () => {
+    const s = loadGrid(['0 0 1', '0 2 1'])
+    const a = s.pieces.find((p) => p.c === 0 && p.r === 0)!
+    const b = s.pieces.find((p) => p.c === 1 && p.r === 0)!
+    const c = s.pieces.find((p) => p.c === 1 && p.r === 1)!
+    const d = s.pieces.find((p) => p.c === 2 && p.r === 0)!
+    expect(canAppend([a], b)).toBe(true)
+    expect(canAppend([a], c)).toBe(false)
+    expect(canAppend([b], d)).toBe(false)
+  })
 
-describe('scoring table', () => {
-  it('tickle and pop', () => {
-    expect(ticklePoints('s2')).toBe(20);
-    expect(popPoints('s3', 1)).toBe(300);
-    expect(hugChainBonus(4)).toBe(1200);
-    expect(hugChainBonus(2)).toBe(0);
-  });
-});
+  it('lets a rainbow join any colour and clear that colour', () => {
+    const s = loadGrid(['R 0 1', '0 2 0'])
+    const path = [at(s, 0, 0), at(s, 1, 0), at(s, 0, 1)]
+    const clears = collectClears(s.pieces, path)
+    const ids = new Set(clears.map((p) => `${p.c},${p.r}`))
+    expect(ids.has('2,1')).toBe(true)
+    expect(ids.has('1,1')).toBe(false)
+  })
 
-describe('row constraints', () => {
-  it('never single-colour-only row from generator', () => {
-    const { bonbons } = initialField('rows-1', 8);
-    const byRow = new Map<number, Bonbon[]>();
-    for (const b of bonbons) {
-      if (!byRow.has(b.row)) byRow.set(b.row, []);
-      byRow.get(b.row)!.push(b);
+  it('pops a bomb neighbourhood', () => {
+    const s = loadGrid(['0 0 B0 0', '1 2 1 2'])
+    const path = [0, 1, 2, 3].map((c) => at(s, c, 0))
+    const clears = collectClears(s.pieces, path)
+    expect(clears.some((p) => p.c === 2 && p.r === 1)).toBe(true)
+    expect(clears.some((p) => p.c === 1 && p.r === 1)).toBe(true)
+  })
+})
+
+describe('pacing', () => {
+  it('pops on release and settles inside a second', () => {
+    for (let n = 2; n <= 24; n++) {
+      expect(settleBudget(n, n >= BOMB_AT)).toBeLessThan(1000)
     }
-    for (const row of byRow.values()) {
-      if (row.length < 2) continue;
-      const flavours = new Set(row.map((b) => b.flavour));
-      expect(flavours.size).toBeGreaterThan(1);
-    }
-  });
-});
+    const s = createGame('feel', 7, 9, 'timed')
+    const path = findPath(s, 6)
+    expect(path).toBeTruthy()
+    s.drag = path!.map((p) => p.id)
+    const first = release(s)
+    expect(first.length).toBe(1)
+    expect(s.popAt[0]).toBe(0)
+    expect(s.hitstopTotal).toBe(HITSTOP_MS)
+    expect(s.hitstopTotal).toBeGreaterThanOrEqual(60)
+    expect(s.hitstopTotal).toBeLessThanOrEqual(90)
+    expect(s.inputLocked).toBe(false)
+    const held = byId(s, path![1].id)!
+    const r0 = held.r
+    step(s, 30)
+    expect(held.r).toBe(r0)
+    expect(held.dead).toBe(false)
+    let guard = 0
+    while (!s.settled && guard++ < 80) step(s, 16)
+    expect(s.settled).toBe(true)
+    expect(s.settleMs).toBeLessThan(1000)
+    expect(s.pieces.filter((p) => !p.dead)).toHaveLength(7 * 9)
+    expect(s.pieces.some((p) => p.kind === 'bomb')).toBe(true)
+  })
 
-describe('daily seed', () => {
-  it('is stable', () => {
-    expect(dailySeed(new Date('2026-11-10'))).toBe('bonbon-2026-11-10');
-    expect(seedFromString(dailySeed())).toHaveLength(4);
-  });
-});
+  it('a chain of 8 drops a rainbow', () => {
+    const s = loadGrid(['0 0 0 0 0 0 0 0'])
+    s.drag = s.pieces.map((p) => p.id)
+    release(s)
+    let guard = 0
+    while (!s.settled && guard++ < 80) step(s, 16)
+    expect(s.pieces.some((p) => p.kind === 'rainbow')).toBe(true)
+  })
 
-describe('level generator', () => {
+  it('does not lock the next press', () => {
+    const s = createGame('feel', 7, 9, 'timed')
+    const upper = findPath(s, 6)!
+    const lower = findPath(s, 2, upper.map((p) => p.id), 'bottom')!
+    const id = lower[0].id
+    const r = lower[0].r
+    s.drag = upper.map((p) => p.id)
+    release(s)
+    expect(s.phase).not.toBe('idle')
+    expect(s.inputLocked).toBe(false)
+    rush(s)
+    expect(s.settled).toBe(true)
+    expect(byId(s, id)!.r).toBe(r)
+    expect(extendDrag(s, id)).toBe(true)
+    expect(s.drag).toEqual([id])
+  })
+
+  it('climbs the note ladder', () => {
+    for (let i = 0; i < 8; i++) expect(ladderHz(i + 1)).toBeGreaterThan(ladderHz(i))
+  })
+})
+
+describe('modes and seeds', () => {
   it('is deterministic', () => {
-    expect(levelBoardHash('trail-7')).toBe(levelBoardHash('trail-7'));
-    const b = generateLevelBoard('trail-1', 12);
-    expect(b.filter((x) => x.heart).length).toBe(12);
-  });
-});
+    const a = createGame('feel', 7, 9, 'timed')
+    const b = createGame('feel', 7, 9, 'timed')
+    expect(gridSignature(a)).toBe(gridSignature(b))
+  })
+
+  it('builds a stable daily seed', () => {
+    expect(dailySeed(new Date(2026, 10, 10))).toBe('bonbon-2026-11-10')
+    const day = dailySeed(new Date(2026, 10, 10))
+    expect(gridSignature(createGame(day, 6, 8, 'daily'))).toBe(gridSignature(createGame(day, 6, 8, 'daily')))
+  })
+
+  it('leaves cuddle untimed', () => {
+    const s = createGame('pretty', 6, 8, 'cuddle')
+    step(s, 5000)
+    expect(s.timeLeft).toBe(60_000)
+    expect(roundOver(s)).toBe(false)
+  })
+})
+
+function at(s: ReturnType<typeof loadGrid>, c: number, r: number) {
+  return s.pieces.find((p) => p.c === c && p.r === r)!
+}

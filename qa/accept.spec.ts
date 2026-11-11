@@ -1,0 +1,305 @@
+import { expect, test } from '@playwright/test'
+import { mkdirSync } from 'node:fs'
+
+const viewports = [
+  [360, 640],
+  [390, 844],
+  [430, 932],
+  [844, 390],
+  [932, 430],
+  [1280, 800],
+] as const
+
+const screens = ['title', 'play', 'chain', 'pop', 'pause', 'results'] as const
+
+mkdirSync('qa/shots', { recursive: true })
+
+type Qa = {
+  ready: boolean
+  screen: string
+  pose: string
+  seed: string
+  score: number
+  timeLeft: number
+  paused: boolean
+  inputLocked: boolean
+  chain: number[]
+  D: number
+  frame: number
+  highlightFrame: number
+  popStartedAt: number[]
+  popWallMs: number
+  settled: boolean
+  settleMs: number
+  hitstopMs: number
+  hitstopActive: boolean
+  particleCount: number
+  particleSig: number
+  ghost: boolean
+  ghostX: number
+  ghostY: number
+  spriteMisses: number
+  audioCreates: number
+  filterOps: number
+  muteSfx: boolean
+  muteMusic: boolean
+  board: { id: number; x: number; y: number; d: number; popping: boolean; kind: string }[]
+  pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
+  findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => { id: number; x: number; y: number }[] | null
+  center: (id: number) => { x: number; y: number } | null
+  pump: (ms: number) => void
+  draw: () => void
+  pause: () => void
+  start: (mode: string, seed?: string) => void
+  setMute: (sfx: boolean, music: boolean) => void
+}
+
+async function qa(page: import('@playwright/test').Page): Promise<Qa> {
+  return page.evaluate(() => (window as unknown as { __qa: Qa }).__qa)
+}
+
+for (const [w, h] of viewports) {
+  test.describe(`${w}x${h}`, () => {
+    test.use({ viewport: { width: w, height: h }, deviceScaleFactor: 2 })
+
+    test('layout', async ({ page }) => {
+      test.setTimeout(90_000)
+      const errors: string[] = []
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') errors.push(msg.text())
+      })
+      for (const screen of screens) {
+        errors.length = 0
+        const seed = screen === 'play' ? 'pretty' : 'feel'
+        await page.goto(`?qa&freeze=1&screen=${screen}&seed=${seed}`, { timeout: 30_000 })
+        await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+        await page.evaluate(() => document.fonts.ready)
+        const check = await page.evaluate(() =>
+          (window as unknown as { __checkOverlaps: () => { overlaps: unknown[]; offscreen: string[] } }).__checkOverlaps(),
+        )
+        const geo = await page.evaluate(() =>
+          (window as unknown as { __checkPlayGeometry: () => { violations: string[] } }).__checkPlayGeometry(),
+        )
+        expect(check.overlaps, `${screen} ${JSON.stringify(check)}`).toEqual([])
+        expect(check.offscreen, screen).toEqual([])
+        expect(geo.violations, `${screen} ${JSON.stringify(geo)}`).toEqual([])
+        const text = (await page.locator('#app').innerText()).replace(/\s+/g, ' ').trim()
+        if (screen === 'title') expect(text).toBe('Bonbon Boing!')
+        else if (screen === 'pause') expect(text).toBe('')
+        else expect(text).toMatch(/^[\d ]+$/)
+        const blank = await page.evaluate(() => {
+          const c = document.getElementById('field') as HTMLCanvasElement
+          const ctx = c.getContext('2d')
+          if (!ctx) return true
+          const d = ctx.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data
+          return d[3] === 0
+        })
+        expect(blank, screen).toBe(false)
+        expect(errors, `${screen} ${errors.join('\n')}`).toEqual([])
+        const state = await qa(page)
+        if (screen !== 'title') {
+          const ds = new Set(state.board.map((p) => p.d))
+          expect(ds.size).toBe(1)
+          expect([...ds][0]).toBe(state.D)
+        }
+        if (screen === 'chain') expect(state.chain.length).toBeGreaterThanOrEqual(5)
+        if (screen === 'pop') {
+          expect(state.hitstopActive).toBe(true)
+          expect(state.hitstopMs).toBeGreaterThanOrEqual(60)
+          expect(state.hitstopMs).toBeLessThanOrEqual(90)
+          expect(state.particleCount).toBeGreaterThan(4)
+        }
+        await page.screenshot({ path: `qa/shots/${screen}_${w}x${h}.png`, animations: 'disabled' })
+      }
+    })
+
+    test('play-feel', async ({ page }) => {
+      test.setTimeout(60_000)
+      await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      const driven = await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const upper = q.findChain(6)
+        const lower = upper ? q.findChain(2, upper.map((p) => p.id), 'bottom') : null
+        if (!upper || !lower) return { ok: false as const }
+        const before = q.frame
+        q.pointer('down', upper[0].x, upper[0].y)
+        const highlighted = q.chain.length === 1 && q.highlightFrame === q.frame && q.frame > before
+        for (let i = 1; i < upper.length; i++) q.pointer('move', upper[i].x, upper[i].y)
+        const chain = q.chain.length
+        q.pointer('up', upper[upper.length - 1].x, upper[upper.length - 1].y)
+        const held = q.board.find((p) => p.id === lower[0].id && !p.popping)
+        const sig = q.particleSig
+        q.pump(32)
+        const heldAfter = q.board.find((p) => p.id === lower[0].id)
+        const mid = {
+          highlighted,
+          chain,
+          path: upper.length,
+          pop0: q.popStartedAt[0] ?? 999,
+          wall: q.popWallMs,
+          locked: q.inputLocked,
+          hitstop: q.hitstopMs,
+          active: q.hitstopActive,
+          particles: q.particleCount,
+          moved: held && heldAfter ? heldAfter.x !== held.x || q.particleSig === sig : true,
+          audio: q.audioCreates,
+          misses: q.spriteMisses,
+        }
+        const spot = q.center(lower[0].id)
+        q.pointer('down', spot!.x, spot!.y)
+        const next = { chain: q.chain.slice(), locked: q.inputLocked, settled: q.settled }
+        q.pointer('up', spot!.x, spot!.y)
+        q.draw()
+        const misses = q.spriteMisses
+        return { ok: true as const, mid, next, id: lower[0].id, misses }
+      })
+      expect(driven.ok).toBe(true)
+      if (!driven.ok) return
+      expect(driven.mid.highlighted).toBe(true)
+      expect(driven.mid.chain).toBe(driven.mid.path)
+      expect(driven.mid.pop0).toBeLessThan(50)
+      expect(driven.mid.wall).toBeLessThan(50)
+      expect(driven.mid.locked).toBe(false)
+      expect(driven.mid.hitstop).toBeGreaterThanOrEqual(60)
+      expect(driven.mid.hitstop).toBeLessThanOrEqual(90)
+      expect(driven.mid.active).toBe(true)
+      expect(driven.mid.particles).toBeGreaterThan(4)
+      expect(driven.mid.moved).toBe(false)
+      expect(driven.mid.audio).toBe(0)
+      expect(driven.next.locked).toBe(false)
+      expect(driven.next.settled).toBe(true)
+      expect(driven.next.chain).toEqual([driven.id])
+      expect(driven.misses).toBeLessThan(40)
+
+      await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      const started = Date.now()
+      await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const path = q.findChain(6)!
+        q.pointer('down', path[0].x, path[0].y)
+        for (let i = 1; i < path.length; i++) q.pointer('move', path[i].x, path[i].y)
+        q.pointer('up', path[path.length - 1].x, path[path.length - 1].y)
+      })
+      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.settled, undefined, { timeout: 1500 })
+      const settle = await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        return { ms: q.settleMs, locked: q.inputLocked, bomb: q.board.some((p) => p.kind === 'bomb') }
+      })
+      expect(Date.now() - started).toBeLessThan(1000)
+      expect(settle.ms).toBeLessThan(1000)
+      expect(settle.locked).toBe(false)
+      expect(settle.bomb).toBe(true)
+      const perf = await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const before = q.spriteMisses
+        const t = performance.now()
+        for (let i = 0; i < 120; i++) q.draw()
+        return { ms: performance.now() - t, before, after: q.spriteMisses, filters: q.filterOps }
+      })
+      expect(perf.after).toBe(perf.before)
+      expect(perf.filters).toBe(0)
+      expect(perf.ms / 120).toBeLessThan(12)
+    })
+
+    test('navigation', async ({ page }) => {
+      test.setTimeout(60_000)
+      await page.goto('?qa&screen=play&seed=qa-nav', { timeout: 30_000 })
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      const pause = await page.getByRole('button', { name: 'Pause' }).boundingBox()
+      const home = await page.getByRole('button', { name: 'Home' }).boundingBox()
+      expect(pause && pause.width >= 44 && pause.y >= 0 && pause.y + pause.height <= h + 1).toBe(true)
+      expect(home && home.width >= 44 && home.x >= 0 && home.x + home.width <= w + 1).toBe(true)
+      await page.getByRole('button', { name: 'Pause' }).click()
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Home' })).toBeVisible()
+      const frozen = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.timeLeft)
+      await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.pump(700))
+      await page.waitForTimeout(180)
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.timeLeft)).toBe(frozen)
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.paused)).toBe(true)
+      await page.getByRole('button', { name: 'Resume' }).click()
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('play')
+      await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const path = q.findChain(2)!
+        q.pointer('down', path[0].x, path[0].y)
+        for (let i = 1; i < path.length; i++) q.pointer('move', path[i].x, path[i].y)
+        q.pointer('up', path[path.length - 1].x, path[path.length - 1].y)
+        q.pump(1000)
+      })
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.score)).toBeGreaterThan(0)
+      await page.getByRole('button', { name: 'Pause' }).click()
+      await page.getByRole('button', { name: 'Restart' }).click()
+      const reset = await qa(page)
+      expect(reset.score).toBe(0)
+      expect(reset.timeLeft).toBeGreaterThan(59_000)
+      expect(Math.ceil(reset.timeLeft / 1000)).toBe(60)
+      expect(reset.screen).toBe('play')
+      await page.keyboard.press('Escape')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('pause')
+      await page.keyboard.press('Escape')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('title')
+      await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.setMute(true, false))
+      await page.reload()
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.muteSfx)).toBe(true)
+      await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        q.setMute(false, false)
+        q.start('daily')
+      })
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.seed)).toMatch(/^bonbon-\d{4}-\d{2}-\d{2}$/)
+      await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        q.start('cuddle', 'pretty')
+        q.pump(2000)
+      })
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.timeLeft)).toBe(60_000)
+      await page.goto('?qa&screen=play&seed=qa-nav', { timeout: 30_000 })
+      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.screen === 'play')
+      await page.goBack()
+      expect(page.url()).toContain('/bonbon-boing/')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('pause')
+      await page.goBack()
+      expect(page.url()).toContain('/bonbon-boing/')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('title')
+      await page.goBack()
+      expect(page.url()).toContain('/bonbon-boing/')
+      expect(page.url()).not.toContain('github.com')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.screen)).toBe('title')
+    })
+
+    test('ghost hand onboarding', async ({ page }) => {
+      test.setTimeout(60_000)
+      await page.goto('./', { timeout: 30_000 })
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      await page.getByRole('button', { name: 'Play' }).click()
+      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.ghost === true)
+      const pose = await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const text = document.querySelector('#app')?.textContent ?? ''
+        return { x: q.ghostX, y: q.ghostY, D: q.D, w: innerWidth, h: innerHeight, text }
+      })
+      expect(pose.text.toLowerCase()).not.toMatch(/drag|swipe|tap to|match|chain|aim/)
+      expect(pose.x).toBeGreaterThan(0)
+      expect(pose.y).toBeGreaterThan(0)
+      expect(pose.x).toBeLessThan(pose.w)
+      expect(pose.y).toBeLessThan(pose.h)
+      await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const path = q.findChain(2)!
+        q.pointer('down', path[0].x, path[0].y)
+        for (let i = 1; i < path.length; i++) q.pointer('move', path[i].x, path[i].y)
+        q.pointer('up', path[path.length - 1].x, path[path.length - 1].y)
+      })
+      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.ghost === false)
+      await page.reload()
+      await page.getByRole('button', { name: 'Play' }).click()
+      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.screen === 'play')
+      expect(await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.ghost)).toBe(false)
+    })
+  })
+}

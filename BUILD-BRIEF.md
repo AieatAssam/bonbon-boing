@@ -1,3 +1,5 @@
+> **Superseded.** The live game is Squish Chain (see the README). This brief describes the rejected bounce-and-pop prototype.
+
 # Bonbon Boing! Build brief for the Cursor cloud agent
 
 You are building **Bonbon Boing!**, a squishy bounce-and-pop puzzle web game, from a finished design package. Do not redesign it. Implement it faithfully, then polish the feel.

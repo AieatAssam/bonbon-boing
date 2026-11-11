@@ -1,0 +1,956 @@
+import { boardLayout, type Layout } from './layout'
+import {
+  byId,
+  createGame,
+  dailySeed,
+  extendDrag,
+  findPath,
+  release,
+  roundOver,
+  rush,
+  step,
+  visualRow,
+  type GameState,
+  type Kind,
+  type Mode,
+  type Piece,
+} from './sim'
+import { renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
+import { audioCreates, playPop, setAudioPaused, setAudioPrefs, unlockAudio } from './audio'
+
+type Screen = 'title' | 'play' | 'pause' | 'results'
+type Pose = 'idle' | 'chain' | 'pop'
+
+type Save = {
+  v: 2
+  tut: boolean
+  muteSfx: boolean
+  muteMusic: boolean
+  bestTimed: number
+  bestCuddle: number
+  dailyBest: number
+  dailyDay: string
+}
+
+export type ChainCell = { id: number; x: number; y: number; c: number; r: number }
+
+export type Qa = {
+  ready: boolean
+  screen: Screen
+  pose: Pose
+  mode: Mode
+  seed: string
+  score: number
+  combo: number
+  timeLeft: number
+  paused: boolean
+  inputLocked: false
+  chain: number[]
+  D: number
+  cols: number
+  rows: number
+  board: {
+    id: number
+    c: number
+    r: number
+    color: number
+    kind: Kind
+    popping: boolean
+    falling: boolean
+    x: number
+    y: number
+    d: number
+  }[]
+  ghost: boolean
+  ghostX: number
+  ghostY: number
+  hitstopMs: number
+  hitstopActive: boolean
+  particleCount: number
+  particleSig: number
+  popStartedAt: number[]
+  popWallMs: number
+  settled: boolean
+  settleMs: number
+  muteSfx: boolean
+  muteMusic: boolean
+  frame: number
+  highlightFrame: number
+  spriteMisses: number
+  audioCreates: number
+  filterOps: number
+  pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
+  findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => ChainCell[] | null
+  center: (id: number) => { x: number; y: number } | null
+  pause: () => void
+  resume: () => void
+  restart: () => void
+  home: () => void
+  start: (mode: Mode, seed?: string) => void
+  pump: (ms: number) => void
+  draw: () => void
+  setMute: (sfx: boolean, music: boolean) => void
+}
+
+const KEY = 'bonbon-boing-v2'
+const COLORS = ['#FF4F93', '#2FDB8E', '#FFD23A', '#5B8CFF', '#FF8A4A']
+const CONFETTI = ['#FF4F93', '#FFD23A', '#3DDE97', '#5B8CFF', '#FFFFFF']
+
+const params = new URLSearchParams(location.search)
+const qaMode = params.has('qa')
+const tutParam = params.has('tut')
+const seedParam = params.get('seed')
+const screenParam = params.get('screen')
+
+declare global {
+  interface Window {
+    __qa: Qa
+    __ready: boolean
+    __checkOverlaps: () => { overlaps: [string, string][]; offscreen: string[] }
+    __checkPlayGeometry: () => { violations: string[] }
+  }
+}
+
+type Spring = { ox: number; oy: number; vx: number; vy: number }
+
+const ICONS = {
+  pause:
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5" fill="#4A2440"/><rect x="14" y="4" width="4" height="16" rx="1.5" fill="#4A2440"/></svg>',
+  home: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M4 11 L12 4 L20 11 V20 H15 V14 H9 V20 H4 Z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path fill="#FF4F93" d="M8 5 L20 12 L8 19 Z"/></svg>',
+  restart:
+    '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2-4.9" fill="none" stroke="#4A2440" stroke-width="2.4" stroke-linecap="round"/><path d="M19 4 V9 H14" fill="none" stroke="#4A2440" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  heart:
+    '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="#FF4F93" d="M12 20 C5 14 5 8 9 6.2 C10.8 5.4 12 7 12 7 C12 7 13.2 5.4 15 6.2 C19 8 19 14 12 20 Z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="#FFB703"/><g stroke="#FFB703" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.5 4.5l2 2M17.5 17.5l2 2M19.5 4.5l-2 2M6.5 17.5l-2 2"/></g></svg>',
+  note: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M9 18a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-5V6l9-2v9a3 3 0 1 1-2-2.8V6.2L11 7.6V15a3 3 0 0 1-2 2.8z"/></svg>',
+  sound:
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9c1.2.8 2 2.2 2 3s-.8 2.2-2 3" fill="none" stroke="#4A2440" stroke-width="2" stroke-linecap="round"/></svg>',
+  muted:
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 10l5 5M21 10l-5 5" stroke="#FF4F93" stroke-width="2" stroke-linecap="round"/></svg>',
+  star: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#FFB703" d="M12 3l2.4 5.6L20 9.2l-4.2 3.8L17 19l-5-3-5 3 1.2-6L4 9.2l5.6-.6z"/></svg>',
+}
+
+function loadSave(): Save {
+  const blank: Save = {
+    v: 2,
+    tut: false,
+    muteSfx: false,
+    muteMusic: false,
+    bestTimed: 0,
+    bestCuddle: 0,
+    dailyBest: 0,
+    dailyDay: '',
+  }
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return blank
+    const parsed = JSON.parse(raw) as Partial<Save>
+    return { ...blank, ...parsed, v: 2 }
+  } catch {
+    return blank
+  }
+}
+
+function storeSave(save: Save) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(save))
+  } catch {
+    /* private mode */
+  }
+}
+
+export function boot(): void {
+  const save = loadSave()
+  setAudioPrefs({ sfx: !save.muteSfx, music: !save.muteMusic })
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const root = document.getElementById('app')
+  if (!root) return
+  const canvas = document.createElement('canvas')
+  canvas.id = 'field'
+  document.body.prepend(canvas)
+  const ctx = canvas.getContext('2d')
+  if (!ctx || !root) return
+  const gfx = ctx
+  const appRoot = root
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:fixed;left:0;top:0;padding-top:env(safe-area-inset-top);visibility:hidden'
+  document.body.append(probe)
+
+  const title = el('div')
+  const logo = el('h1', 'logo ui')
+  logo.dataset.nozoom = '1'
+  logo.textContent = 'Bonbon Boing!'
+  const dock = el('div', 'dock')
+  title.id = 'title'
+  title.append(logo, dock)
+  const hud = el('div')
+  hud.id = 'hud'
+  const scoreEl = el('div', 'ui score')
+  const timeEl = el('div', 'ui timer')
+  const pauseMenu = el('div', 'scrim')
+  pauseMenu.id = 'pause'
+  const menu = el('div', 'menu')
+  pauseMenu.append(menu)
+  const results = el('div', 'card')
+  results.id = 'results'
+  const finalEl = el('div', 'ui final')
+  const bestEl = el('div', 'ui best')
+  const stars = el('div', 'stars')
+  const resultRow = el('div', 'row')
+  results.append(stars, finalEl, bestEl, resultRow)
+  root.append(title, hud, pauseMenu, results)
+
+  const mk = (parent: HTMLElement, label: string, action: string, icon: string, big = false) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = `ui icon${big ? ' big' : ''}`
+    b.setAttribute('aria-label', label)
+    b.dataset.action = action
+    b.innerHTML = icon
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      onAction(action)
+    })
+    parent.append(b)
+    return b
+  }
+
+  mk(dock, 'Play', 'timed', ICONS.play, true)
+  mk(dock, 'Cuddle', 'cuddle', ICONS.heart)
+  mk(dock, 'Daily', 'daily', ICONS.sun)
+  mk(dock, 'Sound', 'sfx', ICONS.sound)
+  mk(dock, 'Music', 'music', ICONS.note)
+  mk(hud, 'Pause', 'pause', ICONS.pause)
+  mk(hud, 'Home', 'home', ICONS.home)
+  hud.append(scoreEl, timeEl)
+  mk(hud, 'Sound', 'sfx', ICONS.sound)
+  mk(hud, 'Music', 'music', ICONS.note)
+  mk(menu, 'Resume', 'resume', ICONS.play)
+  mk(menu, 'Restart', 'restart', ICONS.restart)
+  mk(menu, 'Home', 'home', ICONS.home)
+  mk(menu, 'Sound', 'sfx', ICONS.sound)
+  mk(menu, 'Music', 'music', ICONS.note)
+  mk(resultRow, 'Restart', 'restart', ICONS.restart)
+  mk(resultRow, 'Home', 'home', ICONS.home)
+
+  let layout: Layout = boardLayout(innerWidth, innerHeight)
+  let state: GameState = createGame('pretty', layout.cols, layout.rows, 'timed')
+  let screen: Screen = 'title'
+  let pose: Pose = 'idle'
+  let mode: Mode = 'timed'
+  let freeze = params.has('freeze')
+  let ghostOn = false
+  let frame = 0
+  let highlightFrame = 0
+  let popWallMs = 0
+  let last = performance.now()
+  const springs = new Map<number, Spring>()
+  let particles: DrawParticle[] = []
+  let floats: { x: number; y: number; text: string; age: number }[] = []
+  let bumpX = 0
+  let bumpY = 0
+  let bumpT = 0
+  let ghostPath: Piece[] = []
+
+  function insetTop(): number {
+    return parseFloat(getComputedStyle(probe).paddingTop) || 0
+  }
+
+  function viewDpr(): number {
+    const native = Math.min(2, devicePixelRatio || 1)
+    const area = Math.max(1, innerWidth * innerHeight)
+    return Math.max(1, Math.min(native, Math.sqrt(1_400_000 / area)))
+  }
+
+  function resize() {
+    const next = boardLayout(innerWidth, innerHeight, insetTop())
+    const dpr = viewDpr()
+    canvas.width = Math.max(1, Math.round(innerWidth * dpr))
+    canvas.height = Math.max(1, Math.round(innerHeight * dpr))
+    canvas.style.width = `${innerWidth}px`
+    canvas.style.height = `${innerHeight}px`
+    gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
+      const score = state.score
+      const timeLeft = state.timeLeft
+      const seed = state.seed
+      const nextMode = state.mode
+      state = createGame(seed, next.cols, next.rows, nextMode)
+      state.score = score
+      state.timeLeft = timeLeft
+      ghostPath = []
+    }
+    layout = next
+  }
+
+  function center(p: Piece): { x: number; y: number } {
+    const s = springs.get(p.id) ?? { ox: 0, oy: 0, vx: 0, vy: 0 }
+    return {
+      x: layout.ox + (p.c + 0.5) * layout.D + s.ox,
+      y: layout.oy + (visualRow(p) + 0.5) * layout.D + s.oy,
+    }
+  }
+
+  function hit(x: number, y: number): Piece | null {
+    let best: Piece | null = null
+    let bestD = layout.D * 0.48
+    for (const p of state.pieces) {
+      if (p.dead) continue
+      const c = center(p)
+      const d = Math.hypot(c.x - x, c.y - y)
+      if (d <= bestD) {
+        best = p
+        bestD = d
+      }
+    }
+    return best
+  }
+
+  function burst(x: number, y: number, color: number, big: boolean) {
+    const n = reduced ? (big ? 8 : 4) : big ? 16 : 7
+    for (let i = 0; i < n; i++) {
+      const a = (Math.PI * 2 * i) / n
+      const sp = (big ? 210 : 100) * (0.6 + (i % 3) * 0.18)
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 40,
+        life: big ? 680 : 440,
+        age: 0,
+        color: big ? CONFETTI[i % CONFETTI.length] : COLORS[color] ?? COLORS[0],
+        kind: big ? 'confetti' : 'dot',
+        rot: i,
+        vr: big ? 5 : 0,
+        w: big ? 12 + (i % 3) * 3 : 7,
+      })
+    }
+    while (particles.length > 96) particles.shift()
+  }
+
+  function notePops(ids: number[]) {
+    const big = state.hitstopTotal > 0
+    ids.forEach((id, i) => {
+      const p = byId(state, id)
+      if (!p) return
+      const c = center(p)
+      const index = Math.max(0, state.popAt.length - ids.length + i)
+      burst(c.x, c.y, p.color, big)
+      if (!qaMode) playPop(index, big)
+    })
+    if (big && !reduced) {
+      bumpX = (ids.length % 2 === 0 ? 1 : -1) * 5
+      bumpY = 3
+      bumpT = 200
+    }
+    if (!qaMode && ids.length) {
+      try {
+        navigator.vibrate?.(big ? 16 : 8)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function armRelease() {
+    const t0 = performance.now()
+    const ids = release(state)
+    popWallMs = performance.now() - t0
+    if (!ids.length) return
+    const spot = center(byId(state, ids[0]) ?? state.pieces[0])
+    floats.push({ x: spot.x, y: spot.y - layout.D * 0.3, text: `+${state.gained}`, age: 0 })
+    if (state.combo > 1) floats.push({ x: spot.x, y: spot.y - layout.D * 0.7, text: `x${state.combo}`, age: 0 })
+    if (state.hitstopTotal > 0) {
+      for (const id of state.showIds) {
+        const p = byId(state, id)
+        if (!p) continue
+        const spot = center(p)
+        burst(spot.x, spot.y, p.color, true)
+      }
+      if (!qaMode) playPop(0, true)
+    } else notePops(ids)
+    ghostOn = false
+    save.tut = true
+    storeSave(save)
+    syncHud()
+  }
+
+  function show(next: Screen) {
+    screen = next
+    title.hidden = next !== 'title'
+    hud.hidden = next !== 'play'
+    pauseMenu.hidden = next !== 'pause'
+    results.hidden = next !== 'results'
+    setAudioPaused(next === 'pause')
+    if (next === 'results') {
+      finalEl.textContent = String(state.score)
+      const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
+      bestEl.innerHTML = `${ICONS.star}<span>${best}</span>`
+      const n = state.score >= 2500 ? 3 : state.score >= 1000 ? 2 : 1
+      stars.innerHTML = [0, 1, 2].map((i) => (i < n ? ICONS.star : '')).join('')
+    }
+    syncHud()
+  }
+
+  function syncHud() {
+    scoreEl.textContent = String(state.score)
+    timeEl.innerHTML = mode === 'cuddle' ? ICONS.heart : String(Math.ceil(state.timeLeft / 1000))
+  }
+
+  function fresh(nextMode: Mode, seed: string) {
+    mode = nextMode
+    pose = 'idle'
+    particles = []
+    floats = []
+    springs.clear()
+    ghostPath = []
+    state = createGame(seed, layout.cols, layout.rows, nextMode)
+    ghostOn = tutParam || (!save.tut && !qaMode)
+  }
+
+  function showPlay() {
+    show('play')
+  }
+
+  function openPause() {
+    if (screen === 'title') return
+    show('pause')
+  }
+
+  function rememberBest() {
+    if (mode === 'daily') {
+      if (save.dailyDay !== state.seed) {
+        save.dailyDay = state.seed
+        save.dailyBest = 0
+      }
+      save.dailyBest = Math.max(save.dailyBest, state.score)
+    } else if (mode === 'cuddle') save.bestCuddle = Math.max(save.bestCuddle, state.score)
+    else save.bestTimed = Math.max(save.bestTimed, state.score)
+    storeSave(save)
+  }
+
+  function showResults(score?: number) {
+    if (score !== undefined) state.score = score
+    rememberBest()
+    show('results')
+  }
+
+  function onAction(action: string) {
+    if (!qaMode) unlockAudio(false)
+    if (action === 'sfx') {
+      save.muteSfx = !save.muteSfx
+      setAudioPrefs({ sfx: !save.muteSfx })
+      storeSave(save)
+      paintMutes()
+      return
+    }
+    if (action === 'music') {
+      save.muteMusic = !save.muteMusic
+      setAudioPrefs({ music: !save.muteMusic })
+      storeSave(save)
+      paintMutes()
+      return
+    }
+    if (action === 'pause') openPause()
+    else if (action === 'resume') {
+      last = performance.now()
+      showPlay()
+    } else if (action === 'home') show('title')
+    else if (action === 'restart') {
+      const seed = qaMode ? state.seed : mode === 'daily' ? dailySeed() : `${mode}-${Date.now()}`
+      fresh(mode, seed)
+      showPlay()
+    } else if (action === 'timed' || action === 'cuddle' || action === 'daily') {
+      const nextMode = action
+      const seed =
+        seedParam && qaMode
+          ? seedParam
+          : nextMode === 'daily'
+            ? dailySeed()
+            : qaMode
+              ? 'pretty'
+              : `${nextMode}-${Date.now()}`
+      fresh(nextMode, seed)
+      showPlay()
+    }
+    draw()
+  }
+
+  function paintMutes() {
+    for (const b of appRoot.querySelectorAll<HTMLButtonElement>('[data-action="sfx"]')) {
+      b.innerHTML = save.muteSfx ? ICONS.muted : ICONS.sound
+      b.setAttribute('aria-pressed', save.muteSfx ? 'true' : 'false')
+    }
+    for (const b of appRoot.querySelectorAll<HTMLButtonElement>('[data-action="music"]')) {
+      b.setAttribute('aria-pressed', save.muteMusic ? 'true' : 'false')
+      b.style.opacity = save.muteMusic ? '0.45' : '1'
+    }
+  }
+
+  function onDown(x: number, y: number) {
+    if (screen !== 'play') return
+    if (state.phase !== 'idle') rush(state)
+    if (roundOver(state)) {
+      showResults()
+      return
+    }
+    state.drag = []
+    const p = hit(x, y)
+    if (p) extendDrag(state, p.id)
+    if (ghostOn) ghostOn = false
+    draw()
+    highlightFrame = frame
+  }
+
+  function onMove(x: number, y: number) {
+    if (screen !== 'play' || state.drag.length === 0) return
+    const p = hit(x, y)
+    if (p) extendDrag(state, p.id)
+    draw()
+    highlightFrame = frame
+  }
+
+  function onUp() {
+    if (screen !== 'play') return
+    if (state.drag.length >= 2) armRelease()
+    else {
+      state.drag = []
+      if (!save.tut) ghostOn = tutParam || !qaMode
+    }
+    if (state.phase === 'idle' && roundOver(state)) showResults()
+    draw()
+    highlightFrame = frame
+  }
+
+  function updateSprings(dt: number, now: number) {
+    const amp = reduced ? 0 : layout.D * 0.028
+    for (const p of state.pieces) {
+      if (p.dead) continue
+      let s = springs.get(p.id)
+      if (!s) {
+        s = { ox: 0, oy: 0, vx: 0, vy: 0 }
+        springs.set(p.id, s)
+      }
+      const tx = Math.sin(now / 520 + p.id) * amp
+      const ty = Math.cos(now / 640 + p.id * 1.3) * amp * 0.65
+      const k = 0.18
+      s.vx = (s.vx + (tx - s.ox) * k) * 0.72
+      s.vy = (s.vy + (ty - s.oy) * k) * 0.72
+      s.ox += s.vx * (dt / 16)
+      s.oy += s.vy * (dt / 16)
+    }
+  }
+
+  function updateParticles(dt: number) {
+    const sec = dt / 1000
+    particles = particles.filter((p) => {
+      p.age += dt
+      p.x += p.vx * sec
+      p.y += p.vy * sec
+      p.vy += 520 * sec
+      p.rot += p.vr * sec
+      return p.age < p.life
+    })
+    bumpT = Math.max(0, bumpT - dt)
+    const u = bumpT / 200
+    bumpX *= u > 0 ? 1 : 0
+    bumpY *= u > 0 ? 1 : 0
+    if (u > 0) {
+      bumpX = Math.sign(bumpX || 1) * 5 * u
+      bumpY = 3 * u
+    }
+    floats = floats.filter((f) => {
+      f.age += dt
+      f.y -= dt * 0.03
+      return f.age < 700
+    })
+  }
+
+  function tick(dt: number, now: number) {
+    if (screen !== 'play') return
+    const frozen = state.hitstopLeft > 0
+    if (!frozen) updateSprings(dt, now)
+    updateParticles(dt)
+    const popped = step(state, dt)
+    if (popped.length) notePops(popped)
+    if (roundOver(state)) showResults()
+    syncHud()
+  }
+
+  function ghostPose(now: number): { x: number; y: number; down: boolean; alpha: number; prefix: number } | null {
+    if (!ghostOn || screen !== 'play' || state.drag.length > 0 || state.phase !== 'idle') return null
+    if (!ghostPath.length) {
+      ghostPath = findPath(state, 3) ?? []
+      if (!ghostPath.length) return null
+    }
+    const u = (now % 2600) / 2600
+    const travel = Math.min(1, Math.max(0, (u - 0.1) / 0.62))
+    const idx = Math.min(ghostPath.length - 1, Math.floor(travel * ghostPath.length))
+    const c = center(ghostPath[idx])
+    const alpha = u < 0.08 ? u / 0.08 : u > 0.88 ? (1 - u) / 0.12 : 1
+    const towardX = c.x < innerWidth / 2 ? layout.D * 0.28 : -layout.D * 0.28
+    return {
+      x: Math.min(innerWidth - 8, Math.max(8, c.x + towardX)),
+      y: Math.min(innerHeight - 8, Math.max(8, c.y + layout.D * 0.22)),
+      down: u < 0.84,
+      alpha,
+      prefix: idx,
+    }
+  }
+
+  function scene(now: number): Scene {
+    const D = layout.D
+    const ghost = ghostPose(now)
+    const selected = new Set<number>(state.drag.length ? state.drag : state.showIds)
+    if (ghost) {
+      for (let i = 0; i <= ghost.prefix; i++) selected.add(ghostPath[i].id)
+    }
+    const ropeIds = state.drag.length ? state.drag : state.phase !== 'idle' ? state.showIds : ghost ? ghostPath.slice(0, ghost.prefix + 1).map((p) => p.id) : []
+    const pieces = state.pieces
+      .filter((p) => !p.dead || p.popT >= 0)
+      .map((p) => {
+        const c = center(p)
+        const popU = p.popT < 0 ? 0 : Math.min(1, p.popT / 120)
+        const popping = p.popT >= 0
+        const breathe = reduced || popping ? 0 : Math.sin(now / 280 + p.id) * 0.02
+        const on = selected.has(p.id) && !popping
+        let sx = 1 + breathe
+        let sy = 1 - breathe
+        if (on) {
+          sx = 1.24
+          sy = 0.76
+        }
+        if (popping) {
+          sx = 1.35 * (1 - popU)
+          sy = 0.62 + popU * 0.2
+        } else if (p.kind !== 'bonbon' && !on) {
+          const pulse = reduced ? 0 : Math.sin(now / 220 + p.id) * 0.03
+          sx += pulse
+          sy -= pulse
+        }
+        return {
+          id: p.id,
+          color: p.color,
+          kind: p.kind,
+          x: c.x,
+          y: c.y,
+          sx,
+          sy,
+          popping,
+          popU,
+          selected: on,
+        }
+      })
+    const rope = ropeIds
+      .map((id) => byId(state, id))
+      .filter((p): p is Piece => !!p)
+      .map((p) => center(p))
+    let peeks: Scene['peeks'] = []
+    if (screen === 'results') {
+      const card = results.getBoundingClientRect()
+      if (card.width > 0) {
+        peeks = [0, 1, 2, 3].map((i) => ({
+          color: i,
+          x: card.left + ((i + 0.5) * card.width) / 4,
+          y: card.top + 2,
+        }))
+      }
+    }
+    const landscape = innerWidth > innerHeight
+    const heap =
+      screen === 'title'
+        ? [
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+            [-0.5, 0],
+            [0.5, 0],
+            [0, -0.95],
+          ].map(([gx, gy], i) => ({
+            color: i % 5,
+            kind: 'bonbon' as const,
+            x: (landscape ? innerWidth * 0.34 : innerWidth * 0.5) + gx * D * 0.92,
+            y: (landscape ? innerHeight * 0.56 : innerHeight * 0.5) + gy * D * 0.78 + (freeze || reduced ? 0 : Math.sin(now / 380 + i) * 3),
+            sx: 1,
+            sy: 1,
+          }))
+        : []
+    return {
+      w: innerWidth,
+      h: innerHeight,
+      dpr: viewDpr(),
+      D,
+      pieces: screen === 'title' ? [] : pieces,
+      rope: screen === 'title' ? [] : rope,
+      particles,
+      ghost: ghost ? { x: ghost.x, y: ghost.y, down: ghost.down, alpha: ghost.alpha } : null,
+      flash: state.hitstopTotal > 0 ? (state.hitstopLeft / state.hitstopTotal) * 0.22 : 0,
+      bumpX: reduced ? 0 : bumpX,
+      bumpY: reduced ? 0 : bumpY,
+      floats,
+      screen,
+      heap,
+      mat:
+        screen === 'title'
+          ? null
+          : {
+              x: layout.ox - D * 0.1,
+              y: Math.max(layout.hud, layout.oy - D * 0.08),
+              w: layout.cols * D + D * 0.2,
+              h: layout.rows * D + D * 0.16,
+            },
+      peeks,
+    }
+  }
+
+  function draw() {
+    const now = performance.now()
+    const blink = !freeze && !reduced && now % 3200 < 140
+    renderScene(gfx, scene(now), blink)
+    frame += 1
+  }
+
+  function applyUrl() {
+    const want = screenParam ?? 'title'
+    if (want === 'results') {
+      fresh('timed', seedParam ?? 'pretty')
+      showResults(3200)
+      return
+    }
+    if (want === 'title') {
+      fresh('timed', seedParam ?? (qaMode ? 'pretty' : `boot-${Date.now()}`))
+      show('title')
+      return
+    }
+    const seed = want === 'chain' || want === 'pop' ? seedParam && seedParam !== 'pretty' ? seedParam : 'feel' : seedParam ?? (qaMode ? 'pretty' : `boot-${Date.now()}`)
+    fresh('timed', seed)
+    showPlay()
+    if (want === 'chain' || want === 'pop') {
+      const path = findPath(state, want === 'pop' ? 6 : 5)
+      if (path) state.drag = path.map((p) => p.id)
+      pose = want
+      if (want === 'pop' && path) {
+        armRelease()
+        updateParticles(48)
+        freeze = true
+        pose = 'pop'
+      }
+    }
+    if (want === 'pause') openPause()
+  }
+
+  function armHistory() {
+    history.replaceState({ bb: 0 }, '')
+    history.pushState({ bb: 1 }, '')
+    addEventListener('popstate', () => {
+      history.pushState({ bb: 1 }, '')
+      if (screen === 'play') openPause()
+      else if (screen === 'pause' || screen === 'results') show('title')
+      draw()
+    })
+  }
+
+  function visibleUi(): { n: string; r: DOMRect; el: HTMLElement }[] {
+    return [...appRoot.querySelectorAll<HTMLElement>('.ui')].filter((el) => {
+      if (el.closest('[hidden]')) return false
+      const s = getComputedStyle(el)
+      return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    }).map((el) => ({
+      n: el.getAttribute('aria-label') || el.className,
+      r: el.getBoundingClientRect(),
+      el,
+    }))
+  }
+
+  window.__checkOverlaps = () => {
+    const els = visibleUi()
+    const overlaps: [string, string][] = []
+    const offscreen: string[] = []
+    for (let i = 0; i < els.length; i++) {
+      const a = els[i]
+      if (a.r.left < -1 || a.r.top < -1 || a.r.right > innerWidth + 1 || a.r.bottom > innerHeight + 1) offscreen.push(a.n)
+      for (let j = i + 1; j < els.length; j++) {
+        const b = els[j]
+        if (a.el.contains(b.el) || b.el.contains(a.el)) continue
+        const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left)
+        const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top)
+        if (ix > 2 && iy > 2) overlaps.push([a.n, b.n])
+      }
+    }
+    return { overlaps, offscreen }
+  }
+
+  window.__checkPlayGeometry = () => {
+    const violations: string[] = []
+    for (const u of visibleUi()) {
+      if (u.el.tagName === 'BUTTON' && (u.r.width < 44 || u.r.height < 44)) violations.push(`small ${u.n}`)
+    }
+    if (screen === 'play') {
+      const ds = new Set<number>()
+      for (const p of state.pieces) {
+        if (p.dead && p.popT < 0) continue
+        if (p.fallT >= 0 && p.fallT < 1) continue
+        ds.add(layout.D)
+        const c = center(p)
+        const rad = layout.D / 2
+        if (c.x - rad < -2 || c.y - rad < -2 || c.x + rad > innerWidth + 2 || c.y + rad > innerHeight + 2) {
+          violations.push(`off piece ${p.id}`)
+        }
+        if (c.y - rad < layout.hud - 2) violations.push(`under hud ${p.id}`)
+      }
+      if (ds.size !== 1) violations.push('mixed D')
+    }
+    const g = ghostPose(performance.now())
+    if (ghostOn && screen === 'play' && g) {
+      if (g.x < 0 || g.y < 0 || g.x > innerWidth || g.y > innerHeight) violations.push('ghost offscreen')
+    }
+    return { violations }
+  }
+
+  const api: Qa = {
+    get ready() { return window.__ready },
+    get screen() { return screen },
+    get pose() { return pose },
+    get mode() { return mode },
+    get seed() { return state.seed },
+    get score() { return state.score },
+    get combo() { return state.combo },
+    get timeLeft() { return state.timeLeft },
+    get paused() { return screen === 'pause' },
+    inputLocked: false,
+    get chain() { return state.drag.slice() },
+    get D() { return layout.D },
+    get cols() { return state.cols },
+    get rows() { return state.rows },
+    get board() {
+      return state.pieces
+        .filter((p) => !p.dead || p.popT >= 0)
+        .map((p) => {
+          const c = center(p)
+          return {
+            id: p.id,
+            c: p.c,
+            r: p.r,
+            color: p.color,
+            kind: p.kind,
+            popping: p.popT >= 0,
+            falling: p.fallT >= 0 && p.fallT < 1,
+            x: c.x,
+            y: c.y,
+            d: layout.D,
+          }
+        })
+    },
+    get ghost() { return ghostOn && screen === 'play' },
+    get ghostX() { return ghostPose(performance.now())?.x ?? -1 },
+    get ghostY() { return ghostPose(performance.now())?.y ?? -1 },
+    get hitstopMs() { return state.hitstopTotal },
+    get hitstopActive() { return state.hitstopLeft > 0 },
+    get particleCount() { return particles.length },
+    get particleSig() { return particles.reduce((s, p) => s + p.x + p.y, 0) },
+    get popStartedAt() { return state.popAt.slice() },
+    get popWallMs() { return popWallMs },
+    get settled() { return state.settled },
+    get settleMs() { return state.settleMs },
+    get muteSfx() { return save.muteSfx },
+    get muteMusic() { return save.muteMusic },
+    get frame() { return frame },
+    get highlightFrame() { return highlightFrame },
+    get spriteMisses() { return spriteMisses },
+    get audioCreates() { return audioCreates },
+    filterOps: 0,
+    pointer(phase, x, y) {
+      if (phase === 'down') onDown(x, y)
+      else if (phase === 'move') onMove(x, y)
+      else onUp()
+    },
+    findChain(min, avoid = [], prefer) {
+      const path = findPath(state, min, avoid, prefer)
+      if (!path) return null
+      return path.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+    },
+    center(id) {
+      const p = byId(state, id)
+      return p ? center(p) : null
+    },
+    pause() { openPause(); draw() },
+    resume() { last = performance.now(); showPlay(); draw() },
+    restart() { onAction('restart') },
+    home() { show('title'); draw() },
+    start(nextMode, seed) {
+      fresh(nextMode, seed ?? (nextMode === 'daily' ? dailySeed() : 'pretty'))
+      showPlay()
+      draw()
+    },
+    pump(ms) {
+      if (freeze || screen === 'pause') return
+      let left = ms
+      const now = performance.now()
+      while (left > 0) {
+        const d = Math.min(16, left)
+        tick(d, now)
+        left -= d
+      }
+      draw()
+    },
+    draw() { draw() },
+    setMute(sfx, music) {
+      save.muteSfx = sfx
+      save.muteMusic = music
+      setAudioPrefs({ sfx: !sfx, music: !music })
+      storeSave(save)
+      paintMutes()
+    },
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (screen !== 'play') return
+    canvas.setPointerCapture(e.pointerId)
+    const r = canvas.getBoundingClientRect()
+    onDown(e.clientX - r.left, e.clientY - r.top)
+  })
+  canvas.addEventListener('pointermove', (e) => {
+    if (screen !== 'play' || !state.drag.length && e.buttons === 0) return
+    const r = canvas.getBoundingClientRect()
+    onMove(e.clientX - r.left, e.clientY - r.top)
+  })
+  canvas.addEventListener('pointerup', () => onUp())
+  canvas.addEventListener('pointercancel', () => onUp())
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault())
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return
+    e.preventDefault()
+    if (screen === 'play') openPause()
+    else if (screen === 'pause' || screen === 'results') show('title')
+    draw()
+  })
+  addEventListener('resize', () => { resize(); draw() })
+
+  function loop(now: number) {
+    if (freeze) return
+    let dt = now - last
+    last = now
+    if (dt > 40) dt = 40
+    if (dt < 0) dt = 0
+    tick(dt, now)
+    draw()
+    requestAnimationFrame(loop)
+  }
+
+  armHistory()
+  resize()
+  applyUrl()
+  paintMutes()
+  draw()
+  window.__qa = api
+  window.__ready = true
+  void document.fonts.ready.then(() => draw())
+  if (!freeze) requestAnimationFrame(loop)
+}
+
+function el(tag: string, className = ''): HTMLElement {
+  const node = document.createElement(tag)
+  if (className) node.className = className
+  return node
+}
