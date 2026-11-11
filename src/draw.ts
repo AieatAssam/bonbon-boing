@@ -1,13 +1,15 @@
 import type { Kind } from './sim'
 
-const INK = '#4A2440'
 const PAL = [
-  { base: '#FF4F93', deep: '#D41468', light: '#FFD5E8', ear: '#FF8BB8' },
-  { base: '#2FDB8E', deep: '#0B9A58', light: '#D7FFE8', ear: '#86F2BC' },
-  { base: '#FFD23A', deep: '#E09600', light: '#FFF4C8', ear: '#FFE58A' },
-  { base: '#5B8CFF', deep: '#2A58D6', light: '#DEE7FF', ear: '#9BB6FF' },
-  { base: '#FF8A4A', deep: '#E85E18', light: '#FFE2D2', ear: '#FFB18A' },
+  { base: '#FF3D8E', deep: '#C10A55', light: '#FFE3F0', ear: '#FF7DB5', rim: '#FF96C5' },
+  { base: '#2FDB8E', deep: '#0A8A50', light: '#D9FFED', ear: '#7FF0BC', rim: '#96F5CB' },
+  { base: '#FFD02A', deep: '#C98600', light: '#FFF6CF', ear: '#FFE67A', rim: '#FFEB9E' },
+  { base: '#5088FF', deep: '#1E52C8', light: '#E2EBFF', ear: '#93B8FF', rim: '#A8C6FF' },
+  { base: '#FF7A28', deep: '#D24800', light: '#FFE5D6', ear: '#FFA96A', rim: '#FFBC8E' },
+  { base: '#C070FF', deep: '#7A2AD4', light: '#F2E6FF', ear: '#E0B6FF', rim: '#E8C8FF' },
 ]
+
+const RIBBON = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
 
 export type DrawPiece = {
   id: number
@@ -30,7 +32,7 @@ export type DrawParticle = {
   life: number
   age: number
   color: string
-  kind: 'dot' | 'confetti'
+  kind: 'dot' | 'confetti' | 'star' | 'goo'
   rot: number
   vr: number
   w: number
@@ -41,18 +43,23 @@ export type Scene = {
   h: number
   dpr: number
   D: number
+  t: number
   pieces: DrawPiece[]
   rope: { x: number; y: number }[]
+  ropeColor: number
+  chainLen: number
+  finger: { x: number; y: number } | null
   particles: DrawParticle[]
   ghost: { x: number; y: number; down: boolean; alpha: number } | null
   flash: number
   bumpX: number
   bumpY: number
-  floats: { x: number; y: number; text: string; age: number }[]
+  floats: { x: number; y: number; text: string; age: number; big?: boolean }[]
   screen: 'title' | 'play' | 'pause' | 'results'
-  heap: { color: number; kind: Kind; x: number; y: number; sx: number; sy: number }[]
+  heap: { color: number; kind: Kind; x: number; y: number; sx: number; sy: number; id: number }[]
   mat: { x: number; y: number; w: number; h: number } | null
   peeks: { color: number; x: number; y: number }[]
+  dim: number
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
@@ -65,11 +72,11 @@ function canvas(w: number, h: number): HTMLCanvasElement {
   return c
 }
 
-function ear(ctx: CanvasRenderingContext2D, color: number, cx: number, cy: number, r: number) {
-  const pal = PAL[color]
+function ear(ctx: CanvasRenderingContext2D, color: number, cx: number, cy: number, r: number, stroke: string) {
+  const pal = PAL[color % PAL.length]
   ctx.fillStyle = pal.ear
-  ctx.strokeStyle = INK
-  ctx.lineWidth = Math.max(2, r * 0.08)
+  ctx.strokeStyle = stroke
+  ctx.lineWidth = Math.max(2, r * 0.07)
   ctx.lineJoin = 'round'
   if (color === 0) {
     for (const s of [-1, 1]) {
@@ -111,13 +118,29 @@ function ear(ctx: CanvasRenderingContext2D, color: number, cx: number, cy: numbe
       ctx.fill()
       ctx.stroke()
     }
-  } else {
+  } else if (color === 4) {
     for (const s of [-1, 1]) {
       ctx.beginPath()
       ctx.arc(cx + s * r * 0.62, cy - r * 0.92, r * 0.32, 0, Math.PI * 2)
       ctx.fill()
       ctx.stroke()
     }
+  } else {
+    ctx.beginPath()
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5
+      const b = a + Math.PI / 5
+      const sx = cx + Math.cos(a) * r * 0.42
+      const sy = cy - r * 1.05 + Math.sin(a) * r * 0.42
+      const bx = cx + Math.cos(b) * r * 0.22
+      const by = cy - r * 1.05 + Math.sin(b) * r * 0.22
+      if (i === 0) ctx.moveTo(sx, sy)
+      else ctx.lineTo(sx, sy)
+      ctx.lineTo(bx, by)
+    }
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
   }
 }
 
@@ -125,19 +148,19 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
   if (!ctx) return c
-  const pal = kind === 'rainbow' ? { base: '#FFF7FB', deep: '#F3D2E4', light: '#FFFFFF', ear: '#FFE0A8' } : PAL[color]
+  const pal = kind === 'rainbow' ? { base: '#FFF7FB', deep: '#D8A8C4', light: '#FFFFFF', ear: '#FFE0A8', rim: '#FFD8F0' } : PAL[color % PAL.length]
   const cx = px / 2
-  const cy = px * 0.56
-  const r = px * 0.32
-  ctx.fillStyle = 'rgba(90, 40, 70, 0.16)'
+  const cy = px * 0.54
+  const r = px * 0.44
+  ctx.fillStyle = 'rgba(70, 30, 55, 0.14)'
   ctx.beginPath()
-  ctx.ellipse(cx, cy + r * 0.92, r * 0.78, r * 0.2, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx, cy + r * 0.96, r * 0.72, r * 0.18, 0, 0, Math.PI * 2)
   ctx.fill()
-  if (kind !== 'rainbow') ear(ctx, color, cx, cy, r)
+  if (kind !== 'rainbow') ear(ctx, color, cx, cy, r, pal.deep)
   else {
     ctx.fillStyle = '#FFE08A'
-    ctx.strokeStyle = INK
-    ctx.lineWidth = Math.max(2, r * 0.08)
+    ctx.strokeStyle = pal.deep
+    ctx.lineWidth = Math.max(2, r * 0.07)
     ctx.beginPath()
     ctx.moveTo(cx - r * 0.55, cy - r * 0.7)
     ctx.lineTo(cx - r * 0.28, cy - r * 1.25)
@@ -148,25 +171,33 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
     ctx.fill()
     ctx.stroke()
   }
-  ctx.fillStyle = INK
-  ctx.beginPath()
-  ctx.arc(cx, cy, r + px * 0.025, 0, Math.PI * 2)
-  ctx.fill()
-  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.42, r * 0.08, cx, cy + r * 0.1, r * 1.05)
+  const g = ctx.createRadialGradient(cx - r * 0.42, cy - r * 0.5, r * 0.06, cx + r * 0.06, cy + r * 0.12, r * 1.12)
   g.addColorStop(0, '#FFFFFF')
-  g.addColorStop(0.16, pal.light)
-  g.addColorStop(0.5, pal.base)
+  g.addColorStop(0.12, pal.light)
+  g.addColorStop(0.48, pal.base)
   g.addColorStop(1, pal.deep)
   ctx.fillStyle = g
   ctx.beginPath()
   ctx.arc(cx, cy, r, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.72)'
+  ctx.strokeStyle = pal.deep
+  ctx.lineWidth = Math.max(2.5, r * 0.07)
+  ctx.stroke()
+  ctx.strokeStyle = pal.rim
+  ctx.lineWidth = Math.max(1.5, r * 0.05)
   ctx.beginPath()
-  ctx.ellipse(cx - r * 0.28, cy - r * 0.38, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2)
+  ctx.arc(cx, cy, r * 0.92, -0.6, 2.3)
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(255,255,255,0.86)'
+  ctx.beginPath()
+  ctx.ellipse(cx - r * 0.34, cy - r * 0.42, r * 0.34, r * 0.2, -0.55, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.beginPath()
+  ctx.ellipse(cx + r * 0.28, cy - r * 0.08, r * 0.16, r * 0.1, 0.4, 0, Math.PI * 2)
   ctx.fill()
   if (kind === 'bomb') {
-    ctx.fillStyle = '#3A2148'
+    ctx.fillStyle = pal.deep
     ctx.beginPath()
     const s = r * 0.28
     ctx.moveTo(cx, cy + r * 0.05 - s)
@@ -189,10 +220,6 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
     ctx.beginPath()
     ctx.arc(cx + r * 0.7, cy - r * 1.18, r * 0.12, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#FFF3B0'
-    ctx.beginPath()
-    ctx.arc(cx + r * 0.66, cy - r * 1.22, r * 0.05, 0, Math.PI * 2)
-    ctx.fill()
   }
   if (kind === 'rainbow') {
     const hues = ['#FF5A8A', '#FFD23A', '#3DDE97', '#5B8CFF', '#C084FC']
@@ -212,47 +239,48 @@ function paintFace(blink: boolean, px: number): HTMLCanvasElement {
   const ctx = c.getContext('2d')
   if (!ctx) return c
   const cx = px / 2
-  const cy = px * 0.56
-  const r = px * 0.32
-  ctx.fillStyle = 'rgba(255,110,160,0.45)'
+  const cy = px * 0.54
+  const r = px * 0.44
+  const ink = '#3A1530'
+  ctx.fillStyle = 'rgba(255,110,160,0.52)'
   ctx.beginPath()
-  ctx.ellipse(cx - r * 0.55, cy + r * 0.18, r * 0.16, r * 0.1, 0, 0, Math.PI * 2)
-  ctx.ellipse(cx + r * 0.55, cy + r * 0.18, r * 0.16, r * 0.1, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx - r * 0.52, cy + r * 0.16, r * 0.18, r * 0.11, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx + r * 0.52, cy + r * 0.16, r * 0.18, r * 0.11, 0, 0, Math.PI * 2)
   ctx.fill()
   const eyeY = cy - r * 0.02
-  const eyeX = r * 0.32
+  const eyeX = r * 0.34
   for (const s of [-1, 1]) {
     if (blink) {
-      ctx.strokeStyle = INK
+      ctx.strokeStyle = ink
       ctx.lineWidth = Math.max(2, r * 0.08)
       ctx.lineCap = 'round'
       ctx.beginPath()
-      ctx.arc(cx + s * eyeX, eyeY, r * 0.16, 0.15 * Math.PI, 0.85 * Math.PI)
+      ctx.arc(cx + s * eyeX, eyeY, r * 0.18, 0.15 * Math.PI, 0.85 * Math.PI)
       ctx.stroke()
     } else {
       ctx.fillStyle = '#FFFFFF'
       ctx.beginPath()
-      ctx.ellipse(cx + s * eyeX, eyeY, r * 0.2, r * 0.24, 0, 0, Math.PI * 2)
+      ctx.ellipse(cx + s * eyeX, eyeY, r * 0.23, r * 0.28, 0, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = INK
-      ctx.lineWidth = Math.max(1.5, r * 0.05)
+      ctx.strokeStyle = ink
+      ctx.lineWidth = Math.max(1.5, r * 0.045)
       ctx.stroke()
-      ctx.fillStyle = INK
+      ctx.fillStyle = ink
       ctx.beginPath()
-      ctx.arc(cx + s * eyeX + r * 0.02, eyeY + r * 0.04, r * 0.11, 0, Math.PI * 2)
+      ctx.arc(cx + s * eyeX + r * 0.02, eyeY + r * 0.045, r * 0.13, 0, Math.PI * 2)
       ctx.fill()
       ctx.fillStyle = '#FFFFFF'
       ctx.beginPath()
-      ctx.arc(cx + s * eyeX - r * 0.04, eyeY - r * 0.05, r * 0.045, 0, Math.PI * 2)
-      ctx.arc(cx + s * eyeX + r * 0.07, eyeY + r * 0.02, r * 0.025, 0, Math.PI * 2)
+      ctx.arc(cx + s * eyeX - r * 0.05, eyeY - r * 0.06, r * 0.055, 0, Math.PI * 2)
+      ctx.arc(cx + s * eyeX + r * 0.08, eyeY + r * 0.03, r * 0.028, 0, Math.PI * 2)
       ctx.fill()
     }
   }
-  ctx.strokeStyle = INK
-  ctx.lineWidth = Math.max(1.5, r * 0.06)
+  ctx.strokeStyle = ink
+  ctx.lineWidth = Math.max(1.5, r * 0.055)
   ctx.lineCap = 'round'
   ctx.beginPath()
-  ctx.arc(cx, cy + r * 0.28, r * 0.16, 0.15 * Math.PI, 0.85 * Math.PI)
+  ctx.arc(cx, cy + r * 0.28, r * 0.17, 0.15 * Math.PI, 0.85 * Math.PI)
   ctx.stroke()
   return c
 }
@@ -264,10 +292,6 @@ function sprite(key: string, paint: () => HTMLCanvasElement): HTMLCanvasElement 
   const made = paint()
   cache.set(key, made)
   return made
-}
-
-export function resetSpriteStats(): void {
-  spriteMisses = 0
 }
 
 export function bodySprite(kind: Kind, color: number, px: number): HTMLCanvasElement {
@@ -299,60 +323,136 @@ function blit(
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh)
 }
 
+function drawSky(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+  const sky = ctx.createLinearGradient(0, 0, 0, h)
+  sky.addColorStop(0, '#9AD8FF')
+  sky.addColorStop(0.45, '#DDF3FF')
+  sky.addColorStop(1, '#FFD9EE')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, w, h)
+  for (let i = 0; i < 7; i++) {
+    const cx = ((i * 173 + t * 0.008) % (w + 120)) - 60
+    const cy = 40 + (i % 3) * 50 + Math.sin(t / 900 + i) * 8
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, 42 + (i % 2) * 12, 22, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx + 32, cy + 6, 34, 18, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx - 28, cy + 8, 28, 16, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  for (let i = 0; i < 16; i++) {
+    const sx = (i * 97 + 40) % w
+    const sy = (i * 61 + 30) % h
+    ctx.beginPath()
+    ctx.arc(sx, sy, 2 + (i % 3), 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawTray(ctx: CanvasRenderingContext2D, m: { x: number; y: number; w: number; h: number }, D: number) {
+  const g = ctx.createLinearGradient(m.x, m.y, m.x, m.y + m.h)
+  g.addColorStop(0, 'rgba(255,255,255,0.94)')
+  g.addColorStop(0.5, 'rgba(255,244,250,0.88)')
+  g.addColorStop(1, 'rgba(255,220,236,0.92)')
+  ctx.fillStyle = g
+  ctx.strokeStyle = '#FFB8D9'
+  ctx.lineWidth = Math.max(3, D * 0.055)
+  round(ctx, m.x, m.y, m.w, m.h, D * 0.3)
+  ctx.fill()
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)'
+  ctx.lineWidth = Math.max(2, D * 0.035)
+  ctx.beginPath()
+  ctx.moveTo(m.x + D * 0.2, m.y + D * 0.12)
+  ctx.lineTo(m.x + m.w - D * 0.2, m.y + D * 0.12)
+  ctx.stroke()
+}
+
+function drawRibbon(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], color: number, width: number) {
+  if (pts.length < 2) return
+  const col = RIBBON[color % RIBBON.length]
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+  ctx.lineWidth = width * 1.15
+  strokeRope(ctx, pts)
+  const grad = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
+  grad.addColorStop(0, col)
+  grad.addColorStop(1, '#FFFFFF')
+  ctx.strokeStyle = grad
+  ctx.lineWidth = width
+  strokeRope(ctx, pts)
+}
+
+function drawChainBubble(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  n: number,
+  D: number,
+  bomb: boolean,
+  rainbow: boolean,
+) {
+  const gold = bomb || rainbow
+  const s = D * (gold ? 0.5 : 0.42) * (1 + Math.min(0.12, n * 0.02))
+  ctx.fillStyle = gold ? 'rgba(255, 214, 92, 0.95)' : 'rgba(255,255,255,0.94)'
+  ctx.strokeStyle = gold ? '#E8A400' : '#FF8CB8'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(x, y, s, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = gold ? '#7A4A00' : '#D41468'
+  ctx.font = `700 ${Math.round(D * 0.34)}px "Fredoka Variable", system-ui`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`x${n}`, x, y + 1)
+}
+
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: boolean): void {
   const { w, h, D } = scene
   const dpr = scene.dpr
   const px = Math.max(32, Math.round(D * dpr))
-  const sky = ctx.createLinearGradient(0, 0, 0, h)
-  sky.addColorStop(0, '#9AD8FF')
-  sky.addColorStop(0.55, '#E7F6FF')
-  sky.addColorStop(1, '#FFD4EC')
-  ctx.fillStyle = sky
-  ctx.fillRect(0, 0, w, h)
+  const pieceD = D * 0.88
+  drawSky(ctx, w, h, scene.t)
   ctx.save()
   ctx.translate(scene.bumpX, scene.bumpY)
-  if (scene.mat) {
-    const m = scene.mat
-    ctx.fillStyle = 'rgba(255,255,255,0.72)'
-    ctx.strokeStyle = '#FFC4DE'
-    ctx.lineWidth = Math.max(3, D * 0.06)
-    round(ctx, m.x, m.y, m.w, m.h, D * 0.28)
-    ctx.fill()
-    ctx.stroke()
-  }
-  if (scene.rope.length > 1) {
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)'
-    ctx.lineWidth = D * 0.2
-    strokeRope(ctx, scene.rope)
-    ctx.strokeStyle = 'rgba(255,180,210,0.95)'
-    ctx.lineWidth = D * 0.08
-    strokeRope(ctx, scene.rope)
-  }
+  if (scene.mat) drawTray(ctx, scene.mat, D)
+  const ribbonW = D * 0.22
+  if (scene.rope.length > 1) drawRibbon(ctx, scene.rope, scene.ropeColor, ribbonW)
   const ox = scene.bumpX
   const oy = scene.bumpY
   for (const h of scene.heap) {
-    blit(ctx, dpr, ox, oy, bodySprite(h.kind, h.color, px), h.x, h.y, D, D, h.sx, h.sy)
-    blit(ctx, dpr, ox, oy, faceSprite(false, px), h.x, h.y + D * (1 - h.sy) * 0.08, D, D, 1, 1)
+    blit(ctx, dpr, ox, oy, bodySprite(h.kind, h.color, px), h.x, h.y, pieceD, pieceD, h.sx, h.sy)
+    blit(ctx, dpr, ox, oy, faceSprite(false, px), h.x, h.y + pieceD * (1 - h.sy) * 0.08, pieceD, pieceD, 1, 1)
   }
   for (const p of scene.peeks) {
-    blit(ctx, dpr, ox, oy, bodySprite('bonbon', p.color, px), p.x, p.y, D, D, 1, 1)
-    blit(ctx, dpr, ox, oy, faceSprite(false, px), p.x, p.y, D, D, 1, 1)
+    blit(ctx, dpr, ox, oy, bodySprite('bonbon', p.color, px), p.x, p.y, pieceD, pieceD, 1, 1)
+    blit(ctx, dpr, ox, oy, faceSprite(false, px), p.x, p.y, pieceD, pieceD, 1, 1)
   }
   for (const p of scene.pieces) {
     const alpha = p.popping ? Math.max(0, 1 - p.popU) : 1
-    const faceScale = p.popping ? Math.max(0, 1 - p.popU) : 1
-    blit(ctx, dpr, ox, oy, bodySprite(p.kind, p.color, px), p.x, p.y, D, D, p.sx, p.sy, alpha)
+    let faceScale = 1
+    blit(ctx, dpr, ox, oy, bodySprite(p.kind, p.color, px), p.x, p.y, pieceD, pieceD, p.sx, p.sy, alpha)
     if (p.selected && !p.popping) {
       ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
       ctx.globalAlpha = 1
-      ctx.strokeStyle = '#FFFFFF'
-      ctx.lineWidth = Math.max(3, D * 0.07)
+      const ring = RIBBON[p.color % RIBBON.length]
+      ctx.strokeStyle = ring
+      ctx.globalAlpha = 0.35
+      ctx.strokeStyle = ring
+      ctx.lineWidth = Math.max(9, D * 0.16)
       ctx.beginPath()
-      ctx.arc(p.x, p.y, D * 0.48, 0, Math.PI * 2)
+      ctx.arc(p.x, p.y, pieceD * 0.54, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      ctx.lineWidth = Math.max(4, D * 0.09)
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, pieceD * 0.54, 0, Math.PI * 2)
       ctx.stroke()
     }
+    if (p.popping) faceScale = Math.max(0, 1 - p.popU * 1.2)
     blit(
       ctx,
       dpr,
@@ -360,9 +460,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       oy,
       faceSprite(blink && !p.popping, px),
       p.x,
-      p.y + (p.popping ? 0 : D * (1 - p.sy) * 0.12),
-      D,
-      D,
+      p.y + (p.popping ? 0 : pieceD * (1 - p.sy) * 0.1),
+      pieceD,
+      pieceD,
       faceScale,
       faceScale,
       alpha,
@@ -377,8 +477,21 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     ctx.translate(q.x, q.y)
     ctx.rotate(q.rot)
     ctx.fillStyle = q.color
-    if (q.kind === 'confetti') {
-      ctx.fillRect(-q.w / 2, -q.w / 4, q.w, q.w / 2)
+    if (q.kind === 'confetti') ctx.fillRect(-q.w / 2, -q.w / 4, q.w, q.w / 2)
+    else if (q.kind === 'star') {
+      ctx.beginPath()
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5
+        const b = a + Math.PI / 5
+        ctx.lineTo(Math.cos(a) * q.w, Math.sin(a) * q.w)
+        ctx.lineTo(Math.cos(b) * q.w * 0.42, Math.sin(b) * q.w * 0.42)
+      }
+      ctx.closePath()
+      ctx.fill()
+    } else if (q.kind === 'goo') {
+      ctx.beginPath()
+      ctx.ellipse(0, 0, q.w * 0.55, q.w * 0.35, 0, 0, Math.PI * 2)
+      ctx.fill()
     } else {
       ctx.beginPath()
       ctx.arc(0, 0, q.w / 2, 0, Math.PI * 2)
@@ -386,24 +499,49 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     }
     ctx.restore()
   }
+  if (scene.finger && scene.chainLen > 1) {
+    const fp = scene.finger
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.strokeStyle = RIBBON[scene.ropeColor % RIBBON.length]
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(fp.x, fp.y, Math.max(6, D * 0.09), 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    const by = fp.y - D * 0.62
+    drawChainBubble(ctx, fp.x, by, scene.chainLen, D, scene.chainLen >= 5, scene.chainLen >= 8)
+  }
   ctx.restore()
   if (scene.ghost && scene.ghost.alpha > 0.02) {
     drawHand(ctx, scene.ghost.x, scene.ghost.y, scene.D, scene.ghost.down, scene.ghost.alpha)
+  }
+  if (scene.dim > 0.01) {
+    ctx.fillStyle = `rgba(58, 24, 52, ${scene.dim * 0.42})`
+    ctx.fillRect(0, 0, w, h)
+    const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.75)
+    v.addColorStop(0, 'rgba(0,0,0,0)')
+    v.addColorStop(1, `rgba(48,16,42,${scene.dim * 0.35})`)
+    ctx.fillStyle = v
+    ctx.fillRect(0, 0, w, h)
   }
   if (scene.flash > 0.01) {
     ctx.fillStyle = `rgba(255,255,255,${scene.flash})`
     ctx.fillRect(0, 0, w, h)
   }
-  ctx.font = `700 ${Math.round(D * 0.42)}px "Fredoka Variable", system-ui`
+  ctx.font = `800 ${Math.round(D * (scene.floats.some((f) => f.big) ? 0.56 : 0.46))}px "Fredoka Variable", system-ui`
   ctx.textAlign = 'center'
-  ctx.lineWidth = 4
+  ctx.lineWidth = 5
   for (const f of scene.floats) {
-    const a = Math.max(0, 1 - f.age / 700)
+    const u = f.age / 900
+    const bounce = Math.sin(u * Math.PI) * D * 0.12
+    const a = Math.max(0, 1 - u)
     ctx.globalAlpha = a
     ctx.strokeStyle = '#FFFFFF'
-    ctx.fillStyle = '#E2186E'
-    ctx.strokeText(f.text, f.x, f.y)
-    ctx.fillText(f.text, f.x, f.y)
+    ctx.fillStyle = f.big ? '#FF9A00' : '#E2186E'
+    const y = f.y - bounce
+    ctx.strokeText(f.text, f.x, y)
+    ctx.fillText(f.text, f.x, y)
   }
   ctx.globalAlpha = 1
 }
@@ -440,7 +578,7 @@ function drawHand(
   ctx.translate(x, y)
   ctx.scale(s * (down ? 1.04 : 1), s * (down ? 0.94 : 1))
   ctx.fillStyle = '#FFE8C8'
-  ctx.strokeStyle = INK
+  ctx.strokeStyle = '#3A1530'
   ctx.lineWidth = 3
   ctx.lineJoin = 'round'
   ctx.beginPath()

@@ -14,7 +14,7 @@ Drag through bonbons that are touching and the same colour. A Rainbow counts as 
 - A chain of 8 or more drops a **Rainbow**. Popping it clears that colour.
 - Pop again quickly and the score combo climbs.
 
-The first visit shows a ghost hand. The round itself has no instructions to read.
+The first visit shows a ghost hand (no “how to play” text on the board). The title uses labelled **Play**, **Cuddle** and **Daily** pills plus a tap-to-squish hero pile.
 
 **Modes**
 

@@ -43,6 +43,8 @@ type Qa = {
   filterOps: number
   muteSfx: boolean
   muteMusic: boolean
+  maxCluster: number
+  ribbonThickness: number
   board: { id: number; x: number; y: number; d: number; popping: boolean; kind: string }[]
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => { id: number; x: number; y: number }[] | null
@@ -84,9 +86,9 @@ for (const [w, h] of viewports) {
         expect(check.offscreen, screen).toEqual([])
         expect(geo.violations, `${screen} ${JSON.stringify(geo)}`).toEqual([])
         const text = (await page.locator('#app').innerText()).replace(/\s+/g, ' ').trim()
-        if (screen === 'title') expect(text).toBe('Bonbon Boing!')
-        else if (screen === 'pause') expect(text).toBe('')
-        else expect(text).toMatch(/^[\d ]+$/)
+        if (screen === 'title') expect(text).toContain('Bonbon Boing!')
+        else if (screen === 'pause') expect(text).toContain('Paused')
+        else expect(text).toMatch(/^[\d A-Za-z!]+$/)
         const blank = await page.evaluate(() => {
           const c = document.getElementById('field') as HTMLCanvasElement
           const ctx = c.getContext('2d')
@@ -102,7 +104,11 @@ for (const [w, h] of viewports) {
           expect(ds.size).toBe(1)
           expect([...ds][0]).toBe(state.D)
         }
-        if (screen === 'chain') expect(state.chain.length).toBeGreaterThanOrEqual(5)
+        if (screen === 'chain') {
+          expect(state.chain.length).toBeGreaterThanOrEqual(5)
+          expect(state.ribbonThickness).toBeGreaterThanOrEqual(8)
+        }
+        if (screen === 'play') expect(state.maxCluster).toBeLessThanOrEqual(8)
         if (screen === 'pop') {
           expect(state.hitstopActive).toBe(true)
           expect(state.hitstopMs).toBeGreaterThanOrEqual(60)

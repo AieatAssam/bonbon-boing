@@ -79,6 +79,24 @@ function schedule() {
   timer = window.setInterval(tick, 560)
 }
 
+export function playLink(index: number): void {
+  if (!ctx || !sfx || !wantSfx || paused) return
+  const t = ctx.currentTime
+  const f = ladderHz(index)
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(f * 0.92, t)
+  o.frequency.exponentialRampToValueAtTime(f * 1.04, t + 0.03)
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(0.12, t + 0.008)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
+  o.connect(g)
+  g.connect(sfx)
+  o.start(t)
+  o.stop(t + 0.1)
+}
+
 export function playPop(index: number, big: boolean): void {
   if (!ctx || !sfx || !wantSfx || paused) return
   const t = ctx.currentTime

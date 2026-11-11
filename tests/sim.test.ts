@@ -9,6 +9,7 @@ import {
   extendDrag,
   findPath,
   gridSignature,
+  maxSameColorCluster,
   ladderHz,
   loadGrid,
   release,
@@ -147,6 +148,14 @@ describe('modes and seeds', () => {
     step(s, 5000)
     expect(s.timeLeft).toBe(60_000)
     expect(roundOver(s)).toBe(false)
+  })
+
+  it('keeps the biggest same-colour blob small at spawn', () => {
+    for (const seed of ['pretty', 'spawn-a', 'spawn-b', 'spawn-c']) {
+      const s = createGame(seed, 8, 10, 'timed')
+      expect(maxSameColorCluster(s)).toBeLessThanOrEqual(8)
+      expect(findPath(s, 3)).toBeTruthy()
+    }
   })
 })
 

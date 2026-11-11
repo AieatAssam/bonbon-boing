@@ -155,10 +155,140 @@ export function canAppend(path: Piece[], next: Piece): boolean {
   return next.color === color && (next.kind === 'bonbon' || next.kind === 'bomb')
 }
 
+export function activeColorCount(state: GameState): number {
+  if (state.mode === 'cuddle') return 5
+  if (state.score >= 400 || state.timeLeft <= 30_000) return 6
+  return 5
+}
+
 export function visualRow(p: Piece): number {
   if (p.fallT < 0 || p.fallT >= 1) return p.r
-  const t = 1 - (1 - p.fallT) ** 3
-  return p.fallFrom + (p.fallTo - p.fallFrom) * t
+  const t = p.fallT
+  const ease = 1 - (1 - t) ** 2.6
+  const wobble = Math.sin(t * Math.PI * 1.15) * 0.12 * (1 - t)
+  return p.fallFrom + (p.fallTo - p.fallFrom) * ease + wobble
+}
+
+function gridMaxCluster(colors: number[][], cols: number, rows: number): number {
+  const seen = new Set<string>()
+  let best = 0
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${c},${r}`
+      if (seen.has(key)) continue
+      const color = colors[r][c]
+      let n = 0
+      const q: [number, number][] = [[c, r]]
+      seen.add(key)
+      for (let i = 0; i < q.length; i++) {
+        const [cc, rr] = q[i]
+        n += 1
+        for (const [dc, dr] of DIRS) {
+          const nc = cc + dc
+          const nr = rr + dr
+          if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
+          const k = `${nc},${nr}`
+          if (seen.has(k) || colors[nr][nc] !== color) continue
+          seen.add(k)
+          q.push([nc, nr])
+        }
+      }
+      if (n > best) best = n
+    }
+  }
+  return best
+}
+
+function gridChainCount(colors: number[][], cols: number, rows: number, min: number): number {
+  let n = 0
+  const seen = new Set<number>()
+  for (let color = 0; color < 6; color++) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (colors[r][c] !== color) continue
+        const id = r * cols + c
+        if (seen.has(id)) continue
+        let size = 0
+        const q: [number, number][] = [[c, r]]
+        const local = new Set<string>()
+        local.add(`${c},${r}`)
+        for (let i = 0; i < q.length; i++) {
+          const [cc, rr] = q[i]
+          size += 1
+          seen.add(rr * cols + cc)
+          for (const [dc, dr] of DIRS) {
+            const nc = cc + dc
+            const nr = rr + dr
+            if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
+            const k = `${nc},${nr}`
+            if (local.has(k) || colors[nr][nc] !== color) continue
+            local.add(k)
+            q.push([nc, nr])
+          }
+        }
+        if (size >= min) n += 1
+      }
+    }
+  }
+  return n
+}
+
+function pickSpawnColor(state: GameState, colors: number[][], c: number, r: number): number {
+  const n = activeColorCount(state)
+  let best = Math.floor(state.rng() * n)
+  let bestScore = 1e9
+  for (let t = 0; t < 7; t++) {
+    const color = Math.floor(state.rng() * n)
+    colors[r][c] = color
+    const score = gridMaxCluster(colors, state.cols, state.rows)
+    if (score < bestScore) {
+      bestScore = score
+      best = color
+    }
+    if (score <= 7) return color
+  }
+  return best
+}
+
+export function maxSameColorCluster(state: GameState): number {
+  const colors: number[][] = []
+  for (let r = 0; r < state.rows; r++) {
+    colors[r] = []
+    for (let c = 0; c < state.cols; c++) {
+      const p = at(state, c, r)
+      colors[r][c] = p && !p.dead ? p.color : -1
+    }
+  }
+  const live = colors.flat().filter((x) => x >= 0)
+  if (!live.length) return 0
+  const seen = new Set<string>()
+  let best = 0
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const color = colors[r][c]
+      if (color < 0) continue
+      const key = `${c},${r}`
+      if (seen.has(key)) continue
+      let n = 0
+      const q: [number, number][] = [[c, r]]
+      seen.add(key)
+      for (let i = 0; i < q.length; i++) {
+        const [cc, rr] = q[i]
+        n += 1
+        for (const [dc, dr] of DIRS) {
+          const nc = cc + dc
+          const nr = rr + dr
+          if (nc < 0 || nr < 0 || nc >= state.cols || nr >= state.rows) continue
+          const k = `${nc},${nr}`
+          if (seen.has(k) || colors[nr][nc] !== color) continue
+          seen.add(k)
+          q.push([nc, nr])
+        }
+      }
+      if (n > best) best = n
+    }
+  }
+  return best
 }
 
 export function collectClears(pieces: Piece[], path: Piece[]): Piece[] {
@@ -252,7 +382,7 @@ export function findPath(
     if (path && path.length >= min) return path
   }
   let best: Piece[] | null = null
-  for (let color = 0; color < 5; color++) {
+  for (let color = 0; color < activeColorCount(state); color++) {
     const path = diameterPath(state, color, min, avoidSet)
     if (!path) continue
     if (!best) {
@@ -310,48 +440,75 @@ function paintBottom(state: GameState) {
 
 function fillBoard(state: GameState) {
   const { cols, rows } = state
-  const colors: number[][] = []
-  for (let r = 0; r < rows; r++) {
-    colors[r] = []
-    for (let c = 0; c < cols; c++) colors[r][c] = Math.floor(state.rng() * 5)
-  }
-  for (let pass = 0; pass < 2; pass++) {
-    const next = colors.map((row) => row.slice())
+  if (lineSeed(state.seed)) {
+    const colors: number[][] = []
     for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (state.rng() > 0.5) continue
-        const counts = [0, 0, 0, 0, 0]
-        counts[colors[r][c]] += 1
-        for (const [dc, dr] of DIRS) {
-          const rr = r + dr
-          const cc = c + dc
-          if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue
-          counts[colors[rr][cc]] += 1
-        }
-        let best = colors[r][c]
-        let n = -1
-        for (let k = 0; k < 5; k++) {
-          if (counts[k] > n) {
-            n = counts[k]
-            best = k
-          }
-        }
-        next[r][c] = best
-      }
+      colors[r] = []
+      for (let c = 0; c < cols; c++) colors[r][c] = Math.floor(state.rng() * 5)
     }
-    for (let r = 0; r < rows; r++) colors[r] = next[r]
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) state.pieces.push(makePiece(state, c, r, colors[r][c], 'bonbon'))
+    }
+    paintSnake(state)
+    paintBottom(state)
+    return
+  }
+  const nColors = activeColorCount(state)
+  let colors: number[][] = []
+  let tries = 0
+  while (tries++ < 48) {
+    colors = []
+    for (let r = 0; r < rows; r++) {
+      colors[r] = []
+      for (let c = 0; c < cols; c++) colors[r][c] = Math.floor(state.rng() * nColors)
+    }
+    for (let pass = 0; pass < 1; pass++) {
+      const next = colors.map((row) => row.slice())
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (state.rng() > 0.38) continue
+          const opts = new Set<number>([colors[r][c]])
+          for (const [dc, dr] of DIRS) {
+            const rr = r + dr
+            const cc = c + dc
+            if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue
+            opts.add(colors[rr][cc])
+          }
+          const choices = [...opts]
+          let pick = colors[r][c]
+          let bestSize = 999
+          for (const k of choices) {
+            next[r][c] = k
+            const size = gridMaxCluster(next, cols, rows)
+            if (size < bestSize) {
+              bestSize = size
+              pick = k
+            }
+          }
+          next[r][c] = pick
+        }
+      }
+      for (let r = 0; r < rows; r++) colors[r] = next[r]
+    }
+    const max = gridMaxCluster(colors, cols, rows)
+  const chains = gridChainCount(colors, cols, rows, 3)
+    if (max <= 8 && chains >= 3) break
   }
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) state.pieces.push(makePiece(state, c, r, colors[r][c], 'bonbon'))
   }
-  if (lineSeed(state.seed)) {
-    paintSnake(state)
-    paintBottom(state)
-  } else if (!findPath(state, 3)) {
-    const ids: number[] = []
+  let guard = 0
+  while (!findPath(state, 3) && guard++ < 8) {
+    const color = guard % nColors
+    const row = Math.min(rows - 1, 1 + (guard % Math.max(1, rows - 2)))
     const len = Math.min(4, cols)
-    for (let c = 0; c < len; c++) ids.push(setCell(state, c, Math.min(2, rows - 1), 0, 'bonbon').id)
-    state.guide = ids
+    const ids: number[] = []
+    for (let c = 0; c < len; c++) ids.push(setCell(state, c, row, color, 'bonbon').id)
+    state.guide = ids.length >= 3 ? ids : state.guide
+    const row2 = rows - 1
+    const ids2: number[] = []
+    for (let c = 0; c < Math.min(3, cols); c++) ids2.push(setCell(state, c, row2, (color + 1) % nColors, 'bonbon').id)
+    state.guideBottom = ids2
   }
 }
 
@@ -440,8 +597,17 @@ function beginFall(state: GameState) {
       p.r = dest
       p.fallT = p.fallFrom === dest ? 1 : 0
     }
+    const grid: number[][] = []
+    for (let r = 0; r < state.rows; r++) {
+      grid[r] = []
+      for (let cc = 0; cc < state.cols; cc++) {
+        const cell = at(state, cc, r)
+        grid[r][cc] = cell && !cell.dead ? cell.color : Math.floor(state.rng() * activeColorCount(state))
+      }
+    }
     for (let i = 0; i < empty; i++) {
-      const color = Math.floor(state.rng() * 5)
+      const color = pickSpawnColor(state, grid, c, i)
+      grid[i][c] = color
       const p = makePiece(state, c, i, color, 'bonbon')
       p.fallFrom = i - empty
       p.fallTo = i
@@ -475,7 +641,7 @@ export function release(state: GameState): number[] {
   const clears = collectClears(state.pieces, path)
   const n = clears.length
   const stag = n <= 1 ? 0 : Math.min(STAGGER_CAP, STAGGER_BUDGET / (n - 1))
-  const big = path.length >= BOMB_AT || n >= BOMB_AT
+  const big = path.length >= 6 || n >= 6
   state.queue = clears.map((p, i) => ({ id: p.id, at: i * stag }))
   state.showIds = clears.map((p) => p.id)
   state.fired = 0
