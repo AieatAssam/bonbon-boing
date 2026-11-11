@@ -69,6 +69,7 @@ export type Scene = {
   waves: { x: number; y: number; r: number; age: number; life: number; color: string }[]
   beams: { x: number; y: number; angle: number; age: number; life: number; color: string }[]
   popRings: { x: number; y: number; age: number; life: number }[]
+  liteRibbon?: boolean
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
@@ -492,23 +493,35 @@ function drawTray(ctx: CanvasRenderingContext2D, m: { x: number; y: number; w: n
   ctx.stroke()
 }
 
-function drawRibbon(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], color: number, width: number) {
+function drawRibbon(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  color: number,
+  width: number,
+  lite = false,
+) {
   if (pts.length < 2) return
   const col = RIBBON[color % RIBBON.length]
-  const deep = PAL[color % PAL.length].deep
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = 'rgba(255,255,255,0.95)'
-  ctx.lineWidth = width * 1.22
-  strokeRope(ctx, pts)
+  if (!lite) {
+    const deep = PAL[color % PAL.length].deep
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+    ctx.lineWidth = width * 1.22
+    strokeRope(ctx, pts)
+    ctx.strokeStyle = col
+    ctx.lineWidth = width
+    strokeRope(ctx, pts)
+    ctx.strokeStyle = deep
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = width * 0.55
+    strokeRope(ctx, pts)
+    ctx.globalAlpha = 1
+    return
+  }
   ctx.strokeStyle = col
   ctx.lineWidth = width
   strokeRope(ctx, pts)
-  ctx.strokeStyle = deep
-  ctx.globalAlpha = 0.55
-  ctx.lineWidth = width * 0.55
-  strokeRope(ctx, pts)
-  ctx.globalAlpha = 1
 }
 
 function drawChainBubble(
@@ -610,7 +623,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   }
   if (scene.titleHint && scene.titleHint.rope.length > 1) {
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
-    drawRibbon(ctx, scene.titleHint.rope, scene.titleHint.ropeColor, D * 0.2)
+    drawRibbon(ctx, scene.titleHint.rope, scene.titleHint.ropeColor, D * 0.2, scene.liteRibbon)
     drawHand(
       ctx,
       scene.titleHint.hand.x,
@@ -622,7 +635,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   }
   if (scene.rope.length > 1) {
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
-    drawRibbon(ctx, scene.rope, scene.ropeColor, D * 0.22)
+    drawRibbon(ctx, scene.rope, scene.ropeColor, D * 0.22, scene.liteRibbon)
     if (scene.bubble) {
       const b = scene.bubble
       drawChainBubble(ctx, b.x, b.y, b.n, D, b.bomb, b.rainbow)

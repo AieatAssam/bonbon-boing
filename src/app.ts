@@ -338,13 +338,15 @@ export function boot(): void {
     const areaCap = Math.sqrt(1_400_000 / area)
     if (fpsBuf.length >= 2) {
       const fps = fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
-      if (fps < 42) perfDprScale = Math.max(0.65, perfDprScale - 0.04)
+      if (fps < 40) perfDprScale = Math.max(0.62, perfDprScale - 0.05)
+      else if (fps < 42) perfDprScale = Math.max(0.65, perfDprScale - 0.03)
       else if (fps > 52) perfDprScale = Math.min(1, perfDprScale + 0.01)
     }
     return Math.max(1, Math.min(native, areaCap * perfDprScale))
   }
 
   function resize() {
+    if (canvasDpr === 0 && (devicePixelRatio || 1) >= 2) perfDprScale = 0.76
     const next = boardLayout(innerWidth, innerHeight, insetTop())
     const dpr = viewDpr()
     if (dpr !== canvasDpr) {
@@ -879,7 +881,8 @@ export function boot(): void {
       state.combo = 1
     }
     const frozen = state.hitstopLeft > 0
-    if (!frozen) updateSprings(dt, now)
+    const liteSprings = perfDprScale < 0.85 && frame % 2 === 0
+    if (!frozen && !liteSprings) updateSprings(dt, now)
     updateParticles(dt)
     const popped = step(state, dt)
     if (popped.length) notePops(popped)
@@ -889,9 +892,13 @@ export function boot(): void {
 
   function ghostPose(now: number): { x: number; y: number; down: boolean; alpha: number; prefix: number } | null {
     if (!ghostOn || screen !== 'play' || state.drag.length > 0 || state.phase !== 'idle') return null
-    if (!ghostPath.length) {
-      ghostPath = findPath(state, 3) ?? findPath(state, 2) ?? []
-      if (!ghostPath.length) return null
+    if (!ghostPath.length || ghostPath.length < 2) {
+      ghostPath =
+        findPath(state, 3) ??
+        findPath(state, 2) ??
+        findPath(state, 2, [], 'bottom') ??
+        []
+      if (ghostPath.length < 2) return null
       ghostCycleStart = now
     }
   if (!ghostCycleStart) ghostCycleStart = now
@@ -1145,6 +1152,7 @@ export function boot(): void {
               h: layout.padTop + layout.rows * D + D * 0.12,
             },
       peeks,
+      liteRibbon: perfDprScale < 0.92,
     }
   }
 

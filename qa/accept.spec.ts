@@ -359,7 +359,10 @@ for (const [w, h] of viewports) {
       await page.goto('./', { timeout: 30_000 })
       await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
       await page.getByRole('button', { name: 'Play' }).click()
-      await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.ghost === true)
+      await page.waitForFunction(() => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        return q.ghost === true && q.ghostX > 0 && q.ghostY > 0
+      })
       const pose = await page.evaluate(() => {
         const q = (window as unknown as { __qa: Qa }).__qa
         const text = document.querySelector('#app')?.textContent ?? ''

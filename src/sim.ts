@@ -691,6 +691,10 @@ export function createGame(seed: string, cols: number, rows: number, mode: Mode)
     let fix = 0
     while (maxSameColorCluster(state) > 7 && fix++ < 80) softenClusters(state, 7)
   }
+  if (!findPath(state, 2)) {
+    let fix2 = 0
+    while (!findPath(state, 2) && fix2++ < 48) softenClusters(state, 6)
+  }
   if (lineSeed(state.seed) && !findPath(state, 2)) {
     const r = state.rows - 1
     const n = Math.min(3, state.cols)
