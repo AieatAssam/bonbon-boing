@@ -76,6 +76,32 @@ export type Scene = {
 const cache = new Map<string, HTMLCanvasElement>()
 export let spriteMisses = 0
 
+let equippedSkin = 'classic'
+let equippedTheme = 'candy'
+let equippedPop = 'sparkle'
+
+export function setCosmetics(theme: string, skin: string, pop: string): void {
+  if (equippedTheme !== theme || equippedSkin !== skin || equippedPop !== pop) {
+    equippedTheme = theme
+    equippedSkin = skin
+    equippedPop = pop
+    invalidateBgCache()
+    cache.clear()
+  }
+}
+
+export function getCosmetics(): { theme: string; skin: string; pop: string } {
+  return { theme: equippedTheme, skin: equippedSkin, pop: equippedPop }
+}
+
+const THEME_SKY: Record<string, [string, string, string]> = {
+  candy: ['#9AD8FF', '#DDF3FF', '#FFD9EE'],
+  night: ['#1B1340', '#3D2A6E', '#FF8FD0'],
+  beach: ['#5ED4FF', '#C8F5FF', '#FFE9C4'],
+  winter: ['#B8D4FF', '#E8F4FF', '#FFF0F6'],
+  space: ['#0D0820', '#2A1555', '#6B4CFF'],
+}
+
 function canvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = w
@@ -287,9 +313,50 @@ function paintRainbow(px: number): HTMLCanvasElement {
   return c
 }
 
+function paintStarburst(color: number, px: number): HTMLCanvasElement {
+  const c = canvas(px, px)
+  const ctx = c.getContext('2d')!
+  const cx = px / 2
+  const cy = px * 0.54
+  const r = px * 0.44
+  const pal = PAL[color % PAL.length]
+  ctx.fillStyle = pal.base
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(cx + Math.cos(a) * r * 1.1, cy + Math.sin(a) * r * 1.1)
+    ctx.lineTo(cx + Math.cos(a + Math.PI / 8) * r * 0.35, cy + Math.sin(a + Math.PI / 8) * r * 0.35)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.fillStyle = '#FFD02A'
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 0.38, 0, Math.PI * 2)
+  ctx.fill()
+  return c
+}
+
 function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
   if (kind === 'bomb') return paintBomb(color, px)
   if (kind === 'rainbow') return paintRainbow(px)
+  if (kind === 'starburst') return paintStarburst(color, px)
+  if (kind === 'choco') {
+    const c = canvas(px, px)
+    const ctx = c.getContext('2d')!
+    const cx = px / 2
+    const cy = px * 0.54
+    const r = px * 0.42
+    ctx.fillStyle = '#5B371E'
+    round(ctx, cx - r, cy - r, r * 2, r * 2, r * 0.25)
+    ctx.fill()
+    ctx.strokeStyle = '#3E2412'
+    ctx.lineWidth = Math.max(2, r * 0.08)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    ctx.fillRect(cx - r * 0.6, cy - r * 0.5, r * 0.35, r * 0.22)
+    return c
+  }
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
   if (!ctx) return c
@@ -314,6 +381,50 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
   ctx.strokeStyle = pal.deep
   ctx.lineWidth = Math.max(2.5, r * 0.07)
   ctx.stroke()
+  if (kind === 'ice') {
+    ctx.strokeStyle = 'rgba(160, 230, 255, 0.9)'
+    ctx.lineWidth = Math.max(3, r * 0.12)
+    ctx.beginPath()
+    ctx.arc(cx, cy, r * 1.02, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(200, 245, 255, 0.45)'
+    ctx.beginPath()
+    ctx.arc(cx, cy, r * 0.92, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  if (kind === 'jelly') {
+    ctx.strokeStyle = 'rgba(255, 120, 200, 0.75)'
+    ctx.setLineDash([Math.max(3, r * 0.08), Math.max(2, r * 0.06)])
+    ctx.lineWidth = Math.max(2.5, r * 0.08)
+    ctx.beginPath()
+    ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+  if (kind === 'sleepy') {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.font = `bold ${Math.max(10, r * 0.35)}px Nunito, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.fillText('Zz', cx, cy - r * 0.15)
+  }
+  const skin = equippedSkin
+  if (skin === 'macaron') {
+    ctx.strokeStyle = pal.light
+    ctx.lineWidth = Math.max(2, r * 0.09)
+    ctx.beginPath()
+    ctx.ellipse(cx, cy - r * 0.05, r * 0.92, r * 0.55, 0, 0, Math.PI * 2)
+    ctx.stroke()
+  } else if (skin === 'gummy') {
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'
+    ctx.beginPath()
+    ctx.ellipse(cx - r * 0.35, cy - r * 0.25, r * 0.22, r * 0.14, -0.4, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (skin === 'mochi') {
+    ctx.fillStyle = pal.rim
+    ctx.beginPath()
+    ctx.ellipse(cx, cy + r * 0.35, r * 0.18, r * 0.1, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
   ctx.strokeStyle = pal.rim
   ctx.lineWidth = Math.max(1.5, r * 0.05)
   ctx.beginPath()
@@ -391,7 +502,7 @@ function sprite(key: string, paint: () => HTMLCanvasElement): HTMLCanvasElement 
 }
 
 export function bodySprite(kind: Kind, color: number, px: number): HTMLCanvasElement {
-  const key = kind === 'bonbon' ? `b:bonbon:${color}:${px}` : `b:${kind}:${color}:${px}`
+  const key = `b:${kind}:${color}:${px}:${equippedSkin}`
   return sprite(key, () => paintBody(kind, color, px))
 }
 
@@ -428,10 +539,11 @@ export function invalidateBgCache(): void {
 }
 
 function drawSkyStatic(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const stops = THEME_SKY[equippedTheme] ?? THEME_SKY.candy!
   const sky = ctx.createLinearGradient(0, 0, 0, h)
-  sky.addColorStop(0, '#9AD8FF')
-  sky.addColorStop(0.45, '#DDF3FF')
-  sky.addColorStop(1, '#FFD9EE')
+  sky.addColorStop(0, stops[0])
+  sky.addColorStop(0.45, stops[1])
+  sky.addColorStop(1, stops[2])
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, w, h)
   ctx.fillStyle = 'rgba(255,255,255,0.28)'
@@ -463,7 +575,7 @@ function ensureBgCache(
   screen: Scene['screen'],
 ): HTMLCanvasElement {
   const matKey = mat ? `${mat.x},${mat.y},${mat.w},${mat.h}` : 'none'
-  const key = `${w}x${h}@${dpr}:${screen}:${matKey}:${D}`
+  const key = `${w}x${h}@${dpr}:${screen}:${matKey}:${D}:${equippedTheme}`
   if (bgCanvas && key === bgKey) return bgCanvas
   const c = canvas(Math.max(1, Math.round(w * dpr)), Math.max(1, Math.round(h * dpr)))
   const ctx = c.getContext('2d')!
@@ -820,26 +932,51 @@ function drawHand(
   down: boolean,
   alpha: number,
 ) {
-  const s = D / 70
+  const s = D / 62
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.translate(x, y)
-  ctx.scale(s * (down ? 1.04 : 1), s * (down ? 0.94 : 1))
-  ctx.fillStyle = '#FFE8C8'
-  ctx.strokeStyle = '#3A1530'
-  ctx.lineWidth = 3
-  ctx.lineJoin = 'round'
+  const sy = down ? 0.9 : 1
+  const sx = down ? 1.06 : 1
+  ctx.scale(s * sx, s * sy)
+  ctx.fillStyle = 'rgba(42, 18, 36, 0.18)'
   ctx.beginPath()
-  ctx.ellipse(2, -18, 9, 16, 0.1, 0, Math.PI * 2)
+  ctx.ellipse(4, 16, 20, 9, 0, 0, Math.PI * 2)
+  ctx.fill()
+  const glove = ctx.createLinearGradient(-18, -22, 22, 28)
+  glove.addColorStop(0, '#FFFFFF')
+  glove.addColorStop(0.45, '#FFF6FB')
+  glove.addColorStop(1, '#FFE8F4')
+  ctx.fillStyle = glove
+  ctx.strokeStyle = '#3A1530'
+  ctx.lineWidth = 3.2
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  const fingers = [
+    [-14, -14, 5.5, 13],
+    [-5, -20, 6, 16],
+    [5, -21, 6, 17],
+    [14, -17, 5.5, 14],
+  ]
+  for (const [fx, fy, fw, fh] of fingers) {
+    ctx.beginPath()
+    ctx.roundRect(fx - fw / 2, fy, fw, fh, fw * 0.45)
+    ctx.fill()
+    ctx.stroke()
+  }
+  ctx.beginPath()
+  ctx.roundRect(-20, 0, 40, 26, 14)
   ctx.fill()
   ctx.stroke()
   ctx.beginPath()
-  ctx.arc(0, 8, 18, 0, Math.PI * 2)
+  ctx.roundRect(10, 6, 11, 9, 5)
+  ctx.fillStyle = '#FFD6EC'
   ctx.fill()
+  ctx.strokeStyle = '#3A1530'
   ctx.stroke()
   ctx.fillStyle = '#FF8AB8'
   ctx.beginPath()
-  ctx.roundRect(-16, 12, 32, 12, 6)
+  ctx.arc(-6, 10, 3.2, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 }

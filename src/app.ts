@@ -30,7 +30,7 @@ import {
 import { invalidateBgCache, renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
 import { audioCreates, playLink, playPop, setAudioPaused, setAudioPrefs, unlockAudio } from './audio'
 import { createMetaLayer } from './meta-shell'
-import type { AdventureLevelDef } from './adventure/levels'
+import { ADVENTURE_LEVELS, type AdventureLevelDef } from './adventure/levels'
 import {
   emptyGoalState,
   evaluateStars,
@@ -119,6 +119,11 @@ export type Qa = {
   pump: (ms: number) => void
   draw: () => void
   setMute: (sfx: boolean, music: boolean) => void
+  openMeta: (which: 'map' | 'shop' | 'achievements' | 'collection') => void
+  closeMeta: () => void
+  prepPromoSave: () => void
+  startAdventure: (levelId: number) => void
+  capturePopBurst: () => void
 }
 
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
@@ -1938,6 +1943,39 @@ export function boot(): void {
       setAudioPrefs({ sfx: !sfx, music: !music })
       meta.persist()
       paintMutes()
+    },
+    openMeta(which) {
+      meta.open(which)
+    },
+    closeMeta() {
+      meta.close()
+    },
+    prepPromoSave() {
+      save.profile.stars = 80
+      save.profile.coins = 120
+      save.profile.level = 12
+      for (const id of ['macaron', 'gummy', 'mochi', 'night', 'beach']) {
+        if (id === 'macaron' || id === 'gummy' || id === 'mochi') {
+          if (!save.owned.skins.includes(id)) save.owned.skins.push(id)
+        } else if (!save.owned.themes.includes(id)) save.owned.themes.push(id)
+      }
+      save.achievements.first_bomb = 1
+      meta.persist()
+    },
+    startAdventure(levelId) {
+      const level = ADVENTURE_LEVELS.find((l) => l.id === levelId) ?? ADVENTURE_LEVELS[0]!
+      startAdventureLevel(level)
+      draw()
+    },
+    capturePopBurst() {
+      const path = findPath(state, 6)
+      if (!path) return
+      state.drag = path.map((p) => p.id)
+      release(state)
+      for (let t = 0; t < 6; t++) {
+        step(state, 18)
+        draw()
+      }
     },
   }
 

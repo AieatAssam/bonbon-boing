@@ -13,6 +13,12 @@ See `assets-src/audio/SOURCES.md` for the full list. Highlights:
 - Fredoka — `@fontsource-variable/fredoka`
 - Nunito — `@fontsource/nunito`
 
+## Visual
+
+- Tutorial glove: drawn in Canvas2D (plush white-mitten style).
+- UI patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, map, missions).
+- Kenney CC0 packs (Impact / Interface) — cited for audio; optional UI reference.
+
 ## Inspirations
 
 Peggle · Puzzle Bobble · Suika Game · Disney Tsum Tsum · Puyo Puyo · LocoRoco · Kirby · Squishmallows · Fall Guys · Gloop Pop (gloss/juice approach).
