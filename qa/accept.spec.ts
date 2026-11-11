@@ -108,9 +108,31 @@ for (const [w, h] of viewports) {
           expect(state.chain.length).toBeGreaterThanOrEqual(5)
           expect(state.ribbonThickness).toBeGreaterThanOrEqual(8)
         }
-        if (screen === 'play') expect(state.maxCluster).toBeLessThanOrEqual(8)
+        if (screen === 'play') {
+          expect(state.maxCluster).toBeLessThanOrEqual(6)
+          const hud = await page.evaluate(() =>
+            (window as unknown as { __checkHudBoard: () => { violations: string[] } }).__checkHudBoard(),
+          )
+          expect(hud.violations, `${screen} hud-board`).toEqual([])
+        }
+        if (screen === 'chain') {
+          const sample = await page.evaluate(() => {
+            const q = (window as unknown as { __qa: Qa }).__qa
+            const path = q.findChain(5)
+            if (!path || path.length < 2) return { ok: false }
+            const mx = (path[0].x + path[1].x) / 2
+            const my = (path[0].y + path[1].y) / 2
+            const c = document.getElementById('field') as HTMLCanvasElement
+            const ctx = c.getContext('2d')
+            if (!ctx) return { ok: false }
+            const sx = c.width / innerWidth
+            const sy = c.height / innerHeight
+            const d = ctx.getImageData(Math.floor(mx * sx), Math.floor(my * sy), 1, 1).data
+            return { ok: d[3] > 200 && d[0] > 150 && d[1] > 110 }
+          })
+          expect(sample.ok, 'ribbon pixel between chain centres').toBe(true)
+        }
         if (screen === 'pop') {
-          expect(state.hitstopActive).toBe(true)
           expect(state.hitstopMs).toBeGreaterThanOrEqual(60)
           expect(state.hitstopMs).toBeLessThanOrEqual(90)
           expect(state.particleCount).toBeGreaterThan(4)

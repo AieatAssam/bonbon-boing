@@ -34,6 +34,7 @@ describe('size unit D', () => {
       const L = boardLayout(w, h)
       expect(L.D).toBeGreaterThanOrEqual(46)
       expect(L.cols * L.D).toBeLessThanOrEqual(w)
+      expect(L.padTop).toBeGreaterThanOrEqual(Math.round(L.D * 0.18) - 1)
       expect(L.oy).toBeGreaterThanOrEqual(L.hud - 1)
       expect(L.ox).toBeGreaterThanOrEqual(0)
     }
@@ -153,7 +154,7 @@ describe('modes and seeds', () => {
   it('keeps the biggest same-colour blob small at spawn', () => {
     for (const seed of ['pretty', 'spawn-a', 'spawn-b', 'spawn-c']) {
       const s = createGame(seed, 8, 10, 'timed')
-      expect(maxSameColorCluster(s)).toBeLessThanOrEqual(8)
+      expect(maxSameColorCluster(s)).toBeLessThanOrEqual(6)
       expect(findPath(s, 3)).toBeTruthy()
     }
   })

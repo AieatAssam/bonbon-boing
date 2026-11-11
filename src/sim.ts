@@ -245,7 +245,7 @@ function pickSpawnColor(state: GameState, colors: number[][], c: number, r: numb
       bestScore = score
       best = color
     }
-    if (score <= 7) return color
+    if (score <= 6) return color
   }
   return best
 }
@@ -492,7 +492,7 @@ function fillBoard(state: GameState) {
     }
     const max = gridMaxCluster(colors, cols, rows)
   const chains = gridChainCount(colors, cols, rows, 3)
-    if (max <= 8 && chains >= 3) break
+    if (max <= 6 && chains >= 3) break
   }
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) state.pieces.push(makePiece(state, c, r, colors[r][c], 'bonbon'))
@@ -548,9 +548,21 @@ function blank(seed: string, cols: number, rows: number, mode: Mode): GameState 
   }
 }
 
+export function softenClusters(state: GameState, max = 6): void {
+  const keep = new Set<number>([...(state.guide ?? []), ...(state.guideBottom ?? [])])
+  let guard = 0
+  while (maxSameColorCluster(state) > max && guard++ < 80) {
+    const live = state.pieces.filter((p) => !p.dead && p.kind === 'bonbon' && !keep.has(p.id))
+    if (!live.length) break
+    const p = live[Math.floor(state.rng() * live.length)]
+    p.color = Math.floor(state.rng() * activeColorCount(state))
+  }
+}
+
 export function createGame(seed: string, cols: number, rows: number, mode: Mode): GameState {
   const state = blank(seed, cols, rows, mode)
   fillBoard(state)
+  softenClusters(state, 6)
   return state
 }
 

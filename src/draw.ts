@@ -60,6 +60,8 @@ export type Scene = {
   mat: { x: number; y: number; w: number; h: number } | null
   peeks: { color: number; x: number; y: number }[]
   dim: number
+  waves: { x: number; y: number; r: number; age: number; life: number; color: string }[]
+  beams: { x: number; y: number; angle: number; age: number; life: number; color: string }[]
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
@@ -372,17 +374,20 @@ function drawTray(ctx: CanvasRenderingContext2D, m: { x: number; y: number; w: n
 function drawRibbon(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], color: number, width: number) {
   if (pts.length < 2) return
   const col = RIBBON[color % RIBBON.length]
+  const deep = PAL[color % PAL.length].deep
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-  ctx.lineWidth = width * 1.15
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+  ctx.lineWidth = width * 1.22
   strokeRope(ctx, pts)
-  const grad = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
-  grad.addColorStop(0, col)
-  grad.addColorStop(1, '#FFFFFF')
-  ctx.strokeStyle = grad
+  ctx.strokeStyle = col
   ctx.lineWidth = width
   strokeRope(ctx, pts)
+  ctx.strokeStyle = deep
+  ctx.globalAlpha = 0.55
+  ctx.lineWidth = width * 0.55
+  strokeRope(ctx, pts)
+  ctx.globalAlpha = 1
 }
 
 function drawChainBubble(
@@ -419,8 +424,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   ctx.save()
   ctx.translate(scene.bumpX, scene.bumpY)
   if (scene.mat) drawTray(ctx, scene.mat, D)
-  const ribbonW = D * 0.22
-  if (scene.rope.length > 1) drawRibbon(ctx, scene.rope, scene.ropeColor, ribbonW)
   const ox = scene.bumpX
   const oy = scene.bumpY
   for (const h of scene.heap) {
@@ -433,8 +436,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   }
   for (const p of scene.pieces) {
     const alpha = p.popping ? Math.max(0, 1 - p.popU) : 1
-    let faceScale = 1
-    blit(ctx, dpr, ox, oy, bodySprite(p.kind, p.color, px), p.x, p.y, pieceD, pieceD, p.sx, p.sy, alpha)
+    if (p.popping && p.popU > 0.55) continue
+    const drawKind = p.popping ? 'bonbon' : p.kind
+    blit(ctx, dpr, ox, oy, bodySprite(drawKind, p.color, px), p.x, p.y, pieceD, pieceD, p.sx, p.sy, alpha)
     if (p.selected && !p.popping) {
       ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
       ctx.globalAlpha = 1
@@ -452,21 +456,71 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.arc(p.x, p.y, pieceD * 0.54, 0, Math.PI * 2)
       ctx.stroke()
     }
-    if (p.popping) faceScale = Math.max(0, 1 - p.popU * 1.2)
-    blit(
-      ctx,
-      dpr,
-      ox,
-      oy,
-      faceSprite(blink && !p.popping, px),
-      p.x,
-      p.y + (p.popping ? 0 : pieceD * (1 - p.sy) * 0.1),
-      pieceD,
-      pieceD,
-      faceScale,
-      faceScale,
-      alpha,
-    )
+    if (!p.popping) {
+      blit(
+        ctx,
+        dpr,
+        ox,
+        oy,
+        faceSprite(blink, px),
+        p.x,
+        p.y + pieceD * (1 - p.sy) * 0.1,
+        pieceD,
+        pieceD,
+        1,
+        1,
+        1,
+      )
+    }
+  }
+  if (scene.rope.length > 1) {
+    ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+    drawRibbon(ctx, scene.rope, scene.ropeColor, D * 0.22)
+    const tip = scene.rope[scene.rope.length - 1]
+    if (scene.chainLen > 1) {
+      drawChainBubble(
+        ctx,
+        tip.x,
+        tip.y - pieceD * 0.72,
+        scene.chainLen,
+        D,
+        scene.chainLen >= 5,
+        scene.chainLen >= 8,
+      )
+    }
+    if (scene.finger) {
+      const fp = scene.finger
+      ctx.fillStyle = '#FFFFFF'
+      ctx.strokeStyle = RIBBON[scene.ropeColor % RIBBON.length]
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(fp.x, fp.y, Math.max(6, D * 0.09), 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+  }
+  for (const wave of scene.waves) {
+    const u = wave.age / wave.life
+    ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+    ctx.strokeStyle = wave.color
+    ctx.globalAlpha = Math.max(0, 1 - u)
+    ctx.lineWidth = Math.max(3, D * 0.07) * (1 - u * 0.3)
+    ctx.beginPath()
+    ctx.arc(wave.x, wave.y, wave.r + u * D * 1.4, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.globalAlpha = 1
+  }
+  for (const beam of scene.beams) {
+    const u = beam.age / beam.life
+    ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+    ctx.strokeStyle = beam.color
+    ctx.globalAlpha = Math.max(0, 0.7 * (1 - u))
+    ctx.lineWidth = Math.max(4, D * 0.09)
+    ctx.beginPath()
+    ctx.moveTo(beam.x, beam.y)
+    ctx.lineTo(beam.x + Math.cos(beam.angle) * D * 2.2, beam.y + Math.sin(beam.angle) * D * 2.2)
+    ctx.stroke()
+    ctx.globalAlpha = 1
   }
   ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
   ctx.globalAlpha = 1
@@ -498,19 +552,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.fill()
     }
     ctx.restore()
-  }
-  if (scene.finger && scene.chainLen > 1) {
-    const fp = scene.finger
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.strokeStyle = RIBBON[scene.ropeColor % RIBBON.length]
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.arc(fp.x, fp.y, Math.max(6, D * 0.09), 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-    const by = fp.y - D * 0.62
-    drawChainBubble(ctx, fp.x, by, scene.chainLen, D, scene.chainLen >= 5, scene.chainLen >= 8)
   }
   ctx.restore()
   if (scene.ghost && scene.ghost.alpha > 0.02) {

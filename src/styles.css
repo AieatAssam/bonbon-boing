@@ -62,7 +62,9 @@ button.ui.icon {
   min-width: 48px;
 }
 
-button.ui.icon .lbl { display: none; }
+button.ui.icon:not(.pill) .lbl { display: none; }
+
+button.ui.pill .lbl { display: inline; font-size: 17px; }
 
 button.ui.pill {
   padding: 12px 18px;
@@ -157,11 +159,11 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   top: calc(8px + var(--sat));
   left: 50%;
   transform: translateX(-50%);
-  width: min(520px, calc(100vw - 16px));
-  height: auto;
-  min-height: 52px;
+  width: min(420px, calc(100vw - 16px));
+  height: 52px;
+  max-height: 52px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(72px, 1fr) 52px;
   align-items: center;
   gap: 8px;
   padding: 0 2px;
@@ -178,13 +180,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   pointer-events: none;
 }
 
-.hud-mini {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink);
-  opacity: 0.75;
-  line-height: 1;
-}
+.hud-mini { display: none; }
 
 .score, .timer, .final, .best, .pause-title {
   pointer-events: none;
@@ -310,7 +306,9 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   border-radius: 999px;
 }
 
-.stars { display: flex; gap: 8px; font-size: 30px; line-height: 1; }
+.stars { display: flex; gap: 12px; line-height: 1; align-items: center; justify-content: center; }
+
+.stars .star svg { width: 44px; height: 44px; display: block; filter: drop-shadow(0 2px 0 #e8a400); }
 
 .stars .star { opacity: 0.28; transform: scale(0.7); transition: transform 280ms ease, opacity 280ms ease; }
 

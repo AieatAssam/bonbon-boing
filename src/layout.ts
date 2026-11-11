@@ -3,6 +3,7 @@ export type Layout = {
   cols: number
   rows: number
   D: number
+  padTop: number
   ox: number
   oy: number
   hud: number
@@ -32,9 +33,10 @@ export function boardLayout(w: number, h: number, insetTop = 0): Layout {
     else break
     D = fit()
   }
+  const padTop = Math.round(D * 0.18)
   const gridW = cols * D
-  const gridH = rows * D
+  const gridH = rows * D + padTop
   const ox = Math.round((w - gridW) / 2)
-  const oy = Math.round(hud + Math.max(0, (h - hud - gridH) / 2))
-  return { cols, rows, D, ox, oy, hud }
+  const oy = Math.round(hud + Math.max(0, (h - hud - gridH - pad) / 2))
+  return { cols, rows, D, padTop, ox, oy, hud }
 }

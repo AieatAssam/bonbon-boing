@@ -83,6 +83,7 @@ export type Qa = {
   filterOps: number
   maxCluster: number
   ribbonThickness: number
+  boardRect: () => { x: number; y: number; w: number; h: number }
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => ChainCell[] | null
   center: (id: number) => { x: number; y: number } | null
@@ -112,6 +113,7 @@ declare global {
     __ready: boolean
     __checkOverlaps: () => { overlaps: [string, string][]; offscreen: string[] }
     __checkPlayGeometry: () => { violations: string[] }
+    __checkHudBoard: () => { violations: string[] }
   }
 }
 
@@ -194,7 +196,6 @@ export function boot(): void {
   hud.id = 'hud'
   const hudLeft = el('div', 'hud-side')
   const hudMid = el('div', 'hud-mid')
-  const hudRight = el('div', 'hud-side')
   const scoreEl = el('div', 'ui score')
   const hudMini = el('div', 'hud-mini ui')
   const timeEl = el('div', 'ui timer ring')
@@ -257,9 +258,7 @@ export function boot(): void {
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
   hudMid.append(scoreEl, hudMini)
-  hud.append(hudLeft, hudMid, timeEl, hudRight)
-  mk(hudRight, 'Sound', 'sfx', ICONS.sound, true)
-  mk(hudRight, 'Music', 'music', ICONS.note, true)
+  hud.append(hudLeft, hudMid, timeEl)
   mkPill(pauseMain, 'Resume', 'resume', ICONS.play, 'primary')
   mkPill(pauseMain, 'Restart', 'restart', ICONS.restart)
   mkPill(pauseMain, 'Home', 'home', ICONS.home)
@@ -281,6 +280,8 @@ export function boot(): void {
   let last = performance.now()
   const springs = new Map<number, Spring>()
   let particles: DrawParticle[] = []
+  let waves: { x: number; y: number; r: number; age: number; life: number; color: string }[] = []
+  let beams: { x: number; y: number; angle: number; age: number; life: number; color: string }[] = []
   let floats: { x: number; y: number; text: string; age: number; big?: boolean }[] = []
   let bumpX = 0
   let bumpY = 0
@@ -327,7 +328,17 @@ export function boot(): void {
     const s = springs.get(p.id) ?? { ox: 0, oy: 0, vx: 0, vy: 0 }
     return {
       x: layout.ox + (p.c + 0.5) * layout.D + s.ox,
-      y: layout.oy + (visualRow(p) + 0.5) * layout.D + s.oy,
+      y: layout.oy + layout.padTop + (visualRow(p) + 0.5) * layout.D + s.oy,
+    }
+  }
+
+  function boardRect(): { x: number; y: number; w: number; h: number } {
+    const D = layout.D
+    return {
+      x: layout.ox - D * 0.1,
+      y: layout.oy,
+      w: layout.cols * D + D * 0.2,
+      h: layout.padTop + layout.rows * D + D * 0.1,
     }
   }
 
@@ -347,24 +358,23 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean) {
-    const n = reduced ? (big ? 10 : 5) : big ? 14 : 8
+    const n = reduced ? (big ? 8 : 5) : big ? 12 : 8
     for (let i = 0; i < n; i++) {
-      const a = (Math.PI * 2 * i) / n + (i % 2) * 0.2
-      const sp = (big ? 230 : 120) * (0.55 + (i % 3) * 0.2)
-      const kind: DrawParticle['kind'] =
-        big && i % 3 === 0 ? 'star' : big && i % 3 === 1 ? 'goo' : big ? 'confetti' : i % 2 ? 'dot' : 'goo'
+      const a = (Math.PI * 2 * i) / n + (i % 2) * 0.15
+      const sp = (big ? 250 : 150) * (0.6 + (i % 3) * 0.18)
+      const star = big && i % 4 === 0
       particles.push({
         x,
         y,
         vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - (kind === 'goo' ? 20 : 50),
-        life: big ? 760 : 520,
+        vy: Math.sin(a) * sp - 55,
+        life: 400 + (i % 3) * 80,
         age: 0,
-        color: big ? CONFETTI[i % CONFETTI.length] : COLORS[color] ?? COLORS[0],
-        kind,
-        rot: i,
-        vr: big ? 6 : 0,
-        w: big ? 10 + (i % 4) * 3 : 7,
+        color: star ? '#FFFFFF' : COLORS[color] ?? COLORS[0],
+        kind: star ? 'star' : 'dot',
+        rot: i * 0.4,
+        vr: star ? 5 : 0,
+        w: star ? 9 : 7 + (i % 2),
       })
     }
     while (particles.length > 120) particles.shift()
@@ -378,6 +388,21 @@ export function boot(): void {
       const c = center(p)
       const index = Math.max(0, state.popAt.length - ids.length + i)
       burst(c.x, c.y, p.color, big)
+      if (p.kind === 'bomb') {
+        waves.push({ x: c.x, y: c.y, r: layout.D * 0.3, age: 0, life: 420, color: 'rgba(255, 214, 92, 0.85)' })
+      }
+      if (p.kind === 'rainbow') {
+        for (let b = 0; b < 8; b++) {
+          beams.push({
+            x: c.x,
+            y: c.y,
+            angle: (Math.PI * 2 * b) / 8,
+            age: 0,
+            life: 520,
+            color: CONFETTI[b % CONFETTI.length],
+          })
+        }
+      }
       if (!qaMode) playPop(index, big)
     })
     if (big && !reduced) {
@@ -433,7 +458,10 @@ export function boot(): void {
       bestEl.innerHTML = `${ICONS.star}<span>${best}</span>`
       const n = state.score >= 2500 ? 3 : state.score >= 1000 ? 2 : 1
       stars.innerHTML = [0, 1, 2]
-        .map((i) => `<span class="star${i < n ? ' on' : ''}" style="transition-delay:${i * 180}ms">${ICONS.star}</span>`)
+        .map(
+          (i) =>
+            `<span class="star${i < n ? ' on' : ''}" style="transition-delay:${i * 180}ms" aria-hidden="true">${ICONS.star.replace('width="18"', 'width="44"').replace('height="18"', 'height="44"')}</span>`,
+        )
         .join('')
       newBestEl.hidden = !isNew
       newBestEl.textContent = isNew ? 'New best!' : ''
@@ -465,14 +493,14 @@ export function boot(): void {
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
       timeEl.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" fill="none" stroke="#ffe0f0" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#ff4f93" stroke-width="4" stroke-dasharray="${dash} 88" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><span>${secs}</span>`
     }
-    const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-    hudMini.textContent = best > 0 ? `Best ${best}` : ''
   }
 
   function fresh(nextMode: Mode, seed: string) {
     mode = nextMode
     pose = 'idle'
     particles = []
+    waves = []
+    beams = []
     floats = []
     springs.clear()
     ghostPath = []
@@ -671,6 +699,14 @@ export function boot(): void {
       p.rot += p.vr * sec
       return p.age < p.life
     })
+    waves = waves.filter((w) => {
+      w.age += dt
+      return w.age < w.life
+    })
+    beams = beams.filter((b) => {
+      b.age += dt
+      return b.age < b.life
+    })
     bumpT = Math.max(0, bumpT - dt)
     const u = bumpT / 200
     bumpX *= u > 0 ? 1 : 0
@@ -747,12 +783,17 @@ export function boot(): void {
         }
         if (popping) {
           const u = popU
-          if (u < 0.18) {
-            sx = 1.26 - u * 2.2
-            sy = 0.72 + u * 1.4
+          if (u < 0.12) {
+            sx = 1.12
+            sy = 1.12
+          } else if (u < 0.35) {
+            const t = (u - 0.12) / 0.23
+            sx = 1.12 + t * 0.18
+            sy = 1.12 - t * 0.42
           } else {
-            sx = Math.max(0, 1.05 - u) * 1.1
-            sy = 0.85 + u * 0.25
+            const t = (u - 0.35) / 0.65
+            sx = Math.max(0.05, 1.3 * (1 - t))
+            sy = Math.max(0.05, 0.7 * (1 - t))
           }
         } else if (p.kind !== 'bonbon' && !on) {
           const pulse = reduced ? 0 : Math.sin(now / 220 + p.id) * 0.03
@@ -789,7 +830,17 @@ export function boot(): void {
     }
     const landscape = innerWidth > innerHeight
     const dragPath = state.drag.map((id) => byId(state, id)).filter((p): p is Piece => !!p)
-    const ropeColor = dragPath.length ? (pathColor(dragPath) ?? dragPath[0].color) : 0
+    const ropeColor = dragPath.length
+      ? (pathColor(dragPath) ?? dragPath[0].color)
+      : state.showIds.length
+        ? (pathColor(state.showIds.map((id) => byId(state, id)).filter((p): p is Piece => !!p)) ?? 0)
+        : 0
+    const lastTip =
+      dragPath.length > 0
+        ? center(dragPath[dragPath.length - 1])
+        : rope.length > 0
+          ? rope[rope.length - 1]
+          : null
     const heap =
       screen === 'title'
         ? [
@@ -827,8 +878,13 @@ export function boot(): void {
       rope: screen === 'title' ? [] : rope,
       ropeColor,
       chainLen: state.drag.length || (state.showIds.length > 1 ? state.showIds.length : 0),
-      finger: fingerOn && state.drag.length > 1 ? { x: fingerX, y: fingerY } : null,
+      finger:
+        state.drag.length > 1 && lastTip
+          ? { x: fingerOn ? fingerX : lastTip.x + layout.D * 0.08, y: fingerOn ? fingerY : lastTip.y + layout.D * 0.08 }
+          : null,
       particles,
+      waves,
+      beams,
       ghost: ghost ? { x: ghost.x, y: ghost.y, down: ghost.down, alpha: ghost.alpha } : null,
       flash: state.hitstopTotal > 0 ? (state.hitstopLeft / state.hitstopTotal) * 0.24 : 0,
       bumpX: reduced ? 0 : bumpX,
@@ -844,7 +900,7 @@ export function boot(): void {
               x: layout.ox - D * 0.1,
               y: Math.max(layout.hud, layout.oy - D * 0.08),
               w: layout.cols * D + D * 0.2,
-              h: layout.rows * D + D * 0.16,
+              h: layout.padTop + layout.rows * D + D * 0.12,
             },
       peeks,
     }
@@ -857,11 +913,27 @@ export function boot(): void {
     frame += 1
   }
 
+  function settleChain(min: number): boolean {
+    const path = findPath(state, min)
+    if (!path) return false
+    state.drag = path.map((p) => p.id)
+    armRelease()
+    let guard = 0
+    while (state.phase !== 'idle' && guard++ < 100) step(state, 40)
+    return true
+  }
+
   function applyUrl() {
     const want = screenParam ?? 'title'
     if (want === 'results') {
-      fresh('timed', seedParam ?? 'pretty')
-      showResults(3200)
+      fresh('timed', seedParam ?? 'feel')
+      showPlay()
+      for (let i = 0; i < 16 && !roundOver(state); i++) {
+        if (!settleChain(i % 3 === 0 ? 5 : 3)) break
+      }
+      while (state.timeLeft > 0 && state.phase === 'idle') step(state, 2500)
+      showResults()
+      if (qaMode && params.has('freeze')) freeze = true
       return
     }
     if (want === 'title') {
@@ -877,23 +949,71 @@ export function boot(): void {
         : seedParam ?? (qaMode ? 'pretty' : `boot-${Date.now()}`)
     fresh('timed', seed)
     showPlay()
-    if (want === 'chain' || want === 'pop' || want === 'bomb' || want === 'rainbow') {
-      const min = want === 'pop' ? 6 : want === 'rainbow' ? 8 : want === 'bomb' ? 5 : 5
-      const path = findPath(state, min)
-      if (path) state.drag = path.map((p) => p.id)
-      pose = want === 'chain' ? 'chain' : want === 'pop' ? 'pop' : 'idle'
-      if (want === 'pop' && path) {
+    if (want === 'chain') {
+      const path = findPath(state, 5)
+      if (path) {
+        state.drag = path.map((p) => p.id)
+        const tip = center(path[path.length - 1])
+        fingerOn = true
+        fingerX = tip.x + layout.D * 0.06
+        fingerY = tip.y + layout.D * 0.06
+        pose = 'chain'
+      }
+    } else if (want === 'pop') {
+      const path = findPath(state, 6)
+      if (path) {
+        state.drag = path.map((p) => p.id)
         armRelease()
-        updateParticles(48)
+        let t = 0
+        while (t < 80) {
+          step(state, 16)
+          updateParticles(16)
+          t += 16
+        }
         freeze = true
         pose = 'pop'
       }
-      if ((want === 'bomb' || want === 'rainbow') && path) {
+    } else if (want === 'bomb' || want === 'bomb-piece') {
+      settleChain(5)
+      freeze = true
+    } else if (want === 'bomb-blast') {
+      settleChain(5)
+      const bomb = state.pieces.find((p) => !p.dead && p.kind === 'bomb')
+      if (bomb) {
+        const pals = state.pieces.filter(
+          (p) => !p.dead && p.kind === 'bonbon' && Math.abs(p.c - bomb.c) + Math.abs(p.r - bomb.r) === 1,
+        )
+        const chain = pals[0] ? [pals[0], bomb] : [bomb]
+        state.drag = chain.map((p) => p.id)
         armRelease()
-        let guard = 0
-        while (state.phase !== 'idle' && guard++ < 80) step(state, 40)
-        freeze = true
+        let t = 0
+        while (t < 90) {
+          step(state, 16)
+          updateParticles(16)
+          t += 16
+        }
       }
+      freeze = true
+    } else if (want === 'rainbow' || want === 'rainbow-piece') {
+      settleChain(8)
+      freeze = true
+    } else if (want === 'rainbow-blast') {
+      settleChain(8)
+      const rb = state.pieces.find((p) => !p.dead && p.kind === 'rainbow')
+      if (rb) {
+        const pals = state.pieces.filter(
+          (p) => !p.dead && p.kind === 'bonbon' && Math.abs(p.c - rb.c) + Math.abs(p.r - rb.r) === 1,
+        )
+        state.drag = (pals[0] ? [pals[0], rb] : [rb]).map((p) => p.id)
+        armRelease()
+        let t = 0
+        while (t < 90) {
+          step(state, 16)
+          updateParticles(16)
+          t += 16
+        }
+      }
+      freeze = true
     }
     if (want === 'pause') openPause()
   }
@@ -939,6 +1059,25 @@ export function boot(): void {
     return { overlaps, offscreen }
   }
 
+  window.__checkHudBoard = () => {
+    const violations: string[] = []
+    if (screen !== 'play') return { violations }
+    const br = boardRect()
+    const box = (r: DOMRect) => {
+      const ix = Math.min(r.right, br.x + br.w) - Math.max(r.left, br.x)
+      const iy = Math.min(r.bottom, br.y + br.h) - Math.max(r.top, br.y)
+      return ix > 1 && iy > 1
+    }
+    const hud = document.getElementById('hud')
+    if (!hud || hud.hidden) return { violations }
+    for (const el of hud.querySelectorAll<HTMLElement>('.ui, button, .score, .timer')) {
+      if (el.closest('[hidden]')) continue
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 && box(r)) violations.push(`hud hits board: ${el.getAttribute('aria-label') || el.className}`)
+    }
+    return { violations }
+  }
+
   window.__checkPlayGeometry = () => {
     const violations: string[] = []
     for (const u of visibleUi()) {
@@ -955,7 +1094,9 @@ export function boot(): void {
         if (c.x - rad < -2 || c.y - rad < -2 || c.x + rad > innerWidth + 2 || c.y + rad > innerHeight + 2) {
           violations.push(`off piece ${p.id}`)
         }
-        if (c.y - rad < layout.hud - 2) violations.push(`under hud ${p.id}`)
+        const br = boardRect()
+        if (c.y - rad < br.y - 2) violations.push(`above board ${p.id}`)
+        if (c.y + rad > br.y + br.h + 2) violations.push(`below board ${p.id}`)
       }
       if (ds.size !== 1) violations.push('mixed D')
     }
@@ -1021,6 +1162,7 @@ export function boot(): void {
     get maxCluster() {
       return maxSameColorCluster(state)
     },
+    boardRect,
     get ribbonThickness() {
       return state.drag.length > 1 || pose === 'chain' ? layout.D * 0.22 : 0
     },
