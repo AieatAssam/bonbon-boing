@@ -766,7 +766,15 @@ export function boot(): void {
     if (ghost) {
       for (let i = 0; i <= ghost.prefix; i++) selected.add(ghostPath[i].id)
     }
-    const ropeIds = state.drag.length ? state.drag : state.phase !== 'idle' ? state.showIds : ghost ? ghostPath.slice(0, ghost.prefix + 1).map((p) => p.id) : []
+    const ropeIds = freeze
+      ? []
+      : state.drag.length
+        ? state.drag
+        : state.phase !== 'idle'
+          ? state.showIds
+          : ghost
+            ? ghostPath.slice(0, ghost.prefix + 1).map((p) => p.id)
+            : []
     const pieces = state.pieces
       .filter((p) => !p.dead || p.popT >= 0)
       .map((p) => {
@@ -927,21 +935,30 @@ export function boot(): void {
   function chainThrough(kind: 'bomb' | 'rainbow'): Piece[] {
     const special = state.pieces.find((p) => !p.dead && p.kind === kind)
     if (!special) return []
-    const color = special.color
-    let best: Piece[] = [special]
-    const queue: Piece[][] = [[special]]
-    const seen = new Set([special.id])
-    while (queue.length) {
-      const path = queue.shift()!
-      if (path.length > best.length) best = path
-      const last = path[path.length - 1]!
-      for (const n of state.pieces) {
-        if (n.dead || seen.has(n.id)) continue
-        if (Math.abs(n.c - last.c) + Math.abs(n.r - last.r) !== 1) continue
-        if (!canAppend(path, n)) continue
-        if (n.kind === 'bonbon' && n.color !== color) continue
-        seen.add(n.id)
-        queue.push([...path, n])
+    const seeds =
+      kind === 'rainbow'
+        ? state.pieces.filter(
+            (p) =>
+              !p.dead &&
+              p.kind === 'bonbon' &&
+              Math.abs(p.c - special.c) + Math.abs(p.r - special.r) === 1,
+          )
+        : [special]
+    let best: Piece[] = []
+    for (const seed of seeds) {
+      const queue: Piece[][] = [kind === 'rainbow' ? [seed, special] : [seed]]
+      const seen = new Set(queue[0]!.map((p) => p.id))
+      while (queue.length) {
+        const path = queue.shift()!
+        if (path.length > best.length) best = path
+        const last = path[path.length - 1]!
+        for (const n of state.pieces) {
+          if (n.dead || seen.has(n.id)) continue
+          if (Math.abs(n.c - last.c) + Math.abs(n.r - last.r) !== 1) continue
+          if (!canAppend(path, n)) continue
+          seen.add(n.id)
+          queue.push([...path, n])
+        }
       }
     }
     return best.length >= 2 ? best : []
@@ -1025,7 +1042,18 @@ export function boot(): void {
       }
       freeze = true
     } else if (want === 'bomb-blast') {
-      settleChain(5)
+      for (const n of [5, 4, 3]) {
+        if (settleChain(n)) break
+      }
+      if (!state.pieces.some((p) => !p.dead && p.kind === 'bomb')) {
+        const anchor =
+          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
+          state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
+        if (anchor) {
+          anchor.kind = 'bomb'
+          anchor.color = state.chainColor ?? anchor.color
+        }
+      }
       const through = chainThrough('bomb')
       if (through.length >= 2) {
         state.drag = through.map((p) => p.id)
@@ -1060,7 +1088,15 @@ export function boot(): void {
       }
       freeze = true
     } else if (want === 'rainbow-blast') {
-      settleChain(8)
+      for (const n of [8, 7, 6]) {
+        if (settleChain(n)) break
+      }
+      if (!state.pieces.some((p) => !p.dead && p.kind === 'rainbow')) {
+        const anchor =
+          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
+          state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
+        if (anchor) anchor.kind = 'rainbow'
+      }
       const through = chainThrough('rainbow')
       if (through.length >= 2) {
         state.drag = through.map((p) => p.id)
