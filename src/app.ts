@@ -93,6 +93,10 @@ export type Qa = {
   maxCluster: number
   ribbonThickness: number
   boardRect: () => { x: number; y: number; w: number; h: number }
+  backingDpr: () => number
+  pieceCenters: () => { x: number; y: number }[]
+  bubbleClear: () => boolean
+  bubbleGap: () => number
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   traceChain: (cells: { id: number; x: number; y: number }[]) => void
   appendPiece: (id: number) => void
@@ -309,7 +313,11 @@ export function boot(): void {
   let clockTickAt = 0
   let ghostDemoDone = false
   let ghostCycleStart = 0
-  let perfDprScale = 1
+  const DPR_FLOOR = 1.25
+  const PERF_REL = [1, 0.75, 0.625] as const
+  let perfLevel = 0
+  let perfSlowStreak = 0
+  let perfFastStreak = 0
   let canvasDpr = 0
   let fpsBuf: number[] = []
   let fpsWinStart = 0
@@ -328,27 +336,53 @@ export function boot(): void {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
   }
 
-  /** Star bands: greedy ~24k → 2★; skilled combos ~30k+ → 3★ */
-  const STAR2_SCORE = 12_000
-  const STAR3_SCORE = 28_000
+  const STAR2_SCORE = 20_000
+  const STAR3_SCORE = 45_000
 
-  function viewDpr(): number {
-    const native = Math.min(2, devicePixelRatio || 1)
+  function nativeDprCap(): number {
+    return Math.min(2, devicePixelRatio || 1)
+  }
+
+  function computeTargetDpr(): number {
+    const native = nativeDprCap()
     const area = Math.max(1, innerWidth * innerHeight)
     const areaCap = Math.sqrt(1_400_000 / area)
-    if (fpsBuf.length >= 2) {
-      const fps = fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
-      if (fps < 40) perfDprScale = Math.max(0.62, perfDprScale - 0.05)
-      else if (fps < 42) perfDprScale = Math.max(0.65, perfDprScale - 0.03)
-      else if (fps > 52) perfDprScale = Math.min(1, perfDprScale + 0.01)
+    const rel = PERF_REL[perfLevel] ?? 1
+    let target = Math.min(native, areaCap * rel)
+    if (native >= DPR_FLOOR) target = Math.max(DPR_FLOOR, target)
+    return target
+  }
+
+  /** Canvas backing-store pixels per CSS px (read-only; does not change scale). */
+  function backingDpr(): number {
+    if (canvas.width < 1 || innerWidth < 1) return computeTargetDpr()
+    return canvas.width / innerWidth
+  }
+
+  function tunePerfDpr(fps: number) {
+    if (fps < 40) {
+      perfSlowStreak += 1
+      perfFastStreak = 0
+      if (perfSlowStreak >= 2 && perfLevel < PERF_REL.length - 1) {
+        perfLevel += 1
+        perfSlowStreak = 0
+      }
+    } else if (fps > 48) {
+      perfFastStreak += 1
+      perfSlowStreak = 0
+      if (perfFastStreak >= 2 && perfLevel > 0) {
+        perfLevel -= 1
+        perfFastStreak = 0
+      }
+    } else {
+      perfSlowStreak = Math.max(0, perfSlowStreak - 1)
+      perfFastStreak = Math.max(0, perfFastStreak - 1)
     }
-    return Math.max(1, Math.min(native, areaCap * perfDprScale))
   }
 
   function resize() {
-    if (canvasDpr === 0 && (devicePixelRatio || 1) >= 2) perfDprScale = 0.76
     const next = boardLayout(innerWidth, innerHeight, insetTop())
-    const dpr = viewDpr()
+    const dpr = computeTargetDpr()
     if (dpr !== canvasDpr) {
       canvasDpr = dpr
       invalidateBgCache()
@@ -392,6 +426,63 @@ export function boot(): void {
     }
   }
 
+  function bubbleVisualR(chainLen: number, bomb: boolean, rainbow: boolean): number {
+    const gold = bomb || rainbow
+    const D = layout.D
+    return D * (gold ? 0.44 : 0.36) * (1 + Math.min(0.1, chainLen * 0.018))
+  }
+
+  function bubblePieceGap(bx: number, by: number): number {
+    let gap = Infinity
+    for (const p of state.pieces) {
+      if (p.dead) continue
+      const c = center(p)
+      gap = Math.min(gap, Math.hypot(bx - c.x, by - c.y))
+    }
+    return gap
+  }
+
+  function bubbleHitsPiece(bx: number, by: number, bubbleR: number): boolean {
+    return bubblePieceGap(bx, by) < bubbleR
+  }
+
+  function placeChainBubble(
+    anchor: { x: number; y: number },
+    rope: { x: number; y: number }[],
+    chainLen: number,
+  ): Scene['bubble'] {
+    const D = layout.D
+    const bubbleR = bubbleVisualR(chainLen, chainLen >= 5, chainLen >= 7)
+    const need = bubbleR + 2
+    const margin = D * 0.45
+    const prev = rope.length >= 2 ? rope[rope.length - 2]! : anchor
+    const side = anchor.x - prev.x >= 0 ? -1 : 1
+    const yMin = layout.hud + D * 0.38
+    const yMax = Math.max(yMin, layout.oy + layout.padTop - D * 0.55)
+    const ySlots = [anchor.y - D * 1.32, anchor.y - D * 1.58, layout.hud + D * 0.72]
+    let best: Scene['bubble'] | null = null
+    let bestScore = -Infinity
+    const step = D * 0.26
+    for (let by = yMin; by <= yMax; by += step) {
+      for (let bx = margin; bx <= innerWidth - margin; bx += step) {
+        const gap = bubblePieceGap(bx, by)
+        if (gap < need) continue
+        const nearFinger = Math.hypot(bx - anchor.x, by - anchor.y)
+        const bias = ySlots.reduce((s, y) => s + Math.max(0, 1 - Math.abs(by - y) / (D * 1.1)), 0)
+        const sideBias = bx * side < anchor.x * side ? 0.25 : 0
+        const score = gap + bias * D * 0.15 + sideBias * D - nearFinger * 0.06
+        if (score > bestScore) {
+          bestScore = score
+          best = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+        }
+      }
+    }
+    if (best) return best
+    const bx = Math.min(innerWidth - margin, Math.max(margin, anchor.x + side * D * 1.05))
+    const by = Math.min(yMax, Math.max(yMin, anchor.y - D * 1.35))
+    return { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+  }
+
   function hit(x: number, y: number): Piece | null {
     let best: Piece | null = null
     let bestD = layout.D * 0.56
@@ -408,7 +499,7 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean, bomb = false) {
-    const lite = perfDprScale < 0.88 || fpsBuf.some((f) => f < 44)
+    const lite = perfLevel > 0 || fpsBuf.some((f) => f < 44)
     const dotN = reduced || lite ? 7 : 10 + Math.floor(state.rng() * 5)
     const extra = bomb ? 8 : big ? 4 : 0
     for (let i = 0; i < dotN + extra; i++) {
@@ -587,6 +678,9 @@ export function boot(): void {
   }
 
   function fresh(nextMode: Mode, seed: string) {
+    perfLevel = 0
+    perfSlowStreak = 0
+    perfFastStreak = 0
     mode = nextMode
     pose = 'idle'
     particles = []
@@ -881,7 +975,7 @@ export function boot(): void {
       state.combo = 1
     }
     const frozen = state.hitstopLeft > 0
-    const liteSprings = perfDprScale < 0.85 && frame % 2 === 0
+    const liteSprings = perfLevel > 0 && frame % 2 === 0
     if (!frozen && !liteSprings) updateSprings(dt, now)
     updateParticles(dt)
     const popped = step(state, dt)
@@ -1097,22 +1191,12 @@ export function boot(): void {
         fingerOn && state.drag.length > 1
           ? { x: fingerX, y: fingerY }
           : rope[rope.length - 1]!
-      let bx = anchor.x
-      let by = anchor.y - D * 1.28
-      const boardTop = layout.oy
-      if (by > boardTop - D * 0.45) {
-        by = Math.min(anchor.y - D * 1.35, layout.hud + D * 0.85)
-        bx = anchor.x
-      }
-      const margin = D * 0.45
-      bx = Math.min(innerWidth - margin, Math.max(margin, bx))
-      by = Math.min(innerHeight - margin, Math.max(layout.hud + D * 0.55, by))
-      bubble = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+      bubble = placeChainBubble(anchor, rope, chainLen)
     }
     return {
       w: innerWidth,
       h: innerHeight,
-      dpr: viewDpr(),
+      dpr: backingDpr(),
       D,
       t: now - bootMs,
       pieces: screen === 'title' ? [] : pieces,
@@ -1152,7 +1236,7 @@ export function boot(): void {
               h: layout.padTop + layout.rows * D + D * 0.12,
             },
       peeks,
-      liteRibbon: perfDprScale < 0.92,
+      liteRibbon: perfLevel > 0,
     }
   }
 
@@ -1168,12 +1252,14 @@ export function boot(): void {
     fpsWinFrames += 1
     const elapsed = now - fpsWinStart
     if (elapsed >= 1000) {
-      fpsBuf.push((fpsWinFrames * 1000) / elapsed)
-      if (fpsBuf.length > 12) fpsBuf.shift()
+      const winFps = (fpsWinFrames * 1000) / elapsed
+      fpsBuf.push(winFps)
+      if (fpsBuf.length > 4) fpsBuf.shift()
+      tunePerfDpr(winFps)
       fpsWinStart = now
       fpsWinFrames = 0
-      const dpr = viewDpr()
-      if (dpr !== canvasDpr) resize()
+      const target = computeTargetDpr()
+      if (Math.abs(target - canvasDpr) > 0.02) resize()
     }
   }
 
@@ -1493,6 +1579,21 @@ export function boot(): void {
       return maxSameColorCluster(state)
     },
     boardRect,
+    backingDpr,
+    pieceCenters() {
+      return state.pieces.filter((p) => !p.dead).map((p) => center(p))
+    },
+    bubbleClear() {
+      const sc = scene(performance.now())
+      if (!sc.bubble) return true
+      const r = bubbleVisualR(sc.bubble.n, sc.bubble.bomb, sc.bubble.rainbow)
+      return !bubbleHitsPiece(sc.bubble.x, sc.bubble.y, r)
+    },
+    bubbleGap() {
+      const sc = scene(performance.now())
+      if (!sc.bubble) return Infinity
+      return bubblePieceGap(sc.bubble.x, sc.bubble.y)
+    },
     get ribbonThickness() {
       return state.drag.length > 1 || pose === 'chain' ? layout.D * 0.22 : 0
     },
@@ -1568,14 +1669,12 @@ export function boot(): void {
       draw()
     },
     get fps() {
+      if (fpsBuf.length) return fpsBuf[fpsBuf.length - 1]!
       const now = performance.now()
-      if (fpsWinFrames > 4 && now > fpsWinStart) {
-        const live = (fpsWinFrames * 1000) / (now - fpsWinStart)
-        if (!fpsBuf.length) return live
-        return fpsBuf.reduce((a, b) => a + b, live) / (fpsBuf.length + 1)
+      if (fpsWinFrames > 2 && now > fpsWinStart) {
+        return (fpsWinFrames * 1000) / (now - fpsWinStart)
       }
-      if (!fpsBuf.length) return 60
-      return fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
+      return 60
     },
     resetFps() {
       fpsBuf.length = 0

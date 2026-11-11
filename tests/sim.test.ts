@@ -6,6 +6,7 @@ import {
   canAppend,
   collectClears,
   createGame,
+  maxColorShare,
   dailySeed,
   extendDrag,
   findPath,
@@ -166,6 +167,13 @@ describe('modes and seeds', () => {
     expect(roundOver(s)).toBe(false)
   })
 
+  it('caps opening colour share at 30%', () => {
+    for (const seed of ['pretty', 'feel', 'spawn-a', 'spawn-b', 'spawn-c', 'daily-x']) {
+      const s = createGame(seed, 7, 10, 'timed')
+      expect(maxColorShare(s)).toBeLessThanOrEqual(0.3)
+    }
+  })
+
   it('keeps start clusters between 4 and 7', () => {
     for (const seed of ['pretty', 'spawn-a', 'spawn-b', 'spawn-c']) {
       const s = createGame(seed, 8, 10, 'timed')
@@ -186,7 +194,7 @@ describe('modes and seeds', () => {
   it('greedy play stays under 3-star cap for a long marathon', () => {
     const s = createGame('feel', 7, 9, 'timed')
     const r = greedySession(s, 80)
-    expect(r.score).toBeLessThan(28_000)
+    expect(r.score).toBeLessThan(45_000)
     expect(r.score).toBeGreaterThan(800)
   })
 

@@ -252,6 +252,14 @@ function colorShareLive(state: GameState, color: number): number {
   return live.filter((p) => p.color === color).length / live.length
 }
 
+/** Highest live share of any active colour on the board. */
+export function maxColorShare(state: GameState): number {
+  const n = activeColorCount(state)
+  let max = 0
+  for (let c = 0; c < n; c++) max = Math.max(max, colorShareLive(state, c))
+  return max
+}
+
 function pickSpawnColor(state: GameState, colors: number[][], c: number, r: number): number {
   const n = activeColorCount(state)
   const below = r + 1 < state.rows ? colors[r + 1][c] : -1
@@ -707,6 +715,7 @@ export function createGame(seed: string, cols: number, rows: number, mode: Mode)
       .sort((a, b) => a.c - b.c)
       .map((p) => p.id)
   }
+  for (let guard = 0; guard < 48 && maxColorShare(state) > 0.3; guard++) softenClusters(state, 7)
   return state
 }
 
