@@ -32,6 +32,7 @@ import { audioCreates, playLink, playPop, setAudioPaused, setAudioPrefs, unlockA
 import { createMetaLayer } from './meta-shell'
 import { ADVENTURE_LEVELS, type AdventureLevelDef } from './adventure/levels'
 import {
+  allGoalsMet,
   emptyGoalState,
   evaluateStars,
   type AdventureGoalState,
@@ -178,6 +179,7 @@ const ICONS = {
   muted:
     '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 10l5 5M21 10l-5 5" stroke="#FF4F93" stroke-width="2" stroke-linecap="round"/></svg>',
   star: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#FFB703" d="M12 3l2.4 5.6L20 9.2l-4.2 3.8L17 19l-5-3-5 3 1.2-6L4 9.2l5.6-.6z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="#4A2440" stroke-width="2"/><path fill="none" stroke="#4A2440" stroke-width="2" stroke-linecap="round" d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4"/></svg>',
 }
 
 export function boot(): void {
@@ -195,6 +197,8 @@ export function boot(): void {
   let adventureLevel: AdventureLevelDef | null = null
   let adventureGoals: AdventureGoalState | null = null
   let lastResultStars: number | null = null
+  let lastAdventureWon = false
+  let lastFinishedAdventureLevel: AdventureLevelDef | null = null
   let lastRunRewards = { coins: 0, xp: 0 }
   let lastRunRewardNote = ''
 
@@ -235,14 +239,15 @@ export function boot(): void {
     ghostDemoDone = meta.save.tut || qaMode
     ghostCycleStart = 0
     lastSimPhase = 'idle'
+    showPlay()
     const intro = adventureLevel.tutorialTip
     if (intro && !save.seenTips.includes(intro)) {
       showTipCard(intro, () => {
         save.seenTips.push(intro)
         meta.persist()
-        showPlay()
+        draw()
       })
-    } else showPlay()
+    }
   }
 
   const meta = createMetaLayer(appRoot, startAdventureLevel)
@@ -331,11 +336,20 @@ export function boot(): void {
   mkPill(dock, 'Score Rush', 'timed', PLUSH_ICONS.rush, 'primary')
   mkPill(dock, 'Cuddle', 'cuddle', PLUSH_ICONS.cuddle, 'relax')
   mkPill(dock, 'Daily', 'daily', PLUSH_ICONS.daily)
-  const metaRow = renderMetaDock(meta.save)
+  const metaRow = renderMetaDock(meta.save, (action) => onAction(action))
   metaRow.classList.add('meta-row')
   dock.append(metaRow)
-  mk(titleCorner, 'Sound', 'sfx', ICONS.sound, true)
-  mk(titleCorner, 'Music', 'music', ICONS.note, true)
+  const settingsPop = el('div', 'title-settings-pop')
+  settingsPop.hidden = true
+  mk(settingsPop, 'Sound', 'sfx', ICONS.sound, true)
+  mk(settingsPop, 'Music', 'music', ICONS.note, true)
+  titleCorner.append(settingsPop)
+  const settingsBtn = mk(titleCorner, 'Settings', 'settings', ICONS.gear, true)
+  settingsBtn.title = 'Sound & music'
+  settingsBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation()
+    settingsPop.hidden = !settingsPop.hidden
+  })
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
   hudMid.append(scoreEl, comboEl, hudMini)
@@ -486,9 +500,15 @@ export function boot(): void {
 
   function center(p: Piece): { x: number; y: number } {
     const s = springs.get(p.id) ?? { ox: 0, oy: 0, vx: 0, vy: 0 }
+    let yExtra = 0
+    if (p.spawnT >= 0 && p.spawnT < 1) {
+      const u = p.spawnT
+      const ease = 1 - (1 - u) ** 2.2
+      yExtra = -layout.D * 0.42 * (1 - ease)
+    }
     return {
       x: layout.ox + (p.c + 0.5) * layout.D + s.ox,
-      y: layout.oy + layout.padTop + (visualRow(p) + 0.5) * layout.D + s.oy,
+      y: layout.oy + layout.padTop + (visualRow(p) + 0.5) * layout.D + yExtra + s.oy,
     }
   }
 
@@ -621,7 +641,7 @@ export function boot(): void {
     else {
       chosen = {
         x: tipPt.x,
-        y: tipPt.y - D * 1.25,
+        y: tipPt.y + D * 0.92,
         nonChain: 0,
         inChain: 0,
         dist: D * 1.25,
@@ -751,12 +771,18 @@ export function boot(): void {
   }
 
   function armRelease() {
+    const bombsBefore = state.track.bombsPopped
     const dragPts = state.drag
       .map((id) => byId(state, id))
       .filter((p): p is Piece => !!p)
       .map((p) => center(p))
     const t0 = performance.now()
     const ids = release(state)
+    if (state.track.bombsPopped > bombsBefore) {
+      meta.notifyFacts({ bomb: true, bombs: state.track.bombsPopped, chainLen: state.lastChainLen, score: state.score })
+    } else if (state.lastChainLen >= 3) {
+      meta.notifyFacts({ chainLen: state.lastChainLen, combo: state.combo, score: state.score, pops: state.track.clearedByColor.reduce((a, b) => a + b, 0) })
+    }
     popWallMs = performance.now() - t0
     if (!ids.length) return
     const spot = center(byId(state, ids[0]) ?? state.pieces[0])
@@ -789,14 +815,34 @@ export function boot(): void {
     if (next === 'results') {
       finalEl.textContent = String(state.score)
       const prior = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-      const isNew = state.score > prior
+      const isNew = mode !== 'adventure' && state.score > prior
       rememberBest()
       const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
       const n =
-        lastResultStars ??
-        (state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1)
+        mode === 'adventure'
+          ? (lastResultStars ?? 0)
+          : (lastResultStars ?? (state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1))
+      if (mode === 'adventure') {
+        newBestEl.hidden = lastAdventureWon
+        newBestEl.textContent = lastAdventureWon ? '' : 'Out of moves!'
+        bestEl.hidden = true
+        rewardEl.textContent = lastAdventureWon ? 'Level clear!' : 'Keep squishing — try again!'
+        resultRow.innerHTML = ''
+        if (lastAdventureWon) {
+          mkPill(resultRow, 'Next level', 'adventure-next', ICONS.play, 'primary')
+          mkPill(resultRow, 'Map', 'adventure-map', PLUSH_ICONS.map)
+          mkPill(resultRow, 'Replay', 'adventure-retry', ICONS.restart)
+        } else {
+          mkPill(resultRow, 'Retry', 'adventure-retry', ICONS.restart, 'primary')
+          mkPill(resultRow, 'Map', 'adventure-map', PLUSH_ICONS.map)
+        }
+      } else {
+        resultRow.innerHTML = ''
+        mkPill(resultRow, 'Play again', 'restart', ICONS.play, 'primary')
+        mkPill(resultRow, 'Home', 'home', ICONS.home)
+      }
       rewardEl.hidden = false
-      rewardEl.textContent = lastRunRewardNote || 'Nice squish!'
+      if (mode !== 'adventure') rewardEl.textContent = lastRunRewardNote || 'Nice squish!'
       const fill = results.querySelector('.xp-fill') as HTMLElement | null
       if (fill) {
         const need = Math.max(1, save.profile.xp + lastRunRewards.xp)
@@ -823,7 +869,9 @@ export function boot(): void {
             `<span class="star${i < n ? ' on' : ''}" style="transition-delay:${i * 180}ms" aria-hidden="true">${ICONS.star.replace('width="18"', 'width="44"').replace('height="18"', 'height="44"')}</span>`,
         )
         .join('')
-      if (isNew) {
+      if (mode === 'adventure') {
+        bestEl.hidden = true
+      } else if (isNew) {
         bestEl.hidden = true
         newBestEl.hidden = false
         newBestEl.textContent = 'New best!'
@@ -963,8 +1011,10 @@ export function boot(): void {
     if (mode === 'adventure' && adventureLevel && adventureGoals) {
       syncAdventureGoalsFromTrack()
       const ev = evaluateStars(adventureGoals, adventureLevel)
-      lastResultStars = ev.stars
-      meta.onAdventureEnd(adventureLevel, adventureGoals)
+      lastAdventureWon = ev.goalMet
+      lastResultStars = lastAdventureWon ? ev.stars : 0
+      lastFinishedAdventureLevel = adventureLevel
+      meta.onAdventureEnd(adventureLevel, adventureGoals, lastAdventureWon)
     } else {
       lastResultStars = null
       meta.onRunEnd({
@@ -1009,11 +1059,28 @@ export function boot(): void {
       clockTickAt = performance.now()
       showPlay()
     } else if (action === 'home') {
-      if (screen === 'play') openPause()
+      if (screen === 'play' && mode === 'adventure') {
+        meta.close()
+        meta.open('map')
+        show('title')
+      } else if (screen === 'play') openPause()
       else {
         meta.close()
         show('title')
       }
+    } else if (action === 'adventure-map') {
+      meta.close()
+      meta.open('map')
+      show('title')
+    } else if (action === 'adventure-next' && lastFinishedAdventureLevel) {
+      const next = ADVENTURE_LEVELS.find((l) => l.id === lastFinishedAdventureLevel!.id + 1)
+      if (next) startAdventureLevel(next)
+      else {
+        meta.open('map')
+        show('title')
+      }
+    } else if (action === 'adventure-retry' && lastFinishedAdventureLevel) {
+      startAdventureLevel(lastFinishedAdventureLevel)
     } else if (action === 'map' || action === 'shop' || action === 'achievements' || action === 'collection') {
       meta.open(action)
     }
@@ -1232,7 +1299,16 @@ export function boot(): void {
     }
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
-    if (mode === 'adventure' && state.phase === 'idle' && state.settled) syncAdventureGoalsFromTrack()
+    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length) {
+      syncAdventureGoalsFromTrack()
+      if (allGoalsMet(adventureGoals, adventureLevel.goals)) {
+        const bonus = Math.max(0, state.movesLeft) * 75
+        if (bonus > 0) state.score += bonus
+        state.movesLeft = 0
+        showResults()
+        return
+      }
+    }
     if (roundOver(state)) showResults()
     syncHud()
   }
@@ -1255,10 +1331,9 @@ export function boot(): void {
     if (idx >= ghostPath.length - 1 && u > 0.88) ghostDemoDone = true
     const c = center(ghostPath[idx])
     const alpha = u < 0.08 ? u / 0.08 : u > 0.88 ? (1 - u) / 0.12 : 1
-    const towardX = c.x < innerWidth / 2 ? layout.D * 0.28 : -layout.D * 0.28
     return {
-      x: Math.min(innerWidth - 8, Math.max(8, c.x + towardX)),
-      y: Math.min(innerHeight - 8, Math.max(8, c.y + layout.D * 0.22)),
+      x: c.x,
+      y: c.y,
       down: u < 0.84,
       alpha,
       prefix: idx,
@@ -1315,6 +1390,10 @@ export function boot(): void {
           const wob = Math.sin(u * Math.PI * 3) * (1 - u) * 0.06
           sx = 1.15 - 0.15 * u + wob
           sy = 0.85 + 0.15 * u - wob
+        } else if (p.spawnT >= 0 && p.spawnT < 1 && !p.dead) {
+          const u = p.spawnT
+          const pop = u < 0.45 ? (u / 0.45) * 1.15 : 1.15 - ((u - 0.45) / 0.55) * 0.15
+          sx = sy = pop
         } else if (p.fallT >= 0 && p.fallT < 1 && !p.dead) {
           const ft = p.fallT
           const land = ft > 0.85 ? Math.sin(((ft - 0.85) / 0.15) * Math.PI) * 0.08 : 0
@@ -1382,7 +1461,7 @@ export function boot(): void {
     const heapCenterY = heapPt.y
     const hintColor = 1
     const hintSlots = new Set([0, 1, 2])
-    if (screen === 'title' && false) {
+    if (screen === 'title' && !save.tut && !qaMode) {
       const u = (now % 2800) / 2800
       const travel = Math.min(1, Math.max(0, (u - 0.12) / 0.58))
       const idx = Math.min(2, Math.floor(travel * 3))
@@ -1405,8 +1484,8 @@ export function boot(): void {
         rope: ropePts,
         ropeColor: hintColor,
         hand: {
-          x: tip.x + D * 0.2,
-          y: tip.y + D * 0.28,
+          x: tip.x,
+          y: tip.y,
           down: travel < 0.86,
           alpha: u < 0.08 ? u / 0.08 : u > 0.9 ? (1 - u) / 0.1 : 0.88,
         },
@@ -1489,15 +1568,7 @@ export function boot(): void {
       dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
       mat,
-      pieceClip:
-        screen === 'play' && state.phase === 'falling' && mat
-          ? {
-              x: layout.ox - D * 0.12,
-              y: layout.oy + layout.padTop,
-              w: layout.cols * D + D * 0.24,
-              h: innerHeight - (layout.oy + layout.padTop) + D,
-            }
-          : null,
+      pieceClip: null,
       peeks,
       liteRibbon: perfLevel > 0,
     }

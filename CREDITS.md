@@ -16,7 +16,7 @@ See `assets-src/audio/SOURCES.md` for the full list. Highlights:
 
 ## Visual
 
-- Tutorial glove: drawn in Canvas2D (plush white-mitten style).
+- Tutorial pointer glove: Canvas2D, silhouette inspired by [Kenney Cursor Pack](https://kenney.nl/assets/cursor-pack) (CC0), recoloured to match bonbon outlines.
 - UI patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, map, missions).
 - Kenney CC0 packs (Impact / Interface) — cited for audio; optional UI reference.
 

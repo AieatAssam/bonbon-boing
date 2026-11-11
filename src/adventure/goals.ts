@@ -1,5 +1,14 @@
 import type { AdventureGoal, AdventureLevelDef } from './levels'
-import { COLOR_NAMES } from '../ui/plushIcons'
+import { PLUSH_ICONS } from '../ui/plushIcons'
+
+const COLOR_DOT = [
+  `<span class="goal-dot" style="background:#FF3D8E"></span>`,
+  `<span class="goal-dot" style="background:#2FDB8E"></span>`,
+  `<span class="goal-dot" style="background:#FFD02A"></span>`,
+  `<span class="goal-dot" style="background:#5088FF"></span>`,
+  `<span class="goal-dot" style="background:#FF7A28"></span>`,
+  `<span class="goal-dot" style="background:#C070FF"></span>`,
+]
 
 export type AdventureGoalState = {
   score: number
@@ -25,28 +34,34 @@ export type StarEval = {
   thresholds: [number, number, number]
 }
 
-export function goalChip(goal: AdventureGoal, state: AdventureGoalState): string {
-  const ev = evaluateGoal(state, goal)
+function goalIcon(goal: AdventureGoal): string {
   switch (goal.type) {
     case 'clear_color':
-      return `${COLOR_NAMES[goal.color % COLOR_NAMES.length] ?? 'Pop'} ${Math.min(ev.progress, ev.target)}/${ev.target}`
+      return COLOR_DOT[goal.color % COLOR_DOT.length] ?? COLOR_DOT[0]!
     case 'pop_bombs':
-      return `Bomb ${Math.min(ev.progress, ev.target)}/${ev.target}`
+      return `<span class="goal-ico">${PLUSH_ICONS.starburst}</span>`
     case 'score_moves':
-      return `Score ${Math.min(ev.progress, ev.target)}/${ev.target}`
+      return `<span class="goal-ico">${PLUSH_ICONS.rush}</span>`
     case 'break_ice':
-      return `Ice ${Math.min(ev.progress, ev.target)}/${ev.target}`
+      return `<span class="goal-ico">${PLUSH_ICONS.ice}</span>`
     case 'clear_choco':
-      return `Choco ${Math.min(ev.progress, ev.target)}/${ev.target}`
+      return `<span class="goal-ico">${PLUSH_ICONS.choco}</span>`
     default:
-      return ev.label
+      return `<span class="goal-dot" style="background:#FF8CB8"></span>`
   }
+}
+
+export function goalChip(goal: AdventureGoal, state: AdventureGoalState): string {
+  const ev = evaluateGoal(state, goal)
+  const tick = ev.met ? '<span class="goal-tick">✓</span>' : ''
+  const count = `${Math.min(ev.progress, ev.target)}/${ev.target}`
+  return `${goalIcon(goal)}<span class="goal-count">${count}</span>${tick}`
 }
 
 export function goalLabel(goal: AdventureGoal): string {
   switch (goal.type) {
     case 'clear_color':
-      return `Clear ${goal.count} ${COLOR_NAMES[goal.color % COLOR_NAMES.length] ?? 'pop'}`
+      return `Clear ${goal.count} bonbons`
     case 'pop_bombs':
       return `Pop ${goal.count} bombs`
     case 'score_moves':

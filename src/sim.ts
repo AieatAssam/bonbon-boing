@@ -8,6 +8,7 @@ export const POP_SQUASH_MS = 40
 export const POP_VANISH_MS = 60
 export const POP_STAGGER_MS = 30
 export const FALL_MS = 220
+export const SPAWN_MS = 300
 export const FALL_DELAY = 70
 export const STAGGER_CAP = 32
 export const STAGGER_BUDGET = 360
@@ -31,6 +32,8 @@ export type Piece = {
   fallTo: number
   fallT: number
   landT: number
+  /** In-board refill pop-in (0..1); -1 = none. */
+  spawnT: number
   /** Ice / sleepy hits remaining before pop. */
   hits: number
   /** Jelly bonbons start locked until a neighbour pops. */
@@ -86,6 +89,8 @@ export type GameState = {
   /** Moves since a length-6+ chain was available (refill tuning). */
   dryLongChain: number
   colorCap: number
+  /** Adventure level id when mode === adventure (for spawn rules). */
+  adventureId: number
   /** Adventure: remaining moves; -1 = unlimited (timed/cuddle). */
   movesLeft: number
   track: RunTrack
@@ -152,6 +157,7 @@ function makePiece(state: GameState, c: number, r: number, color: number, kind: 
     fallTo: r,
     fallT: -1,
     landT: -1,
+    spawnT: -1,
     hits: extra?.hits ?? (kind === 'ice' ? 2 : kind === 'sleepy' ? 3 : 0),
     locked: extra?.locked ?? kind === 'jelly',
   }
@@ -727,6 +733,7 @@ function blank(seed: string, cols: number, rows: number, mode: Mode): GameState 
     showIds: [],
     dryLongChain: 0,
     colorCap: 0,
+    adventureId: 0,
     movesLeft: -1,
     track: {
       clearedByColor: [0, 0, 0, 0, 0, 0],
@@ -944,10 +951,11 @@ function beginFall(state: GameState) {
       const color = pickSpawnColor(state, grid, c, i)
       grid[i][c] = color
       const p = makePiece(state, c, i, color, 'bonbon')
-      p.fallFrom = i - empty
+      p.fallFrom = i
       p.fallTo = i
       p.r = i
-      p.fallT = 0
+      p.fallT = -1
+      p.spawnT = 0
       spawned.push(p)
     }
   }
@@ -1058,7 +1066,8 @@ export function release(state: GameState): number[] {
   state.phase = 'clearing'
   state.settled = false
   state.fallStart = lastAt + FALL_DELAY
-  const starRoll = path.length >= BOMB_AT && path.length < RAINBOW_AT && state.rng() < 0.18
+  const starOk = state.mode !== 'adventure' || state.adventureId >= 25
+  const starRoll = starOk && path.length >= BOMB_AT && path.length < RAINBOW_AT && state.rng() < 0.18
   const wantSpecial = path.length >= RAINBOW_AT ? 'rainbow' : starRoll ? 'starburst' : path.length >= BOMB_AT ? 'bomb' : null
   const onBoard = state.pieces.filter((p) => !p.dead && (p.kind === 'bomb' || p.kind === 'rainbow')).length
   state.special = wantSpecial && onBoard < 2 ? wantSpecial : null
@@ -1129,6 +1138,11 @@ export function step(state: GameState, dt: number): number[] {
     let pending = false
     for (const p of state.pieces) {
       if (p.dead) continue
+      if (p.spawnT >= 0 && p.spawnT < 1) {
+        p.spawnT = Math.min(1, p.spawnT + dt / SPAWN_MS)
+        if (p.spawnT < 1) pending = true
+        else if (p.landT < 0) p.landT = 0
+      }
       if (p.fallT >= 0 && p.fallT < 1) {
         p.fallT = Math.min(1, p.fallT + dt / FALL_MS)
         if (p.fallT < 1) pending = true
@@ -1141,6 +1155,7 @@ export function step(state: GameState, dt: number): number[] {
       for (const p of state.pieces) {
         p.fallT = -1
         p.landT = -1
+        p.spawnT = -1
       }
       state.lastChainLen = 0
       state.phase = 'idle'
@@ -1343,6 +1358,7 @@ export function extendDrag(state: GameState, id: number): boolean {
 export function createAdventureGame(level: AdventureLevelDef, cols: number, rows: number): GameState {
   const state = createGame(level.seed, cols, rows, 'adventure')
   state.colorCap = level.colorCount
+  state.adventureId = level.id
   state.movesLeft = level.moves
   state.timeLeft = ROUND_MS
   const cap = level.colorCount

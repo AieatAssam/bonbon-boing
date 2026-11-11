@@ -1,12 +1,12 @@
 {
-  "version": 2,
+  "version": 3,
   "levels": [
     {
       "id": 1,
       "chapter": 1,
       "title": "Sugar Meadow 1",
       "seed": "adv-1-1-1",
-      "moves": 30,
+      "moves": 28,
       "colorCount": 3,
       "goals": [
         {
@@ -19,9 +19,9 @@
         "ice": 2
       },
       "starScore": [
-        4150,
-        5602,
-        7262
+        4320,
+        5270,
+        6393
       ],
       "tutorialTip": "ice"
     },
@@ -30,7 +30,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 2",
       "seed": "adv-1-2-2",
-      "moves": 30,
+      "moves": 28,
       "colorCount": 3,
       "goals": [
         {
@@ -43,9 +43,9 @@
         "ice": 2
       },
       "starScore": [
-        4350,
-        5872,
-        7612
+        4620,
+        5636,
+        6837
       ]
     },
     {
@@ -53,7 +53,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 3",
       "seed": "adv-1-3-3",
-      "moves": 30,
+      "moves": 28,
       "colorCount": 3,
       "goals": [
         {
@@ -70,9 +70,9 @@
         "ice": 2
       },
       "starScore": [
-        4550,
-        6142,
-        7962
+        4920,
+        6002,
+        7281
       ]
     },
     {
@@ -80,7 +80,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 4",
       "seed": "adv-1-4-4",
-      "moves": 30,
+      "moves": 22,
       "colorCount": 3,
       "goals": [
         {
@@ -97,9 +97,9 @@
         "ice": 3
       },
       "starScore": [
-        4750,
-        6412,
-        8312
+        5220,
+        7412,
+        10179
       ]
     },
     {
@@ -107,7 +107,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 5",
       "seed": "adv-1-5-5",
-      "moves": 30,
+      "moves": 22,
       "colorCount": 3,
       "goals": [
         {
@@ -125,9 +125,9 @@
         "jelly": 1
       },
       "starScore": [
-        4950,
-        6682,
-        8662
+        5520,
+        7838,
+        10764
       ],
       "tutorialTip": "jelly"
     },
@@ -136,7 +136,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 6",
       "seed": "adv-1-6-6",
-      "moves": 30,
+      "moves": 22,
       "colorCount": 3,
       "goals": [
         {
@@ -158,9 +158,9 @@
         "jelly": 1
       },
       "starScore": [
-        5150,
-        6952,
-        9012
+        5820,
+        8264,
+        11349
       ]
     },
     {
@@ -168,7 +168,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 7",
       "seed": "adv-1-7-7",
-      "moves": 29,
+      "moves": 22,
       "colorCount": 3,
       "goals": [
         {
@@ -190,9 +190,9 @@
         "jelly": 1
       },
       "starScore": [
-        5350,
-        7222,
-        9362
+        6120,
+        8690,
+        11934
       ]
     },
     {
@@ -200,12 +200,12 @@
       "chapter": 1,
       "title": "Sugar Meadow 8",
       "seed": "adv-1-8-8",
-      "moves": 29,
-      "colorCount": 3,
+      "moves": 19,
+      "colorCount": 4,
       "goals": [
         {
           "type": "clear_color",
-          "color": 2,
+          "color": 0,
           "count": 15
         },
         {
@@ -219,13 +219,12 @@
       ],
       "blockers": {
         "ice": 4,
-        "jelly": 1,
-        "starburst": 0
+        "jelly": 1
       },
       "starScore": [
-        5550,
-        7492,
-        9712
+        6420,
+        9116,
+        12519
       ]
     },
     {
@@ -233,12 +232,12 @@
       "chapter": 1,
       "title": "Sugar Meadow 9",
       "seed": "adv-1-9-9",
-      "moves": 29,
-      "colorCount": 3,
+      "moves": 19,
+      "colorCount": 4,
       "goals": [
         {
           "type": "clear_color",
-          "color": 0,
+          "color": 1,
           "count": 16
         },
         {
@@ -252,13 +251,12 @@
       ],
       "blockers": {
         "ice": 4,
-        "jelly": 1,
-        "starburst": 0
+        "jelly": 1
       },
       "starScore": [
-        5750,
-        7762,
-        10062
+        6720,
+        9542,
+        13104
       ]
     },
     {
@@ -266,12 +264,12 @@
       "chapter": 1,
       "title": "Sugar Meadow 10",
       "seed": "adv-1-10-10",
-      "moves": 29,
-      "colorCount": 3,
+      "moves": 19,
+      "colorCount": 4,
       "goals": [
         {
           "type": "clear_color",
-          "color": 1,
+          "color": 2,
           "count": 17
         },
         {
@@ -286,13 +284,12 @@
       "blockers": {
         "ice": 4,
         "jelly": 2,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        5950,
-        8032,
-        10412
+        7020,
+        9968,
+        13689
       ]
     },
     {
@@ -300,7 +297,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 11",
       "seed": "adv-1-11-11",
-      "moves": 29,
+      "moves": 19,
       "colorCount": 4,
       "goals": [
         {
@@ -320,13 +317,12 @@
       "blockers": {
         "ice": 4,
         "jelly": 2,
-        "sleepy": 0,
-        "starburst": 1
+        "sleepy": 0
       },
       "starScore": [
-        6150,
-        8302,
-        10762
+        7320,
+        10394,
+        14274
       ]
     },
     {
@@ -334,7 +330,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 12",
       "seed": "adv-1-12-12",
-      "moves": 29,
+      "moves": 18,
       "colorCount": 4,
       "goals": [
         {
@@ -354,13 +350,12 @@
       "blockers": {
         "ice": 5,
         "jelly": 2,
-        "sleepy": 1,
-        "starburst": 0
+        "sleepy": 1
       },
       "starScore": [
-        6350,
-        8572,
-        11112
+        7620,
+        10820,
+        14859
       ],
       "tutorialTip": "sleepy"
     },
@@ -369,7 +364,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 13",
       "seed": "adv-1-13-13",
-      "moves": 29,
+      "moves": 18,
       "colorCount": 4,
       "goals": [
         {
@@ -389,13 +384,12 @@
       "blockers": {
         "ice": 5,
         "jelly": 2,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        6550,
-        8842,
-        11462
+        7920,
+        11246,
+        15444
       ]
     },
     {
@@ -403,7 +397,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 14",
       "seed": "adv-1-14-14",
-      "moves": 28,
+      "moves": 18,
       "colorCount": 4,
       "goals": [
         {
@@ -423,13 +417,12 @@
       "blockers": {
         "ice": 5,
         "jelly": 2,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        6750,
-        9112,
-        11812
+        8220,
+        11672,
+        16029
       ]
     },
     {
@@ -437,7 +430,7 @@
       "chapter": 1,
       "title": "Sugar Meadow 15",
       "seed": "adv-1-15-15",
-      "moves": 28,
+      "moves": 18,
       "colorCount": 4,
       "goals": [
         {
@@ -455,20 +448,19 @@
         },
         {
           "type": "score_moves",
-          "score": 6950,
-          "moves": 28
+          "score": 8520,
+          "moves": 18
         }
       ],
       "blockers": {
         "ice": 5,
         "jelly": 2,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        6950,
-        9382,
-        12162
+        8520,
+        12098,
+        16614
       ]
     },
     {
@@ -476,12 +468,12 @@
       "chapter": 2,
       "title": "Fizz Factory 1",
       "seed": "adv-2-1-16",
-      "moves": 28,
-      "colorCount": 4,
+      "moves": 16,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 0,
+          "color": 1,
           "count": 11
         },
         {
@@ -496,13 +488,12 @@
       "blockers": {
         "ice": 6,
         "jelly": 3,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        7600,
-        10260,
-        13300
+        8380,
+        12989,
+        18436
       ]
     },
     {
@@ -510,12 +501,12 @@
       "chapter": 2,
       "title": "Fizz Factory 2",
       "seed": "adv-2-2-17",
-      "moves": 28,
-      "colorCount": 4,
+      "moves": 16,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 1,
+          "color": 2,
           "count": 12
         },
         {
@@ -530,13 +521,12 @@
       "blockers": {
         "ice": 6,
         "jelly": 3,
-        "sleepy": 0,
-        "starburst": 0
+        "sleepy": 0
       },
       "starScore": [
-        7800,
-        10530,
-        13650
+        8680,
+        13454,
+        19096
       ]
     },
     {
@@ -544,12 +534,12 @@
       "chapter": 2,
       "title": "Fizz Factory 3",
       "seed": "adv-2-3-18",
-      "moves": 28,
-      "colorCount": 4,
+      "moves": 16,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 2,
+          "color": 3,
           "count": 13
         },
         {
@@ -565,13 +555,12 @@
         "ice": 6,
         "jelly": 3,
         "sleepy": 1,
-        "starburst": 0,
         "choco": 1
       },
       "starScore": [
-        8000,
-        10800,
-        14000
+        8980,
+        13919,
+        19756
       ],
       "tutorialTip": "choco"
     },
@@ -580,12 +569,12 @@
       "chapter": 2,
       "title": "Fizz Factory 4",
       "seed": "adv-2-4-19",
-      "moves": 28,
-      "colorCount": 4,
+      "moves": 16,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 3,
+          "color": 4,
           "count": 14
         },
         {
@@ -601,13 +590,12 @@
         "ice": 6,
         "jelly": 3,
         "sleepy": 0,
-        "starburst": 0,
         "choco": 1
       },
       "starScore": [
-        8200,
-        11070,
-        14350
+        9280,
+        14384,
+        20416
       ]
     },
     {
@@ -615,8 +603,8 @@
       "chapter": 2,
       "title": "Fizz Factory 5",
       "seed": "adv-2-5-20",
-      "moves": 28,
-      "colorCount": 4,
+      "moves": 16,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
@@ -640,13 +628,12 @@
         "ice": 7,
         "jelly": 3,
         "sleepy": 0,
-        "starburst": 0,
         "choco": 1
       },
       "starScore": [
-        8400,
-        11340,
-        14700
+        9580,
+        14849,
+        21076
       ]
     },
     {
@@ -654,7 +641,7 @@
       "chapter": 2,
       "title": "Fizz Factory 6",
       "seed": "adv-2-6-21",
-      "moves": 27,
+      "moves": 16,
       "colorCount": 5,
       "goals": [
         {
@@ -679,13 +666,12 @@
         "ice": 7,
         "jelly": 3,
         "sleepy": 0,
-        "starburst": 0,
         "choco": 1
       },
       "starScore": [
-        8600,
-        11610,
-        15050
+        9880,
+        15314,
+        21736
       ]
     },
     {
@@ -693,7 +679,7 @@
       "chapter": 2,
       "title": "Fizz Factory 7",
       "seed": "adv-2-7-22",
-      "moves": 27,
+      "moves": 16,
       "colorCount": 5,
       "goals": [
         {
@@ -718,13 +704,12 @@
         "ice": 7,
         "jelly": 4,
         "sleepy": 0,
-        "starburst": 1,
         "choco": 2
       },
       "starScore": [
-        8800,
-        11880,
-        15400
+        10180,
+        15779,
+        22396
       ]
     },
     {
@@ -732,7 +717,7 @@
       "chapter": 2,
       "title": "Fizz Factory 8",
       "seed": "adv-2-8-23",
-      "moves": 27,
+      "moves": 16,
       "colorCount": 5,
       "goals": [
         {
@@ -757,13 +742,12 @@
         "ice": 7,
         "jelly": 4,
         "sleepy": 0,
-        "starburst": 0,
         "choco": 2
       },
       "starScore": [
-        9000,
-        12150,
-        15750
+        10480,
+        16244,
+        23056
       ]
     },
     {
@@ -771,7 +755,7 @@
       "chapter": 2,
       "title": "Fizz Factory 9",
       "seed": "adv-2-9-24",
-      "moves": 27,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -796,13 +780,12 @@
         "ice": 8,
         "jelly": 4,
         "sleepy": 0,
-        "starburst": 0,
         "choco": 2
       },
       "starScore": [
-        9200,
-        12420,
-        16100
+        10780,
+        16709,
+        23716
       ]
     },
     {
@@ -810,7 +793,7 @@
       "chapter": 2,
       "title": "Fizz Factory 10",
       "seed": "adv-2-10-25",
-      "moves": 27,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -839,9 +822,9 @@
         "choco": 2
       },
       "starScore": [
-        9400,
-        12690,
-        16450
+        11080,
+        17174,
+        24376
       ],
       "tutorialTip": "starburst"
     },
@@ -850,7 +833,7 @@
       "chapter": 2,
       "title": "Fizz Factory 11",
       "seed": "adv-2-11-26",
-      "moves": 27,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -879,9 +862,9 @@
         "choco": 2
       },
       "starScore": [
-        9600,
-        12960,
-        16800
+        11380,
+        17639,
+        25036
       ]
     },
     {
@@ -889,7 +872,7 @@
       "chapter": 2,
       "title": "Fizz Factory 12",
       "seed": "adv-2-12-27",
-      "moves": 27,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -918,9 +901,9 @@
         "choco": 3
       },
       "starScore": [
-        9800,
-        13230,
-        17150
+        11680,
+        18104,
+        25696
       ]
     },
     {
@@ -928,7 +911,7 @@
       "chapter": 2,
       "title": "Fizz Factory 13",
       "seed": "adv-2-13-28",
-      "moves": 26,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -957,9 +940,9 @@
         "choco": 3
       },
       "starScore": [
-        10000,
-        13500,
-        17500
+        11980,
+        18569,
+        26356
       ]
     },
     {
@@ -967,7 +950,7 @@
       "chapter": 2,
       "title": "Fizz Factory 14",
       "seed": "adv-2-14-29",
-      "moves": 26,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -996,9 +979,9 @@
         "choco": 3
       },
       "starScore": [
-        10200,
-        13770,
-        17850
+        12280,
+        19034,
+        27016
       ]
     },
     {
@@ -1006,7 +989,7 @@
       "chapter": 2,
       "title": "Fizz Factory 15",
       "seed": "adv-2-15-30",
-      "moves": 26,
+      "moves": 15,
       "colorCount": 5,
       "goals": [
         {
@@ -1028,8 +1011,8 @@
         },
         {
           "type": "score_moves",
-          "score": 10400,
-          "moves": 26
+          "score": 12580,
+          "moves": 15
         }
       ],
       "blockers": {
@@ -1040,9 +1023,9 @@
         "choco": 3
       },
       "starScore": [
-        10400,
-        14040,
-        18200
+        12580,
+        19499,
+        27676
       ]
     },
     {
@@ -1050,8 +1033,8 @@
       "chapter": 3,
       "title": "Frost Fields 1",
       "seed": "adv-3-1-31",
-      "moves": 26,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
@@ -1079,9 +1062,9 @@
         "choco": 3
       },
       "starScore": [
-        11050,
-        14917,
-        19337
+        12440,
+        18411,
+        25501
       ]
     },
     {
@@ -1089,8 +1072,8 @@
       "chapter": 3,
       "title": "Frost Fields 2",
       "seed": "adv-3-2-32",
-      "moves": 26,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
@@ -1118,9 +1101,9 @@
         "choco": 4
       },
       "starScore": [
-        11250,
-        15187,
-        19687
+        12740,
+        18855,
+        26116
       ]
     },
     {
@@ -1128,8 +1111,8 @@
       "chapter": 3,
       "title": "Frost Fields 3",
       "seed": "adv-3-3-33",
-      "moves": 26,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
@@ -1157,9 +1140,9 @@
         "choco": 4
       },
       "starScore": [
-        11450,
-        15457,
-        20037
+        13040,
+        19299,
+        26731
       ]
     },
     {
@@ -1167,8 +1150,8 @@
       "chapter": 3,
       "title": "Frost Fields 4",
       "seed": "adv-3-4-34",
-      "moves": 26,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
@@ -1196,9 +1179,9 @@
         "choco": 4
       },
       "starScore": [
-        11650,
-        15727,
-        20387
+        13340,
+        19743,
+        27346
       ]
     },
     {
@@ -1206,12 +1189,12 @@
       "chapter": 3,
       "title": "Frost Fields 5",
       "seed": "adv-3-5-35",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 5,
+          "color": 0,
           "count": 17
         },
         {
@@ -1235,9 +1218,9 @@
         "choco": 4
       },
       "starScore": [
-        11850,
-        15997,
-        20737
+        13640,
+        20187,
+        27961
       ]
     },
     {
@@ -1245,12 +1228,12 @@
       "chapter": 3,
       "title": "Frost Fields 6",
       "seed": "adv-3-6-36",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 0,
+          "color": 1,
           "count": 18
         },
         {
@@ -1274,9 +1257,9 @@
         "choco": 4
       },
       "starScore": [
-        12050,
-        16267,
-        21087
+        13940,
+        20631,
+        28576
       ]
     },
     {
@@ -1284,12 +1267,12 @@
       "chapter": 3,
       "title": "Frost Fields 7",
       "seed": "adv-3-7-37",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 1,
+          "color": 2,
           "count": 19
         },
         {
@@ -1313,9 +1296,9 @@
         "choco": 5
       },
       "starScore": [
-        12250,
-        16537,
-        21437
+        14240,
+        21075,
+        29191
       ]
     },
     {
@@ -1323,12 +1306,12 @@
       "chapter": 3,
       "title": "Frost Fields 8",
       "seed": "adv-3-8-38",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 2,
+          "color": 3,
           "count": 20
         },
         {
@@ -1352,9 +1335,9 @@
         "choco": 5
       },
       "starScore": [
-        12450,
-        16807,
-        21787
+        14540,
+        21519,
+        29806
       ]
     },
     {
@@ -1362,12 +1345,12 @@
       "chapter": 3,
       "title": "Frost Fields 9",
       "seed": "adv-3-9-39",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 13,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 3,
+          "color": 4,
           "count": 21
         },
         {
@@ -1391,9 +1374,9 @@
         "choco": 5
       },
       "starScore": [
-        12650,
-        17077,
-        22137
+        14840,
+        21963,
+        30421
       ]
     },
     {
@@ -1401,12 +1384,12 @@
       "chapter": 3,
       "title": "Frost Fields 10",
       "seed": "adv-3-10-40",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 4,
+          "color": 0,
           "count": 22
         },
         {
@@ -1430,9 +1413,9 @@
         "choco": 5
       },
       "starScore": [
-        12850,
-        17347,
-        22487
+        15140,
+        22407,
+        31036
       ]
     },
     {
@@ -1440,12 +1423,12 @@
       "chapter": 3,
       "title": "Frost Fields 11",
       "seed": "adv-3-11-41",
-      "moves": 25,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 5,
+          "color": 1,
           "count": 23
         },
         {
@@ -1469,9 +1452,9 @@
         "choco": 5
       },
       "starScore": [
-        13050,
-        17617,
-        22837
+        15440,
+        22851,
+        31651
       ]
     },
     {
@@ -1479,12 +1462,12 @@
       "chapter": 3,
       "title": "Frost Fields 12",
       "seed": "adv-3-12-42",
-      "moves": 24,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 0,
+          "color": 2,
           "count": 24
         },
         {
@@ -1508,9 +1491,9 @@
         "choco": 6
       },
       "starScore": [
-        13250,
-        17887,
-        23187
+        15740,
+        23295,
+        32266
       ]
     },
     {
@@ -1518,12 +1501,12 @@
       "chapter": 3,
       "title": "Frost Fields 13",
       "seed": "adv-3-13-43",
-      "moves": 24,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 1,
+          "color": 3,
           "count": 25
         },
         {
@@ -1547,9 +1530,9 @@
         "choco": 6
       },
       "starScore": [
-        13450,
-        18157,
-        23537
+        16040,
+        23739,
+        32882
       ]
     },
     {
@@ -1557,12 +1540,12 @@
       "chapter": 3,
       "title": "Frost Fields 14",
       "seed": "adv-3-14-44",
-      "moves": 24,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 2,
+          "color": 4,
           "count": 26
         },
         {
@@ -1586,9 +1569,9 @@
         "choco": 6
       },
       "starScore": [
-        13650,
-        18427,
-        23887
+        16340,
+        24183,
+        33497
       ]
     },
     {
@@ -1596,12 +1579,12 @@
       "chapter": 3,
       "title": "Frost Fields 15",
       "seed": "adv-3-15-45",
-      "moves": 24,
-      "colorCount": 6,
+      "moves": 12,
+      "colorCount": 5,
       "goals": [
         {
           "type": "clear_color",
-          "color": 3,
+          "color": 0,
           "count": 26
         },
         {
@@ -1618,8 +1601,8 @@
         },
         {
           "type": "score_moves",
-          "score": 13850,
-          "moves": 24
+          "score": 16640,
+          "moves": 12
         }
       ],
       "blockers": {
@@ -1630,9 +1613,9 @@
         "choco": 6
       },
       "starScore": [
-        13850,
-        18697,
-        24237
+        16640,
+        24627,
+        34112
       ]
     },
     {
@@ -1640,7 +1623,7 @@
       "chapter": 4,
       "title": "Choco Cavern 1",
       "seed": "adv-4-1-46",
-      "moves": 24,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1669,9 +1652,9 @@
         "choco": 6
       },
       "starScore": [
-        14500,
-        19575,
-        25375
+        16500,
+        24420,
+        33825
       ]
     },
     {
@@ -1679,7 +1662,7 @@
       "chapter": 4,
       "title": "Choco Cavern 2",
       "seed": "adv-4-2-47",
-      "moves": 24,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1708,9 +1691,9 @@
         "choco": 7
       },
       "starScore": [
-        14700,
-        19845,
-        25725
+        16800,
+        24864,
+        34440
       ]
     },
     {
@@ -1718,7 +1701,7 @@
       "chapter": 4,
       "title": "Choco Cavern 3",
       "seed": "adv-4-3-48",
-      "moves": 24,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1747,9 +1730,9 @@
         "choco": 7
       },
       "starScore": [
-        14900,
-        20115,
-        26075
+        17100,
+        25308,
+        35055
       ]
     },
     {
@@ -1757,7 +1740,7 @@
       "chapter": 4,
       "title": "Choco Cavern 4",
       "seed": "adv-4-4-49",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1786,9 +1769,9 @@
         "choco": 7
       },
       "starScore": [
-        15100,
-        20385,
-        26425
+        17400,
+        25752,
+        35670
       ]
     },
     {
@@ -1796,7 +1779,7 @@
       "chapter": 4,
       "title": "Choco Cavern 5",
       "seed": "adv-4-5-50",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1825,9 +1808,9 @@
         "choco": 7
       },
       "starScore": [
-        15300,
-        20655,
-        26775
+        17700,
+        26196,
+        36285
       ]
     },
     {
@@ -1835,7 +1818,7 @@
       "chapter": 4,
       "title": "Choco Cavern 6",
       "seed": "adv-4-6-51",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1864,9 +1847,9 @@
         "choco": 7
       },
       "starScore": [
-        15500,
-        20925,
-        27125
+        18000,
+        26640,
+        36900
       ]
     },
     {
@@ -1874,7 +1857,7 @@
       "chapter": 4,
       "title": "Choco Cavern 7",
       "seed": "adv-4-7-52",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1903,9 +1886,9 @@
         "choco": 8
       },
       "starScore": [
-        15700,
-        21195,
-        27475
+        18300,
+        27084,
+        37515
       ]
     },
     {
@@ -1913,7 +1896,7 @@
       "chapter": 4,
       "title": "Choco Cavern 8",
       "seed": "adv-4-8-53",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1942,9 +1925,9 @@
         "choco": 8
       },
       "starScore": [
-        15900,
-        21465,
-        27825
+        18600,
+        27528,
+        38130
       ]
     },
     {
@@ -1952,7 +1935,7 @@
       "chapter": 4,
       "title": "Choco Cavern 9",
       "seed": "adv-4-9-54",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -1981,9 +1964,9 @@
         "choco": 8
       },
       "starScore": [
-        16100,
-        21735,
-        28175
+        18900,
+        27972,
+        38745
       ]
     },
     {
@@ -1991,7 +1974,7 @@
       "chapter": 4,
       "title": "Choco Cavern 10",
       "seed": "adv-4-10-55",
-      "moves": 23,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2020,9 +2003,9 @@
         "choco": 8
       },
       "starScore": [
-        16300,
-        22005,
-        28525
+        19200,
+        28416,
+        39360
       ]
     },
     {
@@ -2030,7 +2013,7 @@
       "chapter": 4,
       "title": "Choco Cavern 11",
       "seed": "adv-4-11-56",
-      "moves": 22,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2059,9 +2042,9 @@
         "choco": 8
       },
       "starScore": [
-        16500,
-        22275,
-        28875
+        19500,
+        28860,
+        39975
       ]
     },
     {
@@ -2069,7 +2052,7 @@
       "chapter": 4,
       "title": "Choco Cavern 12",
       "seed": "adv-4-12-57",
-      "moves": 22,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2098,9 +2081,9 @@
         "choco": 9
       },
       "starScore": [
-        16700,
-        22545,
-        29225
+        19800,
+        29304,
+        40590
       ]
     },
     {
@@ -2108,7 +2091,7 @@
       "chapter": 4,
       "title": "Choco Cavern 13",
       "seed": "adv-4-13-58",
-      "moves": 22,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2137,9 +2120,9 @@
         "choco": 9
       },
       "starScore": [
-        16900,
-        22815,
-        29575
+        20100,
+        29748,
+        41205
       ]
     },
     {
@@ -2147,7 +2130,7 @@
       "chapter": 4,
       "title": "Choco Cavern 14",
       "seed": "adv-4-14-59",
-      "moves": 22,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2176,9 +2159,9 @@
         "choco": 9
       },
       "starScore": [
-        17100,
-        23085,
-        29925
+        20400,
+        30192,
+        41820
       ]
     },
     {
@@ -2186,7 +2169,7 @@
       "chapter": 4,
       "title": "Choco Cavern 15",
       "seed": "adv-4-15-60",
-      "moves": 22,
+      "moves": 12,
       "colorCount": 6,
       "goals": [
         {
@@ -2208,8 +2191,8 @@
         },
         {
           "type": "score_moves",
-          "score": 17300,
-          "moves": 22
+          "score": 20700,
+          "moves": 12
         }
       ],
       "blockers": {
@@ -2220,9 +2203,9 @@
         "choco": 9
       },
       "starScore": [
-        17300,
-        23355,
-        30275
+        20700,
+        30636,
+        42434
       ]
     }
   ]

@@ -31,14 +31,15 @@
  * .meta-map-node.done { background: #e8fff4; border-color: #2fdb8e; }
  */
 
-import { ADVENTURE_LEVELS, chapterLevelRange, type AdventureLevelDef } from '../adventure/levels'
-import { CHAPTER_STAR_GATES, chapterUnlocked, starsNeededForChapter } from '../adventure/chapters'
+import { ADVENTURE_LEVELS, type AdventureLevelDef } from '../adventure/levels'
+import { CHAPTER_STAR_GATES, chapterUnlocked } from '../adventure/chapters'
 import { PLUSH_ICONS } from './plushIcons'
 import { ACHIEVEMENTS, countUnlocked } from '../meta/achievements'
 import { CATALOGUE, getCatalogItem, isOwned, meetsGates, type CatalogItem } from '../meta/catalogue'
 import { MISSION_POOL, ensureDailyMissions, missionDef } from '../meta/missions'
 import { xpToNextLevel } from '../meta/progression'
 import type { SaveV3 } from '../meta/save'
+import { queueToast } from './toastQueue'
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -51,11 +52,22 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-function iconBtn(label: string, iconHtml: string, action?: string): HTMLButtonElement {
+function iconBtn(
+  label: string,
+  iconHtml: string,
+  action?: string,
+  onAction?: (action: string) => void,
+): HTMLButtonElement {
   const b = el('button', 'ui pill meta-card tap')
   b.type = 'button'
   b.style.minHeight = '48px'
   if (action) b.dataset.action = action
+  if (action && onAction) {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      onAction(action)
+    })
+  }
   const ico = el('span', 'meta-ico')
   ico.innerHTML = iconHtml
   ico.setAttribute('aria-hidden', 'true')
@@ -81,41 +93,47 @@ export function renderMap(save: SaveV3, opts: MapRenderOpts = {}): HTMLElement {
 
   const chapterUnlockedOk = chapterUnlocked(save.adventure.chapterStars, chapter)
   if (!chapterUnlockedOk) {
-    const need = starsNeededForChapter(save.adventure.chapterStars, chapter)
-    const lock = el('p', 'meta-sub chapter-lock', `Need ${need} more ★ from Ch ${chapter - 1} (have ${CHAPTER_STAR_GATES[chapter]} total)`)
+    const need = CHAPTER_STAR_GATES[chapter]
+    const lock = el('p', 'meta-sub chapter-lock', `Need ${need} ★ — you have ${save.profile.stars}`)
     panel.append(head, lock)
     const scrim = el('div', 'meta-scrim')
     scrim.append(panel)
     return scrim
   }
 
-  const row = el('div', 'meta-map-row')
-  for (const level of chapterLevelRange(chapter)) {
+  const scroll = el('div', 'meta-map-scroll')
+  const path = el('div', 'meta-map-path')
+  const frontier = save.adventure.frontier
+  let lastCh = 0
+  for (const level of ADVENTURE_LEVELS) {
+    if (level.chapter !== lastCh) {
+      lastCh = level.chapter
+      const banner = el('div', 'meta-chapter-banner', `Chapter ${level.chapter}`)
+      path.append(banner)
+    }
     const prog = save.adventure.levels[String(level.id)]
-    const locked = level.id > save.adventure.frontier
-    const node = el('button', 'meta-map-node ui' + (locked ? ' locked' : prog?.stars ? ' done' : ''))
+    const locked = level.id > frontier
+    const current = level.id === frontier
+    const node = el('button', 'meta-map-node ui map-path-node' + (locked ? ' locked' : prog?.stars ? ' done' : '') + (current ? ' current' : ''))
     node.type = 'button'
-    node.style.minWidth = '52px'
-    node.style.minHeight = '52px'
-    const label = el('span', '', locked ? '🔒' : String(level.id))
+    node.style.alignSelf = level.id % 2 === 0 ? 'flex-end' : 'flex-start'
+    const label = el('span', 'map-node-num', locked ? '🔒' : String(level.id))
     node.append(label)
+    if (current) node.append(el('span', 'map-pip-bounce', '🍡'))
     node.title = level.title
     node.disabled = locked
-    node.dataset.levelId = String(level.id)
+    if (prog?.stars) {
+      const cap = el('span', 'meta-sub map-stars', '★'.repeat(prog.stars))
+      node.append(cap)
+    }
     if (!locked && opts.onPickLevel) {
       node.addEventListener('click', () => opts.onPickLevel!(level))
     }
-    if (prog?.stars) {
-      const cap = el('span', 'meta-sub', '★'.repeat(prog.stars))
-      cap.style.display = 'block'
-      cap.style.fontSize = '10px'
-      node.append(cap)
-    }
-    row.append(node)
+    path.append(node)
   }
-
-  const hint = el('p', 'meta-sub', 'Tap a level to play!')
-  panel.append(head, row, hint)
+  scroll.append(path)
+  const hint = el('p', 'meta-sub', 'Follow the candy path — tap a level!')
+  panel.append(head, scroll, hint)
   const scrim = el('div', 'meta-scrim')
   scrim.append(panel)
   return scrim
@@ -126,14 +144,20 @@ export type ShopRenderOpts = {
   onEquip?: (item: CatalogItem) => void
 }
 
+export type CollectionRenderOpts = {
+  onEquip?: (item: CatalogItem) => void
+}
+
 export function renderShop(save: SaveV3, opts: ShopRenderOpts = {}): HTMLElement {
   const panel = el('div', 'meta-panel')
   const head = el('div', 'meta-head')
-  head.append(el('h2', 'meta-title', 'Sugar Shop'), el('span', 'meta-chip', `⭐ ${save.profile.stars}`))
+  const headCoins = el('span', 'meta-chip', `🪙 ${save.profile.coins}`)
+  head.append(el('h2', 'meta-title', 'Sugar Shop'), headCoins, el('span', 'meta-chip', `⭐ ${save.profile.stars}`))
   const grid = el('div', 'meta-grid cols-2')
 
   for (const item of CATALOGUE) {
-    if (item.priceStars === 0 && isOwned(save, item.id)) continue
+    if (item.id === 'classic' && isOwned(save, item.id)) continue
+    if (item.priceStars === 0 && item.priceCoins == null && isOwned(save, item.id)) continue
     const owned = isOwned(save, item.id)
     const equipped =
       (item.kind === 'skin' && save.equipped.skin === item.id) ||
@@ -158,11 +182,30 @@ export function renderShop(save: SaveV3, opts: ShopRenderOpts = {}): HTMLElement
           ? `🪙 ${item.priceCoins}`
           : `⭐ ${item.priceStars}`
     body.append(el('div', 'meta-sub', price))
+    const actions = el('div', 'meta-shop-actions')
+    if (owned) {
+      if (!equipped) {
+        const eq = el('button', 'ui pill primary meta-equip-btn', 'Equip')
+        eq.type = 'button'
+        eq.addEventListener('click', (ev) => {
+          ev.stopPropagation()
+          opts.onEquip?.(item)
+        })
+        actions.append(eq)
+      } else {
+        actions.append(el('span', 'meta-equipped-tick', '✓ Equipped'))
+      }
+    } else if (!locked) {
+      const buy = el('button', 'ui pill primary meta-buy-btn', item.priceCoins != null ? 'Buy' : 'Get')
+      buy.type = 'button'
+      buy.addEventListener('click', (ev) => {
+        ev.stopPropagation()
+        opts.onBuy?.(item)
+      })
+      actions.append(buy)
+    }
+    body.append(actions)
     card.append(em, body)
-    card.addEventListener('click', () => {
-      if (owned) opts.onEquip?.(item)
-      else if (!locked) opts.onBuy?.(item)
-    })
     grid.append(card)
   }
 
@@ -199,7 +242,7 @@ export function renderAchievements(save: SaveV3): HTMLElement {
   return scrim
 }
 
-export function renderCollection(save: SaveV3): HTMLElement {
+export function renderCollection(save: SaveV3, opts: CollectionRenderOpts = {}): HTMLElement {
   const panel = el('div', 'meta-panel')
   const head = el('div', 'meta-head')
   const lvl = save.profile.level
@@ -223,13 +266,18 @@ export function renderCollection(save: SaveV3): HTMLElement {
         (kind === 'skin' && save.equipped.skin === id) ||
         (kind === 'theme' && save.equipped.theme === id) ||
         (kind === 'pop' && save.equipped.pop === id)
-      const card = el('div', 'meta-card')
+      const card = el('button', 'meta-card tap ui')
+      card.type = 'button'
       card.style.minHeight = '48px'
+      card.style.width = '100%'
       const em = el('span', 'meta-emoji', item.emoji)
       const body = el('div')
       body.append(el('div', 'meta-label', item.name))
-      body.append(el('div', 'meta-sub', equipped ? 'On' : 'Ready'))
+      body.append(el('div', 'meta-sub', equipped ? '✓ Equipped' : 'Tap to equip'))
       card.append(em, body)
+      if (!equipped && opts.onEquip) {
+        card.addEventListener('click', () => opts.onEquip!(item))
+      } else if (equipped) card.disabled = true
       row.append(card)
     }
     sec.append(row)
@@ -261,30 +309,21 @@ export function renderCollection(save: SaveV3): HTMLElement {
   return scrim
 }
 
-let toastTimer: ReturnType<typeof setTimeout> | null = null
-
 export function showToast(message: string, emoji = '✨'): HTMLElement {
-  if (toastTimer) clearTimeout(toastTimer)
-  document.querySelectorAll('.meta-toast').forEach((n) => n.remove())
-  const toast = el('div', 'meta-toast ui')
-  toast.setAttribute('role', 'status')
-  toast.textContent = `${emoji} ${message}`
-  document.body.append(toast)
-  toastTimer = setTimeout(() => {
-    toast.remove()
-    toastTimer = null
-  }, 2800)
-  return toast
+  queueToast(message, emoji)
+  const stub = el('div')
+  stub.style.display = 'none'
+  return stub
 }
 
-export function renderMetaDock(save: SaveV3): HTMLElement {
+export function renderMetaDock(save: SaveV3, onAction?: (action: string) => void): HTMLElement {
   const dock = el('div', 'meta-grid cols-2')
   dock.style.gap = '8px'
   dock.append(
-    iconBtn('Adventure', PLUSH_ICONS.map, 'map'),
-    iconBtn('Shop', PLUSH_ICONS.shop, 'shop'),
-    iconBtn('Stickers', PLUSH_ICONS.stickers, 'achievements'),
-    iconBtn('Collection', PLUSH_ICONS.bag, 'collection'),
+    iconBtn('Adventure', PLUSH_ICONS.map, 'map', onAction),
+    iconBtn('Shop', PLUSH_ICONS.shop, 'shop', onAction),
+    iconBtn('Stickers', PLUSH_ICONS.stickers, 'achievements', onAction),
+    iconBtn('Collection', PLUSH_ICONS.bag, 'collection', onAction),
   )
   dock.dataset.stars = String(save.profile.stars)
   dock.dataset.level = String(save.profile.level)

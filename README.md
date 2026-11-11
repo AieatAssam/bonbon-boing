@@ -12,7 +12,7 @@
 2. **Release** to squish-pop — each note climbs the squeak ladder.
 3. **Boing Bomb** (5+ chain): drag through the bomb to pop neighbours.
 4. **Rainbow** (7+ chain): clears that colour from the board.
-5. **Starburst** (lucky 6-chain): sparkly 3×3 blast!
+5. **Starburst** (Adventure level 25+): on a 5–6 link chain you have an **18%** chance to spawn a sparkly 3×3 blast instead of a bomb.
 
 The first visit shows a glossy white-glove hint (no wall-of-text tutorial). Drag back along the chain to undo the last step.
 
@@ -28,6 +28,7 @@ The first visit shows a glossy white-glove hint (no wall-of-text tutorial). Drag
 ## Meta & collection
 
 - **Sugar Stars** ⭐ — earn from runs, missions, and Adventure stars; spend in the **Shop**.
+- **Coins** 🪙 — earn from runs and missions; buy coin-priced skins such as **Macaron** (🪙 55 in the Shop once you own the gates).
 - **Bonbon skins** — classic plush, macaron, gummy, mochi, jelly bean, star cookie (shape + colour marks for colour-blind play).
 - **Board themes** — candy sky, night sprinkle, beach, winter frost, space jelly.
 - **Pop trails** — sparkle, hearts, bubbles, confetti.
@@ -41,8 +42,8 @@ Everything saves in `localStorage` (`bonbon-boing-v3`) with migration from older
 ## Controls
 
 - **Pause** / **Home** on the HUD; **Back** / **Esc** opens pause then menu.
-- **Sound** / **Music** toggles persist.
-- Title shortcuts: **Map**, **Shop**, **Stickers**, **Bag** (collection + missions).
+- **Settings** (gear, top corner): **Sound** / **Music** toggles persist.
+- Title shortcuts: **Adventure**, **Shop**, **Stickers**, **Collection** (each opens a scrollable panel).
 
 ## Tech
 
@@ -74,7 +75,7 @@ QA hooks: `?qa` exposes `window.__qa` (no audio context). Layout captures: `&scr
 - Audio: CC0 — see [CREDITS.md](CREDITS.md) and `assets-src/audio/SOURCES.md`
 - Fonts: Fredoka & Nunito (SIL OFL 1.1)
 - Meta design patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, adventure map, missions).
-- Tutorial glove is drawn in-engine (plush style); Kenney CC0 packs listed in CREDITS for other UI inspiration.
+- Tutorial pointer glove is drawn in-engine; silhouette inspired by Kenney Cursor Pack (CC0) — see [CREDITS.md](CREDITS.md).
 
 Bonbon Boing! is an independent fan-made game. It is not affiliated with, endorsed by or sponsored by PopCap/EA, Taito, Aladdin X, Disney, SEGA, Sony, Nintendo/HAL Laboratory, Jazwares or Mediatonic. All names are trademarks of their owners.
 

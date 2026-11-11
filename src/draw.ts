@@ -925,6 +925,7 @@ function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
   ctx.closePath()
 }
 
+/** White-glove pointer (fingertip at x,y); silhouette inspired by Kenney Cursor Pack (CC0). */
 function drawHand(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -933,51 +934,67 @@ function drawHand(
   down: boolean,
   alpha: number,
 ) {
-  const s = D / 62
+  const s = D / 56
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.translate(x, y)
-  const sy = down ? 0.9 : 1
-  const sx = down ? 1.06 : 1
-  ctx.scale(s * sx, s * sy)
-  ctx.fillStyle = 'rgba(42, 18, 36, 0.18)'
+  ctx.rotate(-0.36)
+  const press = down ? 0.94 : 1
+  ctx.scale(s * press, s * press)
+  ctx.fillStyle = 'rgba(42, 18, 36, 0.16)'
   ctx.beginPath()
-  ctx.ellipse(4, 16, 20, 9, 0, 0, Math.PI * 2)
+  ctx.ellipse(6, 22, 18, 8, 0.3, 0, Math.PI * 2)
   ctx.fill()
-  const glove = ctx.createLinearGradient(-18, -22, 22, 28)
+  const glove = ctx.createLinearGradient(-16, -8, 18, 38)
   glove.addColorStop(0, '#FFFFFF')
-  glove.addColorStop(0.45, '#FFF6FB')
-  glove.addColorStop(1, '#FFE8F4')
+  glove.addColorStop(0.5, '#FFF8FC')
+  glove.addColorStop(1, '#FFE6F2')
   ctx.fillStyle = glove
   ctx.strokeStyle = '#3A1530'
-  ctx.lineWidth = 3.2
+  ctx.lineWidth = 3.1
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  const fingers = [
-    [-14, -14, 5.5, 13],
-    [-5, -20, 6, 16],
-    [5, -21, 6, 17],
-    [14, -17, 5.5, 14],
+  // Index finger toward chain (origin = fingertip).
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(-4, 10)
+  ctx.quadraticCurveTo(-5, 22, -3, 34)
+  ctx.quadraticCurveTo(-2, 40, 2, 42)
+  ctx.lineTo(6, 40)
+  ctx.quadraticCurveTo(9, 32, 8, 18)
+  ctx.quadraticCurveTo(7, 8, 0, 0)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  // Curled middle / ring / pinky nubs on palm.
+  const nubs: [number, number, number][] = [
+    [-12, 30, 7],
+    [-4, 36, 7.5],
+    [6, 36, 7],
   ]
-  for (const [fx, fy, fw, fh] of fingers) {
+  for (const [nx, ny, nr] of nubs) {
     ctx.beginPath()
-    ctx.roundRect(fx - fw / 2, fy, fw, fh, fw * 0.45)
+    ctx.arc(nx, ny, nr, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
   }
+  // Palm + wrist.
   ctx.beginPath()
-  ctx.roundRect(-20, 0, 40, 26, 14)
+  ctx.roundRect(-16, 38, 34, 24, 12)
   ctx.fill()
   ctx.stroke()
+  // Thumb.
   ctx.beginPath()
-  ctx.roundRect(10, 6, 11, 9, 5)
-  ctx.fillStyle = '#FFD6EC'
+  ctx.moveTo(10, 44)
+  ctx.quadraticCurveTo(20, 38, 22, 28)
+  ctx.quadraticCurveTo(23, 22, 18, 20)
+  ctx.quadraticCurveTo(13, 22, 10, 30)
+  ctx.closePath()
   ctx.fill()
-  ctx.strokeStyle = '#3A1530'
   ctx.stroke()
-  ctx.fillStyle = '#FF8AB8'
+  ctx.fillStyle = '#FF9EC8'
   ctx.beginPath()
-  ctx.arc(-6, 10, 3.2, 0, Math.PI * 2)
+  ctx.arc(0, 4, 2.6, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 }

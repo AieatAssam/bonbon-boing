@@ -40,15 +40,17 @@ export function buildLevel(id: number): AdventureLevelDef {
   const chapter = (Math.ceil(id / 15) as 1 | 2 | 3 | 4)
   const indexInChapter = ((id - 1) % 15) + 1
   const tier = indexInChapter + (chapter - 1) * 3
-  const colorCount = Math.min(6, 3 + Math.floor((id - 1) / 10))
-  const moves = Math.max(14, 30 - Math.floor(id / 7))
-  const baseScore = 3500 + id * 200 + chapter * 450
+  const colorCount =
+    id <= 3 ? 3 : chapter === 1 && id < 8 ? 3 : chapter === 1 ? 4 : chapter === 2 ? 5 : Math.min(6, 4 + Math.floor(chapter / 2))
+  const moves =
+    id <= 3 ? 28 : id <= 7 ? 22 : chapter === 1 ? Math.max(16, 20 - Math.floor(id / 6)) : chapter === 2 ? Math.max(14, 18 - Math.floor(id / 8)) : Math.max(12, 16 - Math.floor(id / 10))
+  const baseScore = 3500 + id * 220 + chapter * 520 + tier * 80
 
   const blockers: BlockerHints = {}
   if (id >= 1) blockers.ice = Math.min(14, 2 + Math.floor(id / 4))
   if (id >= 5) blockers.jelly = Math.min(6, 1 + Math.floor((id - 4) / 6))
   if (id >= 10) blockers.sleepy = id % 9 === 0 || id === 12 ? 1 : 0
-  if (id >= 8) blockers.starburst = id % 11 === 0 ? 1 : 0
+  if (id >= 25) blockers.starburst = id % 11 === 0 ? 1 : 0
   if (chapter >= 3 || id >= 18) blockers.choco = Math.min(10, 1 + Math.floor((id - 17) / 5))
 
   const goals: AdventureGoal[] = []
@@ -61,10 +63,12 @@ export function buildLevel(id: number): AdventureLevelDef {
     goals.push({ type: 'score_moves', score: baseScore, moves: moves })
   }
 
+  const starMul: [number, number, number] =
+    id <= 3 ? [1, 1.22, 1.48] : chapter === 1 ? [1, 1.42, 1.95] : chapter === 2 ? [1, 1.55, 2.2] : [1, 1.48, 2.05]
   const starScore: [number, number, number] = [
     baseScore,
-    Math.floor(baseScore * 1.35),
-    Math.floor(baseScore * 1.75),
+    Math.floor(baseScore * starMul[1]),
+    Math.floor(baseScore * starMul[2]),
   ]
 
   let tutorialTip: string | undefined

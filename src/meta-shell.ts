@@ -13,7 +13,7 @@ import {
   showToast,
 } from './ui/metaDom'
 import { setCosmetics } from './draw'
-import { playUnlock } from './audio'
+import { queueToasts } from './ui/toastQueue'
 
 export type MetaLayer = {
   save: SaveV3
@@ -21,9 +21,10 @@ export type MetaLayer = {
   open: (which: 'map' | 'shop' | 'achievements' | 'collection', opts?: { mapChapter?: 1 | 2 | 3 | 4 }) => void
   close: () => void
   onRunEnd: (summary: RunSummary, extra?: AchievementFacts) => void
-  onAdventureEnd: (level: AdventureLevelDef, goal: AdventureGoalState) => void
+  onAdventureEnd: (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean) => void
   applyCosmetics: () => void
   touchStreak: () => void
+  notifyFacts: (facts: AchievementFacts) => void
 }
 
 function yesterday(d = new Date()): string {
@@ -64,8 +65,17 @@ export function createMetaLayer(
     slot.style.pointerEvents = 'none'
   }
 
+  const pushMetaHistory = () => {
+    try {
+      history.pushState({ meta: 1 }, '', location.href)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const open = (which: 'map' | 'shop' | 'achievements' | 'collection', opts?: { mapChapter?: 1 | 2 | 3 | 4 }) => {
     close()
+    pushMetaHistory()
     let panel: HTMLElement
     if (which === 'map') {
       panel = renderMap(save, {
@@ -98,7 +108,15 @@ export function createMetaLayer(
     } else if (which === 'achievements') {
       panel = renderAchievements(save)
     } else {
-      panel = renderCollection(save)
+      panel = renderCollection(save, {
+        onEquip: (item) => {
+          equip(save, item.id)
+          applyCosmetics()
+          showToast(`${item.name} on!`, item.emoji)
+          persist()
+          open('collection')
+        },
+      })
     }
     panel.style.pointerEvents = 'auto'
     const back = document.createElement('button')
@@ -111,7 +129,9 @@ export function createMetaLayer(
     back.style.pointerEvents = 'auto'
     back.textContent = 'Back'
     back.addEventListener('click', () => close())
-    panel.append(back)
+    const inner = panel.querySelector('.meta-panel')
+    if (inner) inner.append(back)
+    else panel.append(back)
     openEl = panel
     slot.append(panel)
     slot.style.pointerEvents = 'auto'
@@ -155,29 +175,41 @@ export function createMetaLayer(
       mode: summary.mode === 'adventure' ? 'adventure' : summary.mode,
       runs: save.stats.runs,
     }
-    const unlocked = grantAchievements(save, facts)
-    for (const a of unlocked) {
-      playUnlock()
-      showToast(a.toast, a.emoji)
-    }
+    const unlocked = summary.mode === 'adventure' ? [] : grantAchievements(save, facts)
+    if (unlocked.length) queueToasts(unlocked.map((a) => ({ toast: a.toast, emoji: a.emoji })))
     if (lvl.leveled) showToast(`Level ${lvl.to}!`, '🎂')
     persist()
   }
 
-  const onAdventureEnd = (level: AdventureLevelDef, goal: AdventureGoalState) => {
+  const notifyFacts = (facts: AchievementFacts) => {
+    const unlocked = grantAchievements(save, facts)
+    if (unlocked.length) {
+      queueToasts(unlocked.map((a) => ({ toast: a.toast, emoji: a.emoji })))
+      persist()
+    }
+  }
+
+  const onAdventureEnd = (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean) => {
     const ev = evaluateStars(goal, level)
     const key = String(level.id)
     const prior = save.adventure.levels[key]
     const best = Math.max(prior?.bestScore ?? 0, goal.score)
-    const stars = Math.max(prior?.stars ?? 0, ev.stars) as 0 | 1 | 2 | 3
+    const prevStars = prior?.stars ?? 0
+    const stars = won ? (Math.max(prevStars, ev.stars) as 0 | 1 | 2 | 3) : (prevStars as 0 | 1 | 2 | 3)
+    const starGain = won ? stars - prevStars : 0
     save.adventure.levels[key] = { stars, bestScore: best }
-    if (ev.goalMet) {
+    if (won) {
+      notifyFacts({ adventureLevel: level.id, stars: starGain, won: true, mode: 'adventure' })
+    }
+    if (won) {
       save.stats.adventureWins += 1
       if (level.id >= save.adventure.frontier) save.adventure.frontier = level.id + 1
-      save.profile.stars += stars
+      if (starGain > 0) save.profile.stars += starGain
+      if (starGain > 0) {
+        const ch = String(level.chapter)
+        save.adventure.chapterStars[ch] = (save.adventure.chapterStars[ch] ?? 0) + starGain
+      }
     }
-    save.adventure.chapterStars[String(level.chapter)] =
-      (save.adventure.chapterStars[String(level.chapter)] ?? 0) + stars
     onRunEnd(
       {
         mode: 'adventure',
@@ -187,10 +219,10 @@ export function createMetaLayer(
         bombs: goal.bombsPopped,
         rainbows: 0,
         pops: Object.values(goal.clearedByColor).reduce((a, b) => a + b, 0),
-        won: ev.goalMet,
-        starsEarned: stars,
+        won,
+        starsEarned: starGain,
       },
-      { adventureLevel: level.id, stars, won: ev.goalMet },
+      { adventureLevel: level.id, stars: starGain, won },
     )
   }
 
@@ -206,5 +238,11 @@ export function createMetaLayer(
     persist()
   }
 
-  return { save, persist, open, close, onRunEnd, onAdventureEnd, applyCosmetics, touchStreak }
+  if (typeof window !== 'undefined') {
+    addEventListener('popstate', () => {
+      if (openEl) close()
+    })
+  }
+
+  return { save, persist, open, close, onRunEnd, onAdventureEnd, applyCosmetics, touchStreak, notifyFacts }
 }
