@@ -1,6 +1,6 @@
 import type { AdventureLevelDef } from './adventure/levels'
 import { evaluateStars, type AdventureGoalState } from './adventure/goals'
-import { equip, purchase } from './meta/catalogue'
+import { equip, getCatalogItem, purchase } from './meta/catalogue'
 import { grantAchievements, type AchievementFacts } from './meta/achievements'
 import { applyMissionProgress, claimMission, ensureDailyMissions, missionDef } from './meta/missions'
 import { addXp, type RunSummary } from './meta/progression'
@@ -13,11 +13,12 @@ import {
   showToast,
 } from './ui/metaDom'
 import { setCosmetics } from './draw'
+import { playUnlock } from './audio'
 
 export type MetaLayer = {
   save: SaveV3
   persist: () => void
-  open: (which: 'map' | 'shop' | 'achievements' | 'collection') => void
+  open: (which: 'map' | 'shop' | 'achievements' | 'collection', opts?: { mapChapter?: 1 | 2 | 3 | 4 }) => void
   close: () => void
   onRunEnd: (summary: RunSummary, extra?: AchievementFacts) => void
   onAdventureEnd: (level: AdventureLevelDef, goal: AdventureGoalState) => void
@@ -63,11 +64,12 @@ export function createMetaLayer(
     slot.style.pointerEvents = 'none'
   }
 
-  const open = (which: 'map' | 'shop' | 'achievements' | 'collection') => {
+  const open = (which: 'map' | 'shop' | 'achievements' | 'collection', opts?: { mapChapter?: 1 | 2 | 3 | 4 }) => {
     close()
     let panel: HTMLElement
     if (which === 'map') {
       panel = renderMap(save, {
+        chapter: opts?.mapChapter,
         onPickLevel: (level) => {
           close()
           onAdventureStart(level)
@@ -80,7 +82,10 @@ export function createMetaLayer(
             showToast(`Got ${item.name}!`, item.emoji)
             persist()
             open('shop')
-          } else showToast('Need more Sugar Stars!', '⭐')
+          } else {
+            const cat = getCatalogItem(item.id)
+            showToast(cat?.priceCoins != null ? 'Need more coins!' : 'Need more Sugar Stars!', cat?.priceCoins != null ? '🪙' : '⭐')
+          }
         },
         onEquip: (item) => {
           equip(save, item.id)
@@ -151,9 +156,11 @@ export function createMetaLayer(
       runs: save.stats.runs,
     }
     const unlocked = grantAchievements(save, facts)
-    for (const a of unlocked) showToast(a.toast, a.emoji)
+    for (const a of unlocked) {
+      playUnlock()
+      showToast(a.toast, a.emoji)
+    }
     if (lvl.leveled) showToast(`Level ${lvl.to}!`, '🎂')
-    if (lvl.coinsGained > 0) showToast(`+${lvl.coinsGained} coins`, '🪙')
     persist()
   }
 

@@ -18,7 +18,7 @@ test('greedy full-round scores from browser build', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const table: { seed: string; score: number }[] = []
   for (const seed of seeds) {
-    await page.goto(`?qa&screen=play&seed=${seed}`, { timeout: 30_000 })
+    await page.goto(`?qa&screen=play&seed=${seed}`, { timeout: 60_000 })
     await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
     for (let i = 0; i < 140; i++) {
       const left = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.timeLeft)

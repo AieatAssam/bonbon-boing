@@ -9,23 +9,25 @@ export type CatalogItem = {
   emoji: string
   blurb: string
   priceStars: number
+  priceCoins?: number
   minLevel?: number
   needsAchievement?: string
 }
 
 export const CATALOGUE: CatalogItem[] = [
   { id: 'classic', kind: 'skin', name: 'Classic Pip', emoji: '🍡', blurb: 'The original squish!', priceStars: 0 },
-  { id: 'macaron', kind: 'skin', name: 'Macaron', emoji: '🥐', blurb: 'Crispy shell, soft heart.', priceStars: 8, minLevel: 2 },
-  { id: 'gummy', kind: 'skin', name: 'Gummy', emoji: '🐻', blurb: 'Wobble hero.', priceStars: 12, minLevel: 4 },
-  { id: 'mochi', kind: 'skin', name: 'Mochi', emoji: '🍥', blurb: 'Extra stretchy.', priceStars: 15, minLevel: 6 },
-  { id: 'jelly', kind: 'skin', name: 'Jelly', emoji: '🫧', blurb: 'Sparkle bounce.', priceStars: 18, minLevel: 8 },
+  { id: 'macaron', kind: 'skin', name: 'Macaron', emoji: '🥐', blurb: 'Crispy shell, soft heart.', priceStars: 0, priceCoins: 55, minLevel: 2 },
+  { id: 'gummy', kind: 'skin', name: 'Gummy', emoji: '🐻', blurb: 'Wobble hero.', priceStars: 0, priceCoins: 85, minLevel: 4 },
+  { id: 'mochi', kind: 'skin', name: 'Mochi', emoji: '🍥', blurb: 'Extra stretchy.', priceStars: 0, priceCoins: 110, minLevel: 6 },
+  { id: 'jelly', kind: 'skin', name: 'Jelly', emoji: '🫧', blurb: 'Sparkle bounce.', priceStars: 0, priceCoins: 140, minLevel: 8 },
   {
     id: 'starcookie',
     kind: 'skin',
     name: 'Star Cookie',
     emoji: '⭐',
     blurb: 'For sweet legends.',
-    priceStars: 25,
+    priceStars: 0,
+    priceCoins: 220,
     minLevel: 12,
     needsAchievement: 'chain_10',
   },
@@ -89,6 +91,10 @@ export function canPurchase(save: SaveV3, id: string): { ok: boolean; reason?: s
   if (!item) return { ok: false, reason: 'missing' }
   if (isOwned(save, id)) return { ok: false, reason: 'owned' }
   if (!meetsGates(save, item)) return { ok: false, reason: 'locked' }
+  if (item.kind === 'skin' && item.priceCoins != null) {
+    if (save.profile.coins < item.priceCoins) return { ok: false, reason: 'coins' }
+    return { ok: true }
+  }
   if (save.profile.stars < item.priceStars) return { ok: false, reason: 'stars' }
   return { ok: true }
 }
@@ -97,7 +103,8 @@ export function purchase(save: SaveV3, id: string): boolean {
   const check = canPurchase(save, id)
   if (!check.ok) return false
   const item = getCatalogItem(id)!
-  save.profile.stars -= item.priceStars
+  if (item.kind === 'skin' && item.priceCoins != null) save.profile.coins -= item.priceCoins
+  else save.profile.stars -= item.priceStars
   const list = ownedList(save, item.kind)
   if (!list.includes(id)) list.push(id)
   save.stats.shopPurchases += 1

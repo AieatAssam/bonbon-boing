@@ -600,9 +600,10 @@ function drawTray(ctx: CanvasRenderingContext2D, m: { x: number; y: number; w: n
   ctx.stroke()
   ctx.strokeStyle = 'rgba(255,255,255,0.65)'
   ctx.lineWidth = Math.max(2, D * 0.035)
+  const shineY = m.y + D * 0.22
   ctx.beginPath()
-  ctx.moveTo(m.x + D * 0.2, m.y + D * 0.12)
-  ctx.lineTo(m.x + m.w - D * 0.2, m.y + D * 0.12)
+  ctx.moveTo(m.x + D * 0.2, shineY)
+  ctx.lineTo(m.x + m.w - D * 0.2, shineY)
   ctx.stroke()
 }
 

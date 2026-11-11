@@ -36,13 +36,15 @@ export function xpFromRun(summary: RunSummary): number {
 }
 
 export function coinsFromRun(summary: RunSummary): number {
-  let coins = 2 + Math.floor(summary.score / 5000)
-  coins += Math.min(8, summary.chainLen)
-  coins += summary.bombs
-  coins += summary.rainbows * 2
-  if (summary.mode === 'cuddle') coins += 1
-  if (summary.won) coins += 3 + (summary.starsEarned ?? 0)
-  return Math.min(40, coins)
+  let coins = 14 + Math.floor(summary.score / 650)
+  coins += Math.min(16, summary.chainLen * 2)
+  coins += summary.bombs * 3
+  coins += summary.rainbows * 5
+  coins += Math.min(10, summary.combo * 2)
+  if (summary.mode === 'daily') coins += 6
+  if (summary.mode === 'cuddle') coins += 4
+  if (summary.won) coins += 8 + (summary.starsEarned ?? 0) * 4
+  return Math.min(90, coins)
 }
 
 export type LevelUpResult = {

@@ -1,3 +1,5 @@
+import levelsBundle from '../../public/data/adventure-levels.json'
+
 export type GoalType = 'clear_color' | 'pop_bombs' | 'score_moves' | 'break_ice' | 'clear_choco'
 
 export type AdventureGoal =
@@ -10,6 +12,9 @@ export type AdventureGoal =
 export type BlockerHints = {
   ice?: number
   choco?: number
+  jelly?: number
+  sleepy?: number
+  starburst?: number
 }
 
 export type AdventureLevelDef = {
@@ -22,6 +27,7 @@ export type AdventureLevelDef = {
   goals: AdventureGoal[]
   blockers: BlockerHints
   starScore: [number, number, number]
+  tutorialTip?: string
 }
 
 const CHAPTER_NAMES = ['Sugar Meadow', 'Fizz Factory', 'Frost Fields', 'Choco Cavern'] as const
@@ -30,43 +36,29 @@ function levelTitle(chapter: number, indexInChapter: number): string {
   return `${CHAPTER_NAMES[chapter - 1] ?? 'Trail'} ${indexInChapter}`
 }
 
-function buildLevel(id: number): AdventureLevelDef {
+export function buildLevel(id: number): AdventureLevelDef {
   const chapter = (Math.ceil(id / 15) as 1 | 2 | 3 | 4)
   const indexInChapter = ((id - 1) % 15) + 1
   const tier = indexInChapter + (chapter - 1) * 3
-  const colorCount = Math.min(6, 3 + Math.floor((id - 1) / 12))
-  const moves = Math.max(12, 28 - Math.floor(id / 8))
-  const baseScore = 4000 + id * 180 + chapter * 500
+  const colorCount = Math.min(6, 3 + Math.floor((id - 1) / 10))
+  const moves = Math.max(14, 30 - Math.floor(id / 7))
+  const baseScore = 3500 + id * 200 + chapter * 450
 
   const blockers: BlockerHints = {}
-  if (chapter >= 3) blockers.ice = Math.min(12, 2 + Math.floor(indexInChapter / 2))
-  if (chapter >= 4) blockers.choco = Math.min(10, 1 + Math.floor(indexInChapter / 3))
+  if (id >= 1) blockers.ice = Math.min(14, 2 + Math.floor(id / 4))
+  if (id >= 5) blockers.jelly = Math.min(6, 1 + Math.floor((id - 4) / 6))
+  if (id >= 10) blockers.sleepy = id % 9 === 0 || id === 12 ? 1 : 0
+  if (id >= 8) blockers.starburst = id % 11 === 0 ? 1 : 0
+  if (chapter >= 3 || id >= 18) blockers.choco = Math.min(10, 1 + Math.floor((id - 17) / 5))
 
   const goals: AdventureGoal[] = []
-  const phase = (id - 1) % 5
-
-  if (chapter === 1 || phase === 0 || phase === 1) {
-    const color = (id + chapter) % Math.max(3, colorCount)
-    const count = 10 + Math.floor(tier * 1.2)
-    goals.push({ type: 'clear_color', color, count })
-  }
-  if (chapter === 2 || phase === 2) {
-    goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 6) })
-  }
-  if (phase === 3 || chapter >= 2) {
-    const score = baseScore
-    const moveCap = moves + 4
-    if (goals.length < 2) goals.push({ type: 'score_moves', score, moves: moveCap })
-  }
-  if (chapter >= 3 && (phase === 4 || indexInChapter > 8)) {
-    goals.push({ type: 'break_ice', count: Math.min(8, 2 + Math.floor(tier / 4)) })
-  }
-  if (chapter >= 4 && indexInChapter > 5) {
-    goals.push({ type: 'clear_choco', count: Math.min(6, 2 + Math.floor(tier / 5)) })
-  }
-
-  if (goals.length === 0) {
-    goals.push({ type: 'clear_color', color: 0, count: 12 + tier })
+  const color = id % Math.max(3, colorCount)
+  goals.push({ type: 'clear_color', color, count: 8 + Math.floor(tier * 0.9) })
+  if (id >= 6) goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 10) })
+  if (id >= 3) goals.push({ type: 'break_ice', count: Math.min(10, 2 + Math.floor(id / 5)) })
+  if (id >= 20) goals.push({ type: 'clear_choco', count: Math.min(8, 2 + Math.floor((id - 19) / 6)) })
+  if (indexInChapter === 15) {
+    goals.push({ type: 'score_moves', score: baseScore, moves: moves })
   }
 
   const starScore: [number, number, number] = [
@@ -74,6 +66,13 @@ function buildLevel(id: number): AdventureLevelDef {
     Math.floor(baseScore * 1.35),
     Math.floor(baseScore * 1.75),
   ]
+
+  let tutorialTip: string | undefined
+  if (id === 1) tutorialTip = 'ice'
+  else if (id === 5) tutorialTip = 'jelly'
+  else if (id === 12) tutorialTip = 'sleepy'
+  else if (id === 18) tutorialTip = 'choco'
+  else if (id === 25) tutorialTip = 'starburst'
 
   return {
     id,
@@ -85,10 +84,15 @@ function buildLevel(id: number): AdventureLevelDef {
     goals,
     blockers,
     starScore,
+    tutorialTip,
   }
 }
 
-export const ADVENTURE_LEVELS: AdventureLevelDef[] = Array.from({ length: 60 }, (_, i) => buildLevel(i + 1))
+type LevelsFile = { version: number; levels: AdventureLevelDef[] }
+
+const bundled = levelsBundle as LevelsFile
+export const ADVENTURE_LEVELS: AdventureLevelDef[] =
+  bundled.levels?.length === 60 ? bundled.levels : Array.from({ length: 60 }, (_, i) => buildLevel(i + 1))
 
 export function levelById(id: number): AdventureLevelDef | undefined {
   return ADVENTURE_LEVELS.find((l) => l.id === id)

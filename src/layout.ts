@@ -9,6 +9,43 @@ export type Layout = {
   hud: number
 }
 
+/** Minimum top padding so row-0 ears/squash stay inside the mat (>= 0.25D ear rise + margin). */
+export function boardPadTop(D: number): number {
+  return Math.max(Math.round(D * 0.34), Math.ceil(D * 0.25) + Math.round(D * 0.1))
+}
+
+/** Ear tip offset above piece center in layout units (matches Canvas sprites). */
+export function earRiseAboveCenter(D: number, squashSy = 1): number {
+  const pieceD = D * 0.88
+  const r = pieceD * 0.5
+  const rise = r * 1.28 * squashSy
+  return rise + D * 0.02
+}
+
+export type EarBounds = {
+  gridTopY: number
+  spawnLineY: number
+  matTopY: number
+  matBottomY: number
+  row0CenterY: number
+  earTipY: number
+}
+
+export function earBoundsAtRest(L: Layout, piece: { r: number; c: number }, squashSy = 1): EarBounds {
+  const gridTopY = L.oy
+  const spawnLineY = L.oy + L.padTop
+  const matTopY = L.oy - L.D * 0.06
+  const matBottomY = L.oy + L.padTop + L.rows * L.D + L.D * 0.14
+  const row0CenterY = L.oy + L.padTop + (piece.r + 0.5) * L.D
+  const earTipY = row0CenterY - earRiseAboveCenter(L.D, squashSy)
+  return { gridTopY, spawnLineY, matTopY, matBottomY, row0CenterY, earTipY }
+}
+
+export function earsInsideMatAtRest(L: Layout, squashSy = 1): boolean {
+  const b = earBoundsAtRest(L, { r: 0, c: 0 }, squashSy)
+  return b.earTipY >= b.matTopY + 1 && b.row0CenterY <= b.matBottomY
+}
+
 export function boardLayout(w: number, h: number, insetTop = 0): Layout {
   const landscape = w > h
   const hud = Math.round(Math.min(landscape ? 72 : 84, Math.max(64, h * (landscape ? 0.07 : 0.09)))) + insetTop
@@ -33,7 +70,12 @@ export function boardLayout(w: number, h: number, insetTop = 0): Layout {
     while (rows * D > availH + 2 && rows > 5) rows -= 1
     D = Math.floor(Math.min(availW / cols, availH / rows))
     D = Math.min(96, Math.max(52, D))
-    padTop = Math.round(D * 0.18)
+    padTop = boardPadTop(D)
+    while (rows * D + padTop > availH + 1 && rows > 5) rows -= 1
+  D = Math.floor(Math.min(availW / cols, (availH - padTop) / Math.max(1, rows)))
+    D = Math.min(96, Math.max(52, D))
+    padTop = boardPadTop(D)
+    while (rows * D + padTop > availH + 1 && rows > 5) rows -= 1
     const gridW = cols * D
     const gridH = rows * D + padTop
     ox = Math.round((w - gridW) / 2)
@@ -46,10 +88,10 @@ export function boardLayout(w: number, h: number, insetTop = 0): Layout {
       D = Math.min(60, Math.max(52, Math.floor(availW / cols)))
     }
     const maxRows = h >= 900 ? 13 : 12
-    padTop = Math.round(D * 0.12)
+    padTop = boardPadTop(D)
     rows = Math.min(maxRows, Math.max(7, Math.floor((availH - padTop) / D)))
     for (let grow = 0; grow < 8; grow++) {
-      padTop = Math.round(D * 0.14)
+      padTop = boardPadTop(D)
       rows = Math.min(maxRows, Math.max(7, Math.floor((availH - padTop) / D)))
       const fill = (rows * D + padTop) / availH
       if ((fill >= 0.895 || D >= 59) && cols * D <= availW) break
@@ -57,7 +99,7 @@ export function boardLayout(w: number, h: number, insetTop = 0): Layout {
       if (cols * D > availW && cols > 5) cols -= 1
     }
     while (rows * D + padTop > availH && rows > 7) rows -= 1
-    padTop = Math.round(D * 0.14)
+    padTop = boardPadTop(D)
     const gridW = cols * D
     ox = Math.round((w - gridW) / 2)
     oy = Math.round(hud + pad)
@@ -89,4 +131,13 @@ export function titleHeroScale(w: number, h: number, D: number): number {
   if (landscape && w >= 1100) return Math.min(1.45, 0.95 + D / 90)
   if (!landscape && h >= 900) return Math.min(1.12, 0.92 + D / 120)
   return 1
+}
+
+/** Title-screen hero pile center — kept above the dock. */
+export function titleHeapCenter(w: number, h: number): { x: number; y: number } {
+  const landscape = w > h
+  return {
+    x: landscape ? w * 0.38 : w * 0.5,
+    y: landscape ? h * 0.52 : h * 0.33,
+  }
 }

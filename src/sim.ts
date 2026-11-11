@@ -337,7 +337,7 @@ function pickSpawnColor(state: GameState, colors: number[][], c: number, r: numb
     const cap = 6
     if (gridMaxCluster(colors, state.cols, state.rows) <= cap) return state.chainColor
   }
-  const buddyPull = state.lastChainLen >= 6 ? 0.22 : 0.14
+  const buddyPull = state.lastChainLen >= 7 ? 0.1 : 0.06
   if (buddy >= 0 && buddy < n && state.rng() < buddyPull && colorShareLive(state, buddy) < 0.28) {
     colors[r][c] = buddy
     const cap = state.rng() < 0.38 ? 7 : 6
@@ -1348,38 +1348,83 @@ export function createAdventureGame(level: AdventureLevelDef, cols: number, rows
   const cap = level.colorCount
   for (const p of state.pieces) {
     if (p.color >= cap) p.color = p.color % cap
+    if (p.kind === 'bonbon' && p.color >= cap) p.color = p.color % cap
   }
-  const slots: { c: number; r: number }[] = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) slots.push({ c, r })
+  const visibleRows = Math.min(4, rows)
+  const spots: { c: number; r: number }[] = []
+  for (let r = 0; r < visibleRows; r++) {
+    for (let c = 0; c < cols; c++) spots.push({ c, r })
   }
-  for (let i = slots.length - 1; i > 0; i--) {
+  for (let i = spots.length - 1; i > 0; i--) {
     const j = Math.floor(state.rng() * (i + 1))
-    ;[slots[i], slots[j]] = [slots[j]!, slots[i]!]
+    ;[spots[i], spots[j]] = [spots[j]!, spots[i]!]
   }
   let idx = 0
-  const place = (kind: Kind, color: number, hits?: number, locked?: boolean) => {
-    const spot = slots[idx++]
-    if (!spot) return
+  const takeSpot = () => spots[idx++] ?? { c: idx % cols, r: 0 }
+  const placeAt = (kind: Kind, color: number, spot: { c: number; r: number }, locked = false) => {
     const p = at(state, spot.c, spot.r)
-    if (!p) return
+    if (!p || p.dead) return
     p.kind = kind
     p.color = color % cap
-    p.hits = hits ?? (kind === 'ice' ? 2 : kind === 'sleepy' ? 3 : 0)
-    p.locked = locked ?? kind === 'jelly'
+    p.hits = kind === 'ice' ? 2 : kind === 'sleepy' ? 3 : 0
+    p.locked = locked || kind === 'jelly'
   }
   const iceN = level.blockers.ice ?? 0
-  for (let i = 0; i < iceN; i++) place('ice', Math.floor(state.rng() * cap), 2)
+  for (let i = 0; i < iceN; i++) {
+    placeAt('ice', i % cap, takeSpot())
+  }
+  const jellyN = level.blockers.jelly ?? 0
+  for (let i = 0; i < jellyN; i++) {
+    placeAt('jelly', (i + 1) % cap, takeSpot(), true)
+  }
   const chocoN = level.blockers.choco ?? 0
-  for (let i = 0; i < chocoN; i++) place('choco', Math.floor(state.rng() * cap))
-  if (level.chapter >= 3 && level.id % 7 === 0) place('sleepy', Math.floor(state.rng() * cap), 3)
-  if (level.chapter >= 2 && level.id % 5 === 0) {
-    const p = state.pieces.find((q) => !q.dead && q.kind === 'bonbon')
-    if (p) {
-      p.kind = 'jelly'
-      p.locked = true
-    }
+  for (let i = 0; i < chocoN; i++) {
+    placeAt('choco', 0, takeSpot())
+  }
+  const sleepyN = level.blockers.sleepy ?? 0
+  for (let i = 0; i < sleepyN; i++) {
+    placeAt('sleepy', (i + 2) % cap, takeSpot())
+  }
+  const burstN = level.blockers.starburst ?? 0
+  for (let i = 0; i < burstN; i++) {
+    placeAt('starburst', (i + 3) % cap, takeSpot())
   }
   softenClusters(state, 6)
   return state
+}
+
+/** QA: measure how often refills match neighbour colour vs fair baseline. */
+export function probeRefillBias(samples = 200, seed = 'refill-fair'): { matchRate: number; baseline: number } {
+  const state = createGame(seed, 7, 10, 'timed')
+  state.colorCap = 5
+  let matches = 0
+  let trials = 0
+  const n = activeColorCount(state)
+  const colors: number[][] = []
+  for (let r = 0; r < state.rows; r++) {
+    colors[r] = []
+    for (let c = 0; c < state.cols; c++) {
+      const p = at(state, c, r)
+      colors[r]![c] = p && !p.dead ? p.color : Math.floor(state.rng() * n)
+    }
+  }
+  state.lastChainLen = 0
+  state.chainColor = -1
+  state.dryLongChain = 0
+  for (let t = 0; t < samples; t++) {
+    const c = Math.floor(state.rng() * state.cols)
+    const r = 0
+    const below = r + 1 < state.rows ? colors[r + 1]![c]! : -1
+    const side = c > 0 ? colors[r]![c - 1]! : -1
+    const buddy = below >= 0 ? below : side
+    const picked = pickSpawnColor(state, colors, c, r)
+    colors[r]![c] = picked
+    if (buddy >= 0 && buddy < n) {
+      trials += 1
+      if (picked === buddy) matches += 1
+    }
+  }
+  const matchRate = trials ? matches / trials : 0
+  const baseline = 1 / n
+  return { matchRate, baseline }
 }

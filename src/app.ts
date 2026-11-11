@@ -1,4 +1,4 @@
-import { boardLayout, titleHeroScale, type Layout } from './layout'
+import { boardLayout, earsInsideMatAtRest, titleHeapCenter, titleHeroScale, type Layout } from './layout'
 import {
   at,
   byId,
@@ -37,6 +37,11 @@ import {
   type AdventureGoalState,
 } from './adventure/goals'
 import { renderMetaDock } from './ui/metaDom'
+import { goalChip } from './adventure/goals'
+import { showTipCard } from './ui/tipCard'
+import { equip, purchase } from './meta/catalogue'
+import { PLUSH_ICONS } from './ui/plushIcons'
+import { getCosmetics } from './draw'
 import type { SaveV3 } from './meta/save'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
@@ -119,11 +124,21 @@ export type Qa = {
   pump: (ms: number) => void
   draw: () => void
   setMute: (sfx: boolean, music: boolean) => void
-  openMeta: (which: 'map' | 'shop' | 'achievements' | 'collection') => void
+  openMeta: (which: 'map' | 'shop' | 'achievements' | 'collection', mapChapter?: number) => void
   closeMeta: () => void
   prepPromoSave: () => void
+  prepMapLock: () => void
+  markTipsSeen: () => void
+  playRealRound: () => void
+  buySkin: (id: string) => void
+  equipItem: (id: string) => void
+  showBlockerTip: (tipId: string) => void
+  earsOk: () => boolean
   startAdventure: (levelId: number) => void
   capturePopBurst: () => void
+  settleChain: (min: number) => boolean
+  hasBomb: () => boolean
+  lastChainLen: number
 }
 
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
@@ -181,6 +196,7 @@ export function boot(): void {
   let adventureGoals: AdventureGoalState | null = null
   let lastResultStars: number | null = null
   let lastRunRewards = { coins: 0, xp: 0 }
+  let lastRunRewardNote = ''
 
   function syncAdventureGoalsFromTrack() {
     if (!adventureGoals) return
@@ -218,9 +234,15 @@ export function boot(): void {
     clockTickAt = 0
     ghostDemoDone = meta.save.tut || qaMode
     ghostCycleStart = 0
-    pieceClipFrames = 0
     lastSimPhase = 'idle'
-    showPlay()
+    const intro = adventureLevel.tutorialTip
+    if (intro && !save.seenTips.includes(intro)) {
+      showTipCard(intro, () => {
+        save.seenTips.push(intro)
+        meta.persist()
+        showPlay()
+      })
+    } else showPlay()
   }
 
   const meta = createMetaLayer(appRoot, startAdventureLevel)
@@ -234,13 +256,14 @@ export function boot(): void {
 
   const title = el('div')
   title.id = 'title'
-  const logo = el('h1', 'logo title-logo ui')
+  const logo = el('h1', 'logo title-logo')
   logo.dataset.nozoom = '1'
   logo.textContent = 'Bonbon Boing!'
-  const titleBest = el('p', 'title-best ui')
+  const titleProfile = el('div', 'title-profile')
+  const titleBest = el('p', 'title-best')
   const titleCorner = el('div', 'title-corner')
   const dock = el('div', 'dock')
-  title.append(logo, titleBest, dock)
+  title.append(logo, titleProfile, titleBest, titleCorner, dock)
   const hud = el('div')
   hud.id = 'hud'
   const hudLeft = el('div', 'hud-side')
@@ -266,10 +289,13 @@ export function boot(): void {
   newBestEl.hidden = true
   const finalEl = el('div', 'ui final')
   const bestEl = el('div', 'ui best')
-  const rewardEl = el('p', 'ui reward-meta')
+  const rewardEl = el('div', 'results-reward ui')
   rewardEl.hidden = true
+  const xpBar = el('div', 'xp-bar')
+  xpBar.innerHTML = '<div class="xp-fill"></div>'
+  const coinRoll = el('p', 'coin-roll ui')
   const resultRow = el('div', 'row')
-  results.append(stars, newBestEl, finalEl, bestEl, rewardEl, resultRow)
+  results.append(stars, newBestEl, finalEl, bestEl, rewardEl, xpBar, coinRoll, resultRow)
   root.append(title, hud, pauseMenu, results)
 
   const mk = (parent: HTMLElement, label: string, action: string, icon: string, tiny = false) => {
@@ -302,12 +328,12 @@ export function boot(): void {
     return b
   }
 
-  mkPill(dock, 'Play', 'timed', ICONS.play, 'primary')
-  mkPill(dock, 'Cuddle', 'cuddle', ICONS.heart, 'relax')
-  mkPill(dock, 'Daily', 'daily', ICONS.sun)
+  mkPill(dock, 'Score Rush', 'timed', PLUSH_ICONS.rush, 'primary')
+  mkPill(dock, 'Cuddle', 'cuddle', PLUSH_ICONS.cuddle, 'relax')
+  mkPill(dock, 'Daily', 'daily', PLUSH_ICONS.daily)
   const metaRow = renderMetaDock(meta.save)
   metaRow.classList.add('meta-row')
-  dock.append(metaRow, titleCorner)
+  dock.append(metaRow)
   mk(titleCorner, 'Sound', 'sfx', ICONS.sound, true)
   mk(titleCorner, 'Music', 'music', ICONS.note, true)
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
@@ -330,7 +356,6 @@ export function boot(): void {
   let freeze = params.has('freeze')
   let ghostOn = false
   let frame = 0
-  let pieceClipFrames = 0
   let lastSimPhase: GameState['phase'] = 'idle'
   let highlightFrame = 0
   let popWallMs = 0
@@ -473,7 +498,7 @@ export function boot(): void {
       x: layout.ox - D * 0.1,
       y: layout.oy,
       w: layout.cols * D + D * 0.2,
-      h: layout.padTop + layout.rows * D + D * 0.1,
+      h: layout.padTop + layout.rows * D + D * 0.18,
     }
   }
 
@@ -627,6 +652,7 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean, bomb = false) {
+    const popId = getCosmetics().pop
     const lite = perfLevel > 0 || fpsBuf.some((f) => f < 44)
     const dotN = reduced || lite ? 7 : 10 + Math.floor(state.rng() * 5)
     const extra = bomb ? 8 : big ? 4 : 0
@@ -635,6 +661,10 @@ export function boot(): void {
       const sp = layout.D * (4 + state.rng() * 5)
       const rad = layout.D * (0.08 + state.rng() * 0.08)
       const conf = bomb && i % 3 === 0
+      const trailStar = popId === 'sparkle' || popId === 'stars'
+      const trailHeart = popId === 'hearts'
+      const trailBubble = popId === 'bubbles'
+      const trailConf = popId === 'confetti' || conf
       particles.push({
         x,
         y,
@@ -642,8 +672,14 @@ export function boot(): void {
         vy: Math.sin(a) * sp - layout.D * (0.4 + state.rng() * 0.6),
         life: 450 + state.rng() * 200,
         age: 0,
-        color: conf ? CONFETTI[Math.floor(state.rng() * CONFETTI.length)]! : COLORS[color] ?? COLORS[0],
-        kind: conf ? 'confetti' : 'dot',
+        color: trailConf
+          ? CONFETTI[Math.floor(state.rng() * CONFETTI.length)]!
+          : trailHeart
+            ? '#FF4F93'
+            : trailBubble
+              ? '#A8E8FF'
+              : COLORS[color] ?? COLORS[0],
+        kind: trailConf ? 'confetti' : trailStar ? 'star' : 'dot',
         rot: state.rng() * Math.PI,
         vr: 0,
         w: rad,
@@ -759,12 +795,27 @@ export function boot(): void {
       const n =
         lastResultStars ??
         (state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1)
-      if (lastRunRewards.coins > 0 || lastRunRewards.xp > 0) {
-        rewardEl.hidden = false
-        rewardEl.textContent = `+${lastRunRewards.xp} XP · +${lastRunRewards.coins} 🪙`
-      } else {
-        rewardEl.hidden = true
-        rewardEl.textContent = ''
+      rewardEl.hidden = false
+      rewardEl.textContent = lastRunRewardNote || 'Nice squish!'
+      const fill = results.querySelector('.xp-fill') as HTMLElement | null
+      if (fill) {
+        const need = Math.max(1, save.profile.xp + lastRunRewards.xp)
+        const pct = Math.min(100, (save.profile.xp / need) * 100)
+        fill.style.width = '0%'
+        requestAnimationFrame(() => {
+          fill.style.width = `${pct}%`
+        })
+      }
+      coinRoll.textContent = ''
+      if (lastRunRewards.coins > 0) {
+        let n = 0
+        const target = lastRunRewards.coins
+        const step = () => {
+          n = Math.min(target, n + Math.max(1, Math.ceil(target / 12)))
+          coinRoll.textContent = `+${n} coins`
+          if (n < target) requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
       }
       stars.innerHTML = [0, 1, 2]
         .map(
@@ -789,7 +840,8 @@ export function boot(): void {
 
   function syncTitleBest() {
     const best = Math.max(save.bestTimed, save.bestCuddle, save.dailyBest)
-    titleBest.textContent = best > 0 ? `Best ${best}` : 'Best —'
+    titleBest.textContent = best > 0 ? `Best rush ${best}` : 'Best rush —'
+    titleProfile.innerHTML = `<span class="title-stat">${PLUSH_ICONS.coin} <b>${save.profile.coins}</b></span><span class="title-stat">Lv <b>${save.profile.level}</b></span>`
   }
 
   function syncHud() {
@@ -809,8 +861,18 @@ export function boot(): void {
     } else if (mode === 'adventure') {
       timeEl.classList.remove('pulse')
       const moves = Math.max(0, state.movesLeft)
-      timeEl.innerHTML = `<span class="moves-left" aria-label="Moves left">${moves}</span>`
+      timeEl.innerHTML = `<span class="moves-left" aria-label="Moves left">${moves}</span><span class="moves-lbl">moves</span>`
+      if (adventureLevel && adventureGoals) {
+        hudMini.hidden = false
+        hudMini.className = 'hud-mini ui goal-strip'
+        hudMini.innerHTML = adventureLevel.goals
+          .map((g) => `<span class="goal-chip">${goalChip(g, adventureGoals!)}</span>`)
+          .join('')
+      }
     } else {
+      hudMini.hidden = true
+      hudMini.className = 'hud-mini ui'
+      hudMini.innerHTML = ''
       const pct = Math.max(0, Math.min(1, state.timeLeft / 60_000))
       const dash = Math.max(0.02, pct) * 88
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
@@ -849,7 +911,6 @@ export function boot(): void {
     clockTickAt = 0
     ghostDemoDone = save.tut || qaMode
     ghostCycleStart = 0
-    pieceClipFrames = 0
     lastSimPhase = 'idle'
   }
 
@@ -920,6 +981,7 @@ export function boot(): void {
       coins: save.profile.coins - coinsBefore,
       xp: save.profile.xp - xpBefore,
     }
+    lastRunRewardNote = lastRunRewards.xp > 0 ? `+${lastRunRewards.xp} XP` : 'Sweet round!'
     adventureLevel = null
     adventureGoals = null
     show('results')
@@ -1167,7 +1229,6 @@ export function boot(): void {
     updateParticles(dt)
     const popped = step(state, dt)
     if (lastSimPhase === 'clearing' && state.phase === 'falling') {
-      if (state.lastChainLen >= 6 || state.hitstopTotal > 0) pieceClipFrames = 3
     }
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
@@ -1299,7 +1360,6 @@ export function boot(): void {
         }))
       }
     }
-    const landscape = innerWidth > innerHeight
     const hero = titleHeroScale(innerWidth, innerHeight, D)
     const dragPath = state.drag.map((id) => byId(state, id)).filter((p): p is Piece => !!p)
     const ropeColor = dragPath.length
@@ -1317,11 +1377,12 @@ export function boot(): void {
           ? rope[rope.length - 1]
           : null
     let titleHint: Scene['titleHint'] = null
-    const heapCenterX = landscape ? innerWidth * 0.38 : innerWidth * 0.5
-    const heapCenterY = landscape ? innerHeight * 0.55 : innerHeight * 0.48
+    const heapPt = titleHeapCenter(innerWidth, innerHeight)
+    const heapCenterX = heapPt.x
+    const heapCenterY = heapPt.y
     const hintColor = 1
     const hintSlots = new Set([0, 1, 2])
-    if (screen === 'title') {
+    if (screen === 'title' && false) {
       const u = (now % 2800) / 2800
       const travel = Math.min(1, Math.max(0, (u - 0.12) / 0.58))
       const idx = Math.min(2, Math.floor(travel * 3))
@@ -1390,9 +1451,9 @@ export function boot(): void {
         ? null
         : {
             x: layout.ox - D * 0.1,
-            y: Math.max(layout.hud, layout.oy - D * 0.08),
+            y: layout.oy - D * 0.06,
             w: layout.cols * D + D * 0.2,
-            h: layout.padTop + layout.rows * D + D * 0.12,
+            h: layout.padTop + layout.rows * D + D * 0.18,
           }
     return {
       w: innerWidth,
@@ -1429,12 +1490,12 @@ export function boot(): void {
       heap,
       mat,
       pieceClip:
-        screen === 'play' && pieceClipFrames > 0 && mat
+        screen === 'play' && state.phase === 'falling' && mat
           ? {
-              x: mat.x - D * 0.08,
-              y: mat.y - D * 0.42,
-              w: mat.w + D * 0.16,
-              h: mat.h + D * 0.5,
+              x: layout.ox - D * 0.12,
+              y: layout.oy + layout.padTop,
+              w: layout.cols * D + D * 0.24,
+              h: innerHeight - (layout.oy + layout.padTop) + D,
             }
           : null,
       peeks,
@@ -1446,7 +1507,6 @@ export function boot(): void {
     const now = performance.now()
     const blink = !freeze && !reduced && now % 3200 < 140
     renderScene(gfx, scene(now), blink)
-    if (pieceClipFrames > 0) pieceClipFrames -= 1
     frame += 1
   }
 
@@ -1734,6 +1794,7 @@ export function boot(): void {
     get seed() { return state.seed },
     get score() { return state.score },
     get combo() { return state.combo },
+    get lastChainLen() { return state.lastChainLen },
     get timeLeft() { return state.timeLeft },
     get paused() { return screen === 'pause' },
     inputLocked: false,
@@ -1944,8 +2005,9 @@ export function boot(): void {
       meta.persist()
       paintMutes()
     },
-    openMeta(which) {
-      meta.open(which)
+    openMeta(which, mapChapter?: number) {
+      const ch = mapChapter as 1 | 2 | 3 | 4 | undefined
+      meta.open(which, ch ? { mapChapter: ch } : undefined)
     },
     closeMeta() {
       meta.close()
@@ -1976,6 +2038,64 @@ export function boot(): void {
         step(state, 18)
         draw()
       }
+    },
+    prepMapLock() {
+      save.profile.stars = 6
+      save.adventure.chapterStars = { '1': 6 }
+      save.adventure.frontier = 18
+      meta.persist()
+    },
+    markTipsSeen() {
+      for (const t of ['ice', 'choco', 'jelly', 'sleepy', 'starburst']) {
+        if (!save.seenTips.includes(t)) save.seenTips.push(t)
+      }
+      meta.persist()
+    },
+    playRealRound() {
+      fresh('timed', seedParam ?? 'qa-real-round')
+      showPlay()
+      clockOn = true
+      clockTickAt = performance.now()
+      clockRunMs = 0
+      let guard = 0
+      while (state.timeLeft > 500 && guard++ < 900) {
+        if (state.phase === 'idle') {
+          if (!settleChain(guard % 3 === 0 ? 5 : 4)) {
+            clockRunMs += 180
+            state.timeLeft = Math.max(0, ROUND_MS - clockRunMs)
+          }
+        } else {
+          step(state, 28)
+        }
+        syncWallClock(performance.now())
+      }
+      clockRunMs = ROUND_MS
+      state.timeLeft = 0
+      showResults()
+    },
+    buySkin(id: string) {
+      save.profile.coins = Math.max(save.profile.coins, 300)
+      purchase(save, id)
+      meta.persist()
+    },
+    equipItem(id: string) {
+      if (equip(save, id)) {
+        meta.applyCosmetics()
+        meta.persist()
+      }
+    },
+    showBlockerTip(tipId: string) {
+      showTipCard(tipId, () => {})
+      freeze = true
+    },
+    earsOk() {
+      return earsInsideMatAtRest(layout, 1) && earsInsideMatAtRest(layout, 0.82)
+    },
+    settleChain(min: number) {
+      return settleChain(min)
+    },
+    hasBomb() {
+      return state.pieces.some((p) => !p.dead && p.kind === 'bomb')
     },
   }
 

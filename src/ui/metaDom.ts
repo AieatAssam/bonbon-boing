@@ -32,6 +32,8 @@
  */
 
 import { ADVENTURE_LEVELS, chapterLevelRange, type AdventureLevelDef } from '../adventure/levels'
+import { CHAPTER_STAR_GATES, chapterUnlocked, starsNeededForChapter } from '../adventure/chapters'
+import { PLUSH_ICONS } from './plushIcons'
 import { ACHIEVEMENTS, countUnlocked } from '../meta/achievements'
 import { CATALOGUE, getCatalogItem, isOwned, meetsGates, type CatalogItem } from '../meta/catalogue'
 import { MISSION_POOL, ensureDailyMissions, missionDef } from '../meta/missions'
@@ -49,13 +51,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-function iconBtn(label: string, emoji: string, action?: string): HTMLButtonElement {
+function iconBtn(label: string, iconHtml: string, action?: string): HTMLButtonElement {
   const b = el('button', 'ui pill meta-card tap')
   b.type = 'button'
   b.style.minHeight = '48px'
   if (action) b.dataset.action = action
-  const ico = el('span', 'meta-emoji')
-  ico.textContent = emoji
+  const ico = el('span', 'meta-ico')
+  ico.innerHTML = iconHtml
   ico.setAttribute('aria-hidden', 'true')
   const wrap = el('div')
   wrap.append(el('div', 'meta-label', label))
@@ -76,6 +78,16 @@ export function renderMap(save: SaveV3, opts: MapRenderOpts = {}): HTMLElement {
   const title = el('h2', 'meta-title', `Adventure · Ch ${chapter}`)
   const stars = el('span', 'meta-chip', `⭐ ${save.profile.stars}`)
   head.append(title, stars)
+
+  const chapterUnlockedOk = chapterUnlocked(save.adventure.chapterStars, chapter)
+  if (!chapterUnlockedOk) {
+    const need = starsNeededForChapter(save.adventure.chapterStars, chapter)
+    const lock = el('p', 'meta-sub chapter-lock', `Need ${need} more ★ from Ch ${chapter - 1} (have ${CHAPTER_STAR_GATES[chapter]} total)`)
+    panel.append(head, lock)
+    const scrim = el('div', 'meta-scrim')
+    scrim.append(panel)
+    return scrim
+  }
 
   const row = el('div', 'meta-map-row')
   for (const level of chapterLevelRange(chapter)) {
@@ -136,7 +148,15 @@ export function renderShop(save: SaveV3, opts: ShopRenderOpts = {}): HTMLElement
     const em = el('span', 'meta-emoji', item.emoji)
     const body = el('div')
     body.append(el('div', 'meta-label', item.name))
-    const price = owned ? (equipped ? 'Equipped' : 'Owned') : locked ? 'Locked' : `⭐ ${item.priceStars}`
+    const price = owned
+      ? equipped
+        ? 'Equipped'
+        : 'Owned'
+      : locked
+        ? 'Locked'
+        : item.priceCoins != null
+          ? `🪙 ${item.priceCoins}`
+          : `⭐ ${item.priceStars}`
     body.append(el('div', 'meta-sub', price))
     card.append(em, body)
     card.addEventListener('click', () => {
@@ -261,10 +281,10 @@ export function renderMetaDock(save: SaveV3): HTMLElement {
   const dock = el('div', 'meta-grid cols-2')
   dock.style.gap = '8px'
   dock.append(
-    iconBtn('Map', '🗺️', 'map'),
-    iconBtn('Shop', '🛍️', 'shop'),
-    iconBtn('Stickers', '🏆', 'achievements'),
-    iconBtn('Bag', '🎒', 'collection'),
+    iconBtn('Adventure', PLUSH_ICONS.map, 'map'),
+    iconBtn('Shop', PLUSH_ICONS.shop, 'shop'),
+    iconBtn('Stickers', PLUSH_ICONS.stickers, 'achievements'),
+    iconBtn('Collection', PLUSH_ICONS.bag, 'collection'),
   )
   dock.dataset.stars = String(save.profile.stars)
   dock.dataset.level = String(save.profile.level)

@@ -76,6 +76,8 @@ QA hooks: `?qa` exposes `window.__qa` (no audio context). Layout captures: `&scr
 - Meta design patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, adventure map, missions).
 - Tutorial glove is drawn in-engine (plush style); Kenney CC0 packs listed in CREDITS for other UI inspiration.
 
+Bonbon Boing! is an independent fan-made game. It is not affiliated with, endorsed by or sponsored by PopCap/EA, Taito, Aladdin X, Disney, SEGA, Sony, Nintendo/HAL Laboratory, Jazwares or Mediatonic. All names are trademarks of their owners.
+
 **Suggested repo description:** Squish Chain puzzle — drag same-colour bonbons, bombs, rainbows, 60s rounds, Adventure map, skins & stickers.
 
 **Suggested topics:** `puzzle-game` `html5-game` `browser-game` `typescript` `vite` `canvas` `pwa` `kawaii` `cute` `mobile-game` `match-game` `casual-game` `adventure-mode` `achievements`

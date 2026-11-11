@@ -121,6 +121,30 @@ export function playPop(index: number, big: boolean): void {
   o2.stop(t + 0.3)
 }
 
+/** Sticker / shop unlock (procedural; similar to Kenney Interface bright blip). */
+export function playUnlock(): void {
+  if (!ctx || !sfx || !wantSfx || paused) return
+  const t = ctx.currentTime
+  const o = ctx.createOscillator()
+  const o2 = ctx.createOscillator()
+  const g = ctx.createGain()
+  o.type = 'sine'
+  o2.type = 'triangle'
+  o.frequency.setValueAtTime(523.25, t)
+  o.frequency.exponentialRampToValueAtTime(987.77, t + 0.12)
+  o2.frequency.setValueAtTime(784, t + 0.05)
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(0.2, t + 0.02)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35)
+  o.connect(g)
+  o2.connect(g)
+  g.connect(sfx)
+  o.start(t)
+  o2.start(t + 0.04)
+  o.stop(t + 0.4)
+  o2.stop(t + 0.4)
+}
+
 export function stopAudio(): void {
   if (timer) window.clearInterval(timer)
   timer = 0

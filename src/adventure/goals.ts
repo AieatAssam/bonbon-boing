@@ -1,4 +1,5 @@
 import type { AdventureGoal, AdventureLevelDef } from './levels'
+import { COLOR_NAMES } from '../ui/plushIcons'
 
 export type AdventureGoalState = {
   score: number
@@ -24,10 +25,28 @@ export type StarEval = {
   thresholds: [number, number, number]
 }
 
+export function goalChip(goal: AdventureGoal, state: AdventureGoalState): string {
+  const ev = evaluateGoal(state, goal)
+  switch (goal.type) {
+    case 'clear_color':
+      return `${COLOR_NAMES[goal.color % COLOR_NAMES.length] ?? 'Pop'} ${Math.min(ev.progress, ev.target)}/${ev.target}`
+    case 'pop_bombs':
+      return `Bomb ${Math.min(ev.progress, ev.target)}/${ev.target}`
+    case 'score_moves':
+      return `Score ${Math.min(ev.progress, ev.target)}/${ev.target}`
+    case 'break_ice':
+      return `Ice ${Math.min(ev.progress, ev.target)}/${ev.target}`
+    case 'clear_choco':
+      return `Choco ${Math.min(ev.progress, ev.target)}/${ev.target}`
+    default:
+      return ev.label
+  }
+}
+
 export function goalLabel(goal: AdventureGoal): string {
   switch (goal.type) {
     case 'clear_color':
-      return `Clear ${goal.count} color ${goal.color + 1}`
+      return `Clear ${goal.count} ${COLOR_NAMES[goal.color % COLOR_NAMES.length] ?? 'pop'}`
     case 'pop_bombs':
       return `Pop ${goal.count} bombs`
     case 'score_moves':
