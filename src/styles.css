@@ -57,9 +57,17 @@ button.ui {
   min-height: 48px;
 }
 
-button.ui.icon {
+button.ui.icon:not(.pill) {
   width: 48px;
   min-width: 48px;
+}
+
+button.ui.pill.icon {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 button.ui.icon:not(.pill) .lbl { display: none; }

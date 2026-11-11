@@ -1,6 +1,7 @@
 import { boardLayout, type Layout } from './layout'
 import {
   byId,
+  canAppend,
   createGame,
   dailySeed,
   extendDrag,
@@ -923,6 +924,29 @@ export function boot(): void {
     return true
   }
 
+  function chainThrough(kind: 'bomb' | 'rainbow'): Piece[] {
+    const special = state.pieces.find((p) => !p.dead && p.kind === kind)
+    if (!special) return []
+    const color = special.color
+    let best: Piece[] = [special]
+    const queue: Piece[][] = [[special]]
+    const seen = new Set([special.id])
+    while (queue.length) {
+      const path = queue.shift()!
+      if (path.length > best.length) best = path
+      const last = path[path.length - 1]!
+      for (const n of state.pieces) {
+        if (n.dead || seen.has(n.id)) continue
+        if (Math.abs(n.c - last.c) + Math.abs(n.r - last.r) !== 1) continue
+        if (!canAppend(path, n)) continue
+        if (n.kind === 'bonbon' && n.color !== color) continue
+        seen.add(n.id)
+        queue.push([...path, n])
+      }
+    }
+    return best.length >= 2 ? best : []
+  }
+
   function applyUrl() {
     const want = screenParam ?? 'title'
     if (want === 'results') {
@@ -970,6 +994,9 @@ export function boot(): void {
           updateParticles(16)
           t += 16
         }
+        state.drag = []
+        state.showIds = []
+        floats = []
         freeze = true
         pose = 'pop'
       }
@@ -978,24 +1005,30 @@ export function boot(): void {
       particles = []
       waves = []
       beams = []
+      floats = []
+      state.drag = []
       state.showIds = []
-      if (!state.pieces.some((p) => !p.dead && p.kind === 'bomb')) {
-        const anchor = state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
+      for (const p of state.pieces) {
+        p.popT = -1
+      }
+      state.pieces = state.pieces.filter((p) => !p.dead)
+      let bomb = state.pieces.find((p) => p.kind === 'bomb')
+      if (!bomb) {
+        const anchor =
+          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
+          state.pieces.find((p) => p.kind === 'bonbon')
         if (anchor) {
           anchor.kind = 'bomb'
-          anchor.color = state.chainColor || anchor.color
+          anchor.color = state.chainColor ?? 0
+          bomb = anchor
         }
       }
       freeze = true
     } else if (want === 'bomb-blast') {
       settleChain(5)
-      const bomb = state.pieces.find((p) => !p.dead && p.kind === 'bomb')
-      if (bomb) {
-        const pals = state.pieces.filter(
-          (p) => !p.dead && p.kind === 'bonbon' && Math.abs(p.c - bomb.c) + Math.abs(p.r - bomb.r) === 1,
-        )
-        const chain = pals[0] ? [pals[0], bomb] : [bomb]
-        state.drag = chain.map((p) => p.id)
+      const through = chainThrough('bomb')
+      if (through.length >= 2) {
+        state.drag = through.map((p) => p.id)
         armRelease()
         let t = 0
         while (t < 90) {
@@ -1003,19 +1036,34 @@ export function boot(): void {
           updateParticles(16)
           t += 16
         }
+        state.drag = []
+        state.showIds = []
       }
       freeze = true
-    } else if (want === 'rainbow' || want === 'rainbow-piece') {
+    } else if (want === 'rainbow' || want === 'rainbow-piece' || want === 'rainbow-board') {
       settleChain(8)
+      particles = []
+      waves = []
+      beams = []
+      floats = []
+      state.drag = []
+      state.showIds = []
+      for (const p of state.pieces) {
+        p.popT = -1
+      }
+      state.pieces = state.pieces.filter((p) => !p.dead)
+      if (!state.pieces.some((p) => p.kind === 'rainbow')) {
+        const anchor =
+          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
+          state.pieces.find((p) => p.kind === 'bonbon')
+        if (anchor) anchor.kind = 'rainbow'
+      }
       freeze = true
     } else if (want === 'rainbow-blast') {
       settleChain(8)
-      const rb = state.pieces.find((p) => !p.dead && p.kind === 'rainbow')
-      if (rb) {
-        const pals = state.pieces.filter(
-          (p) => !p.dead && p.kind === 'bonbon' && Math.abs(p.c - rb.c) + Math.abs(p.r - rb.r) === 1,
-        )
-        state.drag = (pals[0] ? [pals[0], rb] : [rb]).map((p) => p.id)
+      const through = chainThrough('rainbow')
+      if (through.length >= 2) {
+        state.drag = through.map((p) => p.id)
         armRelease()
         let t = 0
         while (t < 90) {
@@ -1023,6 +1071,8 @@ export function boot(): void {
           updateParticles(16)
           t += 16
         }
+        state.drag = []
+        state.showIds = []
       }
       freeze = true
     }
