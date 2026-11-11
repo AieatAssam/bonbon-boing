@@ -62,6 +62,7 @@ export type Scene = {
   dim: number
   waves: { x: number; y: number; r: number; age: number; life: number; color: string }[]
   beams: { x: number; y: number; angle: number; age: number; life: number; color: string }[]
+  popRings: { x: number; y: number; age: number; life: number }[]
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
@@ -519,7 +520,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   }
   for (const p of scene.pieces) {
     const alpha = p.popping ? Math.max(0, 1 - p.popU) : 1
-    if (p.popping && p.popU > 0.55) continue
+    if (p.popping && p.popU >= 0.99) continue
     const drawKind = p.popping ? 'bonbon' : p.kind
     blit(ctx, dpr, ox, oy, bodySprite(drawKind, p.color, px), p.x, p.y, pieceD, pieceD, p.sx, p.sy, alpha)
     if (p.selected && !p.popping) {
@@ -592,6 +593,17 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.stroke()
     }
   }
+  for (const ring of scene.popRings) {
+    const u = ring.age / ring.life
+    ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'
+    ctx.globalAlpha = Math.max(0, 1 - u)
+    ctx.lineWidth = Math.max(2, D * 0.06) * (1 - u * 0.25)
+    ctx.beginPath()
+    ctx.arc(ring.x, ring.y, D * 0.9 * u, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.globalAlpha = 1
+  }
   for (const wave of scene.waves) {
     const u = wave.age / wave.life
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
@@ -599,7 +611,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     ctx.globalAlpha = Math.max(0, 0.95 * (1 - u * 0.85))
     ctx.lineWidth = Math.max(4, D * 0.12) * (1 - u * 0.35)
     ctx.beginPath()
-    ctx.arc(wave.x, wave.y, wave.r + u * D * 2.2, 0, Math.PI * 2)
+    ctx.arc(wave.x, wave.y, wave.r + u * D * 3.5, 0, Math.PI * 2)
     ctx.stroke()
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'
     ctx.lineWidth = Math.max(2, D * 0.05) * (1 - u)

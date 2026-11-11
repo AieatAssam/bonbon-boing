@@ -1,6 +1,10 @@
 export const ROUND_MS = 60_000
-export const HITSTOP_MS = 72
-export const POP_MS = 120
+export const HITSTOP_MS = 70
+export const POP_MS = 140
+export const POP_GROW_MS = 40
+export const POP_SQUASH_MS = 40
+export const POP_VANISH_MS = 60
+export const POP_STAGGER_MS = 30
 export const FALL_MS = 220
 export const FALL_DELAY = 70
 export const STAGGER_CAP = 32
@@ -40,6 +44,7 @@ export type GameState = {
   elapsed: number
   hitstopLeft: number
   hitstopTotal: number
+  hitstopPending: boolean
   fallStart: number
   timeLeft: number
   score: number
@@ -164,9 +169,10 @@ export function activeColorCount(state: GameState): number {
 export function visualRow(p: Piece): number {
   if (p.fallT < 0 || p.fallT >= 1) return p.r
   const t = p.fallT
-  const ease = 1 - (1 - t) ** 2.6
-  const wobble = Math.sin(t * Math.PI * 1.15) * 0.12 * (1 - t)
-  return p.fallFrom + (p.fallTo - p.fallFrom) * ease + wobble
+  const ease = 1 - (1 - t) ** 2.2
+  const overshoot = t > 0.72 ? Math.sin(((t - 0.72) / 0.28) * Math.PI) * 0.22 * (1 - t) : 0
+  const wobble = Math.sin(t * Math.PI * 2.4) * 0.06 * (1 - t)
+  return p.fallFrom + (p.fallTo - p.fallFrom) * ease + overshoot + wobble
 }
 
 function gridMaxCluster(colors: number[][], cols: number, rows: number): number {
@@ -530,6 +536,7 @@ function blank(seed: string, cols: number, rows: number, mode: Mode): GameState 
     elapsed: 0,
     hitstopLeft: 0,
     hitstopTotal: 0,
+    hitstopPending: false,
     fallStart: 0,
     timeLeft: ROUND_MS,
     score: 0,
@@ -719,19 +726,33 @@ export function release(state: GameState): number[] {
   }
   const clears = collectClears(state.pieces, path)
   const n = clears.length
-  const stag = n <= 1 ? 0 : Math.min(STAGGER_CAP, STAGGER_BUDGET / (n - 1))
+  const bomb = clears.find((p) => p.kind === 'bomb')
   const big = path.length >= 6 || n >= 6
-  state.queue = clears.map((p, i) => ({ id: p.id, at: i * stag }))
+  if (bomb) {
+    state.queue = clears
+      .map((p) => ({
+        id: p.id,
+        at: (Math.abs(p.c - bomb.c) + Math.abs(p.r - bomb.r)) * POP_STAGGER_MS + (p.id === bomb.id ? 0 : POP_STAGGER_MS * 0.6),
+      }))
+      .sort((a, b) => a.at - b.at)
+  } else {
+    state.queue = clears.map((p, i) => ({
+      id: p.id,
+      at: i === 0 ? 0 : i * POP_STAGGER_MS + ((i % 3) * 5),
+    }))
+  }
+  const lastAt = state.queue.length ? state.queue[state.queue.length - 1]!.at : 0
   state.showIds = clears.map((p) => p.id)
   state.fired = 0
   state.resolveMs = 0
   state.elapsed = 0
   state.phase = 'clearing'
   state.settled = false
-  state.fallStart = (n - 1) * stag + FALL_DELAY
+  state.fallStart = lastAt + FALL_DELAY
   state.special = path.length >= RAINBOW_AT ? 'rainbow' : path.length >= BOMB_AT ? 'bomb' : null
   state.hitstopTotal = big ? HITSTOP_MS : 0
-  state.hitstopLeft = state.hitstopTotal
+  state.hitstopLeft = 0
+  state.hitstopPending = big
   state.chainColor = pathColor(path) ?? path[0].color
   state.combo = state.simMs - state.lastSettleAt < 1400 && state.score > 0 ? state.combo + 1 : 1
   let pts = 0
@@ -761,13 +782,19 @@ export function step(state: GameState, dt: number): number[] {
   }
   state.simMs += dt
   state.elapsed += dt
-  if (state.hitstopLeft > 0) {
-    const used = Math.min(dt, state.hitstopLeft)
-    state.hitstopLeft -= used
-    dt -= used
-    if (dt <= 0) return popped
+  for (const p of state.pieces) {
+    if (p.popT >= 0 && p.popT < POP_MS) p.popT += dt
   }
-  state.resolveMs += dt
+  if (state.hitstopPending && state.phase === 'clearing' && state.queue.length > 0) {
+    const head = byId(state, state.queue[0]!.id)
+    if (head && head.popT >= POP_GROW_MS + POP_SQUASH_MS) {
+      state.hitstopPending = false
+      state.hitstopLeft = state.hitstopTotal
+    }
+  }
+  const stall = state.hitstopLeft > 0
+  if (stall) state.hitstopLeft = Math.max(0, state.hitstopLeft - dt)
+  if (!stall) state.resolveMs += dt
   while (state.fired < state.queue.length && state.queue[state.fired].at <= state.resolveMs + 1e-4) {
     const id = state.queue[state.fired].id
     state.fired += 1
@@ -777,9 +804,6 @@ export function step(state: GameState, dt: number): number[] {
     p.popT = 0
     state.popAt.push(state.resolveMs)
     popped.push(id)
-  }
-  for (const p of state.pieces) {
-    if (p.popT >= 0 && p.popT < POP_MS) p.popT += dt
   }
   if (state.phase === 'clearing' && state.resolveMs >= state.fallStart - 1e-4 && state.fired >= state.queue.length) {
     beginFall(state)

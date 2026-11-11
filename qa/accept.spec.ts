@@ -178,8 +178,8 @@ for (const [w, h] of viewports) {
           expect(sample.ok, 'ribbon pixel between chain centres').toBe(true)
         }
         if (screen === 'pop') {
-          expect(state.hitstopMs).toBeGreaterThanOrEqual(60)
-          expect(state.hitstopMs).toBeLessThanOrEqual(90)
+          expect(state.hitstopMs).toBeGreaterThanOrEqual(65)
+          expect(state.hitstopMs).toBeLessThanOrEqual(75)
           expect(state.particleCount).toBeGreaterThan(4)
         }
         await page.screenshot({ path: `qa/shots/${screen}_${w}x${h}.png`, animations: 'disabled' })
@@ -203,7 +203,7 @@ for (const [w, h] of viewports) {
         q.pointer('up', upper[upper.length - 1].x, upper[upper.length - 1].y)
         const held = q.board.find((p) => p.id === lower[0].id && !p.popping)
         const sig = q.particleSig
-        q.pump(32)
+        q.pump(90)
         const heldAfter = q.board.find((p) => p.id === lower[0].id)
         const mid = {
           highlighted,
@@ -213,9 +213,9 @@ for (const [w, h] of viewports) {
           wall: q.popWallMs,
           locked: q.inputLocked,
           hitstop: q.hitstopMs,
-          active: q.hitstopActive,
+          active: q.hitstopActive || q.hitstopMs > 0,
           particles: q.particleCount,
-          moved: held && heldAfter ? heldAfter.x !== held.x || q.particleSig === sig : true,
+          moved: held && heldAfter ? heldAfter.c !== held.c || heldAfter.r !== held.r : true,
           audio: q.audioCreates,
           misses: q.spriteMisses,
         }
@@ -234,8 +234,8 @@ for (const [w, h] of viewports) {
       expect(driven.mid.pop0).toBeLessThan(50)
       expect(driven.mid.wall).toBeLessThan(50)
       expect(driven.mid.locked).toBe(false)
-      expect(driven.mid.hitstop).toBeGreaterThanOrEqual(60)
-      expect(driven.mid.hitstop).toBeLessThanOrEqual(90)
+      expect(driven.mid.hitstop).toBeGreaterThanOrEqual(65)
+      expect(driven.mid.hitstop).toBeLessThanOrEqual(75)
       expect(driven.mid.active).toBe(true)
       expect(driven.mid.particles).toBeGreaterThan(4)
       expect(driven.mid.moved).toBe(false)

@@ -9,6 +9,10 @@ import {
   maxSameColorCluster,
   pathColor,
   release,
+  POP_GROW_MS,
+  POP_MS,
+  POP_SQUASH_MS,
+  POP_VANISH_MS,
   roundOver,
   rush,
   softenClusters,
@@ -285,6 +289,8 @@ export function boot(): void {
   let waves: { x: number; y: number; r: number; age: number; life: number; color: string }[] = []
   let beams: { x: number; y: number; angle: number; age: number; life: number; color: string }[] = []
   let floats: { x: number; y: number; text: string; age: number; big?: boolean }[] = []
+  let popRings: { x: number; y: number; age: number; life: number }[] = []
+  let flashT = 0
   let bumpX = 0
   let bumpY = 0
   let bumpT = 0
@@ -359,27 +365,48 @@ export function boot(): void {
     return best
   }
 
-  function burst(x: number, y: number, color: number, big: boolean) {
-    const n = reduced ? (big ? 8 : 5) : big ? 14 : 9
-    for (let i = 0; i < n; i++) {
-      const a = (Math.PI * 2 * i) / n + (i % 2) * 0.15
-      const sp = layout.D * (big ? 12 + (i % 5) * 2.2 : 7 + (i % 3) * 1.1) * (0.85 + (i % 4) * 0.05)
-      const star = big && i % 4 === 0
+  function burst(x: number, y: number, color: number, big: boolean, bomb = false) {
+    const dotN = reduced ? 8 : 10 + Math.floor(state.rng() * 5)
+    const extra = bomb ? 8 : big ? 4 : 0
+    for (let i = 0; i < dotN + extra; i++) {
+      const a = state.rng() * Math.PI * 2
+      const sp = layout.D * (4 + state.rng() * 5)
+      const rad = layout.D * (0.08 + state.rng() * 0.08)
+      const conf = bomb && i % 3 === 0
       particles.push({
         x,
         y,
         vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 55,
-        life: 400 + (i % 3) * 80,
+        vy: Math.sin(a) * sp - layout.D * (0.4 + state.rng() * 0.6),
+        life: 450 + state.rng() * 200,
         age: 0,
-        color: star ? '#FFFFFF' : COLORS[color] ?? COLORS[0],
-        kind: star ? 'star' : 'dot',
-        rot: i * 0.4,
-        vr: star ? 5 : 0,
-        w: star ? 9 : 7 + (i % 2),
+        color: conf ? CONFETTI[Math.floor(state.rng() * CONFETTI.length)]! : COLORS[color] ?? COLORS[0],
+        kind: conf ? 'confetti' : 'dot',
+        rot: state.rng() * Math.PI,
+        vr: 0,
+        w: rad,
       })
     }
-    while (particles.length > 120) particles.shift()
+    const starN = 3 + Math.floor(state.rng() * 3)
+    for (let i = 0; i < starN; i++) {
+      const a = state.rng() * Math.PI * 2
+      const sp = layout.D * (4.5 + state.rng() * 4.5)
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - layout.D * 0.5,
+        life: 480 + state.rng() * 170,
+        age: 0,
+        color: '#FFFFFF',
+        kind: 'star',
+        rot: state.rng() * Math.PI,
+        vr: 6 + state.rng() * 4,
+        w: layout.D * 0.1,
+      })
+    }
+    popRings.push({ x, y, age: 0, life: 180 })
+    while (particles.length > 160) particles.shift()
   }
 
   function notePops(ids: number[]) {
@@ -389,9 +416,12 @@ export function boot(): void {
       if (!p) return
       const c = center(p)
       const index = Math.max(0, state.popAt.length - ids.length + i)
-      burst(c.x, c.y, p.color, big)
-      if (p.kind === 'bomb') {
-        waves.push({ x: c.x, y: c.y, r: layout.D * 0.3, age: 0, life: 420, color: 'rgba(255, 214, 92, 0.85)' })
+      const bomb = p.kind === 'bomb'
+      burst(c.x, c.y, p.color, big, bomb)
+      if (bomb) {
+        flashT = 200
+        waves.push({ x: c.x, y: c.y, r: layout.D * 0.2, age: 0, life: 520, color: 'rgba(255,255,255,0.92)' })
+        waves.push({ x: c.x, y: c.y, r: layout.D * 0.15, age: 0, life: 560, color: 'rgba(255, 214, 92, 0.88)' })
       }
       if (p.kind === 'rainbow') {
         for (let b = 0; b < 8; b++) {
@@ -407,9 +437,9 @@ export function boot(): void {
       }
       if (!qaMode) playPop(index, big)
     })
-    if (big && !reduced) {
-      bumpX = (ids.length % 2 === 0 ? 1 : -1) * 5
-      bumpY = 3
+    if (big && !reduced && ids.length) {
+      bumpX = (ids.length % 2 === 0 ? 1 : -1) * 4
+      bumpY = 4
       bumpT = 200
     }
     if (!qaMode && ids.length) {
@@ -429,15 +459,7 @@ export function boot(): void {
     const spot = center(byId(state, ids[0]) ?? state.pieces[0])
     floats.push({ x: spot.x, y: spot.y - layout.D * 0.3, text: `+${state.gained}`, age: 0, big: true })
     if (state.combo > 1) floats.push({ x: spot.x, y: spot.y - layout.D * 0.75, text: `x${state.combo}`, age: 0, big: true })
-    if (state.hitstopTotal > 0) {
-      for (const id of state.showIds) {
-        const p = byId(state, id)
-        if (!p) continue
-        const spot = center(p)
-        burst(spot.x, spot.y, p.color, true)
-      }
-      if (!qaMode) playPop(0, true)
-    } else notePops(ids)
+    notePops(ids)
     ghostOn = false
     save.tut = true
     storeSave(save)
@@ -697,7 +719,7 @@ export function boot(): void {
       p.age += dt
       p.x += p.vx * sec
       p.y += p.vy * sec
-      p.vy += 520 * sec
+      p.vy += layout.D * 18 * sec
       p.rot += p.vr * sec
       return p.age < p.life
     })
@@ -722,6 +744,11 @@ export function boot(): void {
       f.y -= dt * 0.03
       return f.age < 700
     })
+    popRings = popRings.filter((r) => {
+      r.age += dt
+      return r.age < r.life
+    })
+    flashT = Math.max(0, flashT - dt)
   }
 
   function tick(dt: number, now: number) {
@@ -777,11 +804,14 @@ export function boot(): void {
             ? ghostPath.slice(0, ghost.prefix + 1).map((p) => p.id)
             : []
     const pieces = state.pieces
-      .filter((p) => !p.dead || p.popT >= 0)
+      .filter((p) => {
+        if (p.dead && (p.popT < 0 || p.popT >= POP_MS)) return false
+        return !p.dead || p.popT >= 0
+      })
       .map((p) => {
         const c = center(p)
-        const popU = p.popT < 0 ? 0 : Math.min(1, p.popT / 120)
-        const popping = p.popT >= 0
+        const popping = p.popT >= 0 && p.popT < POP_MS
+        const popU = popping ? p.popT / POP_MS : 0
         const breathe = reduced || popping ? 0 : Math.sin(now / 280 + p.id) * 0.02
         const on = selected.has(p.id) && !popping
         let sx = 1 + breathe
@@ -792,19 +822,29 @@ export function boot(): void {
           sy = 1.12 + wob
         }
         if (popping) {
-          const u = popU
-          if (u < 0.12) {
-            sx = 1.12
-            sy = 1.12
-          } else if (u < 0.35) {
-            const t = (u - 0.12) / 0.23
-            sx = 1.12 + t * 0.18
-            sy = 1.12 - t * 0.42
+          const t = p.popT
+          if (t < POP_GROW_MS) {
+            const u = t / POP_GROW_MS
+            sx = sy = 1 + 0.18 * u
+          } else if (t < POP_GROW_MS + POP_SQUASH_MS) {
+            const u = (t - POP_GROW_MS) / POP_SQUASH_MS
+            sx = 1.18 + 0.17 * u
+            sy = 1.18 - 0.58 * u
           } else {
-            const t = (u - 0.35) / 0.65
-            sx = Math.max(0.05, 1.3 * (1 - t))
-            sy = Math.max(0.05, 0.7 * (1 - t))
+            const u = (t - POP_GROW_MS - POP_SQUASH_MS) / POP_VANISH_MS
+            sx = Math.max(0.02, 1.35 * (1 - u))
+            sy = Math.max(0.02, 0.6 * (1 - u))
           }
+          if (p.kind === 'bomb' && t < 35) {
+            const swell = 1 + 0.22 * (t / 35)
+            sx *= swell
+            sy *= swell
+          }
+        } else if (p.fallT >= 0 && p.fallT < 1 && !p.dead) {
+          const ft = p.fallT
+          const land = ft > 0.85 ? Math.sin(((ft - 0.85) / 0.15) * Math.PI) * 0.12 : 0
+          sx = 1 + land
+          sy = 1 - land * 0.55
         } else if (p.kind !== 'bonbon' && !on) {
           const pulse = reduced ? 0 : Math.sin(now / 220 + p.id) * 0.03
           sx += pulse
@@ -896,7 +936,13 @@ export function boot(): void {
       waves,
       beams,
       ghost: ghost ? { x: ghost.x, y: ghost.y, down: ghost.down, alpha: ghost.alpha } : null,
-      flash: state.hitstopTotal > 0 ? (state.hitstopLeft / state.hitstopTotal) * 0.24 : 0,
+      flash:
+        flashT > 0
+          ? Math.min(0.42, 0.38 * (flashT / 200))
+          : state.hitstopLeft > 0 && state.hitstopTotal > 0
+            ? 0.08 * (state.hitstopLeft / state.hitstopTotal)
+            : 0,
+      popRings,
       bumpX: reduced ? 0 : bumpX,
       bumpY: reduced ? 0 : bumpY,
       floats,
