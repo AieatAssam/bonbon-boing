@@ -534,19 +534,48 @@ function drawChainBubble(
   rainbow: boolean,
 ) {
   const gold = bomb || rainbow
-  const s = D * (gold ? 0.44 : 0.36) * (1 + Math.min(0.1, n * 0.018))
-  ctx.fillStyle = gold ? 'rgba(255, 214, 92, 0.95)' : 'rgba(255,255,255,0.94)'
+  const h = D * 0.55
+  const w = D * (gold ? 1.05 : 0.92) + Math.max(0, n - 2) * D * 0.08
+  const r = h * 0.42
+  ctx.save()
+  ctx.globalAlpha = 0.88
+  ctx.fillStyle = 'rgba(48, 24, 64, 0.12)'
+  roundRect(ctx, x - w * 0.5 + D * 0.04, y - h * 0.5 + D * 0.05, w, h, r)
+  ctx.fill()
+  ctx.fillStyle = gold ? 'rgba(255, 214, 92, 0.95)' : 'rgba(255,255,255, 0.94)'
   ctx.strokeStyle = gold ? '#E8A400' : '#FF8CB8'
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.arc(x, y, s, 0, Math.PI * 2)
+  ctx.lineWidth = Math.max(2, D * 0.05)
+  roundRect(ctx, x - w * 0.5, y - h * 0.5, w, h, r)
   ctx.fill()
   ctx.stroke()
   ctx.fillStyle = gold ? '#7A4A00' : '#D41468'
-  ctx.font = `700 ${Math.round(D * 0.34)}px "Fredoka Variable", system-ui`
+  ctx.font = `700 ${Math.round(D * 0.3)}px "Fredoka Variable", system-ui`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(`x${n}`, x, y + 1)
+  ctx.restore()
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  const q = Math.min(r, w * 0.45, h * 0.45)
+  ctx.beginPath()
+  ctx.moveTo(x + q, y)
+  ctx.lineTo(x + w - q, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + q)
+  ctx.lineTo(x + w, y + h - q)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - q, y + h)
+  ctx.lineTo(x + q, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - q)
+  ctx.lineTo(x, y + q)
+  ctx.quadraticCurveTo(x, y, x + q, y)
+  ctx.closePath()
 }
 
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: boolean): void {

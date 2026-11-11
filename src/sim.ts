@@ -260,6 +260,39 @@ export function maxColorShare(state: GameState): number {
   return max
 }
 
+function rebalanceColorShare(state: GameState, cap = 0.3): void {
+  const n = activeColorCount(state)
+  for (let guard = 0; guard < 280 && maxColorShare(state) > cap + 1e-9; guard++) {
+    let dom = 0
+    let domShare = 0
+    for (let c = 0; c < n; c++) {
+      const sh = colorShareLive(state, c)
+      if (sh > domShare) {
+        domShare = sh
+        dom = c
+      }
+    }
+    if (domShare <= cap) break
+    const domPieces = state.pieces.filter((p) => !p.dead && p.kind === 'bonbon' && p.color === dom)
+    if (!domPieces.length) break
+    const pick = domPieces[Math.floor(state.rng() * domPieces.length)]!
+    let minC = -1
+    let minShare = 1
+    for (let c = 0; c < n; c++) {
+      if (c === dom) continue
+      const sh = colorShareLive(state, c)
+      if (sh < minShare) {
+        minShare = sh
+        minC = c
+      }
+    }
+    if (minC < 0) break
+    const was = pick.color
+    pick.color = minC
+    if (!findPath(state, 3) || maxSameColorCluster(state) > 7) pick.color = was
+  }
+}
+
 function pickSpawnColor(state: GameState, colors: number[][], c: number, r: number): number {
   const n = activeColorCount(state)
   const below = r + 1 < state.rows ? colors[r + 1][c] : -1
@@ -715,7 +748,27 @@ export function createGame(seed: string, cols: number, rows: number, mode: Mode)
       .sort((a, b) => a.c - b.c)
       .map((p) => p.id)
   }
-  for (let guard = 0; guard < 48 && maxColorShare(state) > 0.3; guard++) softenClusters(state, 7)
+  rebalanceColorShare(state, 0.3)
+  if (!findPath(state, 3)) {
+    boostChains(state)
+    rebalanceColorShare(state, 0.3)
+  }
+  for (let fix = 0; fix < 56 && !findPath(state, 3); fix++) softenClusters(state, 6)
+  if (!findPath(state, 3)) {
+    boostChains(state)
+    softenClusters(state, 6)
+  }
+  for (let fix = 0; fix < 36 && (!findPath(state, 3) || maxColorShare(state) > 0.3); fix++) {
+    if (maxColorShare(state) > 0.3) rebalanceColorShare(state, 0.3)
+    else softenClusters(state, 6)
+  }
+  if (!findPath(state, 3)) {
+    for (let i = 0; i < 12 && !findPath(state, 3); i++) {
+      boostChains(state)
+      softenClusters(state, 7)
+    }
+  }
+  if (maxColorShare(state) > 0.3) rebalanceColorShare(state, 0.3)
   return state
 }
 
@@ -895,10 +948,19 @@ export function release(state: GameState): number[] {
   state.combo = comboFresh ? 1 : Math.min(COMBO_CAP, state.combo + 1)
   let pts = 0
   clears.forEach((_, i) => {
-    pts += 4 * (i + 1)
+    pts += 7 * (i + 1)
   })
-  if (clears.some((p) => p.kind === 'bomb')) pts += 45
-  if (clears.some((p) => p.kind === 'rainbow')) pts += 120
+  const chainLen = path.length
+  if (chainLen >= 7) pts = Math.round(pts * 3.2)
+  else if (chainLen >= 6) pts = Math.round(pts * 2.45)
+  let bombPts = clears.some((p) => p.kind === 'bomb') ? 58 : 0
+  let rainbowPts = clears.some((p) => p.kind === 'rainbow') ? 150 : 0
+  if (!comboFresh && chainLen >= BOMB_AT && (bombPts || rainbowPts)) {
+    if (bombPts) bombPts = Math.round(bombPts * 1.5)
+    if (rainbowPts) rainbowPts = Math.round(rainbowPts * 1.5)
+  }
+  pts += bombPts + rainbowPts
+  if (chainLen >= 5) pts += chainLen * 42
   state.gained = Math.round(pts * state.combo)
   state.score += state.gained
   state.popAt = []
@@ -1003,6 +1065,99 @@ export function playToIdle(state: GameState, maxSteps = 240): void {
   while (state.phase !== 'idle' && guard++ < maxSteps) step(state, 16)
 }
 
+function pathPickScore(state: GameState, path: Piece[], comboBias: boolean): number {
+  const inCombo = state.score > 0 && state.simMs - state.lastSettleAt < COMBO_WINDOW_MS
+  let s = path.length * 10
+  if (path.length >= 7) s += 120
+  else if (path.length >= 6) s += 55
+  else if (path.length >= 5) s += 28
+  if (comboBias) {
+    if (path.length >= 5) s += inCombo ? 85 : 18
+    if (path.length >= 3 && inCombo) s += 35
+    if (inCombo && path.length >= BOMB_AT) s += 80
+    if (inCombo && path.length >= RAINBOW_AT) s += 110
+    if (path.some((p) => p.kind === 'bomb')) s += 55
+    if (path.some((p) => p.kind === 'rainbow')) s += 90
+  }
+  return s
+}
+
+function bestPath(state: GameState, comboBias: boolean): Piece[] | null {
+  const inCombo = state.score > 0 && state.simMs - state.lastSettleAt < COMBO_WINDOW_MS
+  if (!comboBias) {
+    let best: Piece[] | null = null
+    for (let min = 2; min <= 14; min++) {
+      const p = findPath(state, min)
+      if (p && (!best || p.length > best.length)) best = p
+    }
+    return best
+  }
+  if (inCombo) {
+    let best: Piece[] | null = null
+    for (let min = BOMB_AT; min <= 14; min++) {
+      const p = findPath(state, min)
+      if (p && (!best || p.length > best.length)) best = p
+    }
+    if (best) return best
+  }
+  let best: Piece[] | null = null
+  let bestScore = -1
+  for (let min = 2; min <= 14; min++) {
+    const p = findPath(state, min)
+    if (!p) continue
+    const sc = pathPickScore(state, p, true)
+    if (!best || sc > bestScore || (sc === bestScore && p.length > best.length)) {
+      bestScore = sc
+      best = p
+    }
+  }
+  return best
+}
+
+export function comboGreedySession(
+  state: GameState,
+  moves = 60,
+): { score: number; pops7: number; maxChain: number } {
+  let pops7 = 0
+  let maxChain = 0
+  for (let m = 0; m < moves; m++) {
+    if (!mayBeginChain(state)) break
+    const best = bestPath(state, true)
+    if (!best || best.length < 2) break
+    maxChain = Math.max(maxChain, best.length)
+    state.drag = best.map((p) => p.id)
+    release(state)
+    if (best.length >= 7) pops7 += 1
+    playToIdle(state)
+  }
+  return { score: state.score, pops7, maxChain }
+}
+
+/** Greedy bot for one timed round (sim clock). */
+export function comboGreedyTimedRound(
+  state: GameState,
+  msPerMove = 720,
+): { score: number; moves: number; maxChain: number } {
+  let moves = 0
+  let maxChain = 0
+  while (mayBeginChain(state) && moves < 120) {
+    const best = bestPath(state, true)
+    if (!best || best.length < 2) {
+      state.timeLeft = Math.max(0, state.timeLeft - msPerMove)
+      moves += 1
+      continue
+    }
+    maxChain = Math.max(maxChain, best.length)
+    state.drag = best.map((p) => p.id)
+    release(state)
+    playToIdle(state)
+    state.timeLeft = Math.max(0, state.timeLeft - msPerMove)
+    moves += 1
+  }
+  while (state.phase !== 'idle') step(state, 40)
+  return { score: state.score, moves, maxChain }
+}
+
 export function greedySession(
   state: GameState,
   moves = 60,
@@ -1011,11 +1166,7 @@ export function greedySession(
   let maxChain = 0
   for (let m = 0; m < moves; m++) {
     if (!mayBeginChain(state)) break
-    let best = findPath(state, 2)
-    for (let min = 3; min <= 14; min++) {
-      const p = findPath(state, min)
-      if (p && (!best || p.length > best.length)) best = p
-    }
+    const best = bestPath(state, false)
     if (!best || best.length < 2) break
     maxChain = Math.max(maxChain, best.length)
     state.drag = best.map((p) => p.id)
@@ -1034,11 +1185,7 @@ export function greedyTimedRound(
   let moves = 0
   let maxChain = 0
   while (mayBeginChain(state) && moves < 120) {
-    let best = findPath(state, 2)
-    for (let min = 3; min <= 14; min++) {
-      const p = findPath(state, min)
-      if (p && (!best || p.length > best.length)) best = p
-    }
+    const best = bestPath(state, false)
     if (!best || best.length < 2) {
       state.timeLeft = Math.max(0, state.timeLeft - msPerMove)
       moves += 1

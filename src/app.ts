@@ -1,5 +1,6 @@
 import { boardLayout, titleHeroScale, type Layout } from './layout'
 import {
+  at,
   byId,
   canAppend,
   createGame,
@@ -95,8 +96,7 @@ export type Qa = {
   boardRect: () => { x: number; y: number; w: number; h: number }
   backingDpr: () => number
   pieceCenters: () => { x: number; y: number }[]
-  bubbleClear: () => boolean
-  bubbleGap: () => number
+  bubbleCheck: () => { dist: number; distOk: boolean; tipClear: boolean }
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   traceChain: (cells: { id: number; x: number; y: number }[]) => void
   appendPiece: (id: number) => void
@@ -318,6 +318,8 @@ export function boot(): void {
   let perfLevel = 0
   let perfSlowStreak = 0
   let perfFastStreak = 0
+  let perfFastNeed = 5
+  let perfLastStep: 'up' | 'down' | null = null
   let canvasDpr = 0
   let fpsBuf: number[] = []
   let fpsWinStart = 0
@@ -336,8 +338,8 @@ export function boot(): void {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
   }
 
-  const STAR2_SCORE = 20_000
-  const STAR3_SCORE = 45_000
+  const STAR2_SCORE = 15_000
+  const STAR3_SCORE = 30_000
 
   function nativeDprCap(): number {
     return Math.min(2, devicePixelRatio || 1)
@@ -366,13 +368,18 @@ export function boot(): void {
       if (perfSlowStreak >= 2 && perfLevel < PERF_REL.length - 1) {
         perfLevel += 1
         perfSlowStreak = 0
+        if (perfLastStep === 'up') perfFastNeed = Math.min(40, perfFastNeed * 2)
+        else perfFastNeed = 5
+        perfLastStep = 'down'
+        perfFastStreak = 0
       }
     } else if (fps > 48) {
       perfFastStreak += 1
       perfSlowStreak = 0
-      if (perfFastStreak >= 2 && perfLevel > 0) {
+      if (perfFastStreak >= perfFastNeed && perfLevel > 0) {
         perfLevel -= 1
         perfFastStreak = 0
+        perfLastStep = 'up'
       }
     } else {
       perfSlowStreak = Math.max(0, perfSlowStreak - 1)
@@ -426,24 +433,49 @@ export function boot(): void {
     }
   }
 
-  function bubbleVisualR(chainLen: number, bomb: boolean, rainbow: boolean): number {
-    const gold = bomb || rainbow
+  function bubblePillSize(chainLen: number, bomb: boolean, rainbow: boolean): { w: number; h: number } {
     const D = layout.D
-    return D * (gold ? 0.44 : 0.36) * (1 + Math.min(0.1, chainLen * 0.018))
+    const gold = bomb || rainbow
+    const h = D * 0.55
+    const w = D * (gold ? 1.05 : 0.92) + Math.max(0, chainLen - 2) * D * 0.08
+    return { w, h }
   }
 
-  function bubblePieceGap(bx: number, by: number): number {
-    let gap = Infinity
-    for (const p of state.pieces) {
-      if (p.dead) continue
-      const c = center(p)
-      gap = Math.min(gap, Math.hypot(bx - c.x, by - c.y))
+  function dragTipPiece(): Piece | null {
+    const id = state.drag[state.drag.length - 1]
+    return id != null ? (byId(state, id) ?? null) : null
+  }
+
+  function bubbleProtectedIds(): Set<number> {
+    const tip = dragTipPiece()
+    if (!tip) return new Set()
+    const dragSet = new Set(state.drag)
+    const ids = new Set<number>([tip.id])
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (!dc && !dr) continue
+        const p = at(state, tip.c + dc, tip.r + dr)
+        if (p && !p.dead && !dragSet.has(p.id)) ids.add(p.id)
+      }
     }
-    return gap
+    return ids
   }
 
-  function bubbleHitsPiece(bx: number, by: number, bubbleR: number): boolean {
-    return bubblePieceGap(bx, by) < bubbleR
+  function pillHitsPieceCentre(bx: number, by: number, _hw: number, _hh: number, px: number, py: number): boolean {
+    const bubbleR = layout.D * 0.32
+    const pieceR = layout.D * 0.34
+    return Math.hypot(bx - px, by - py) < bubbleR + pieceR
+  }
+
+  function pillOverlapsProtected(bx: number, by: number, hw: number, hh: number): boolean {
+    const blocked = bubbleProtectedIds()
+    for (const id of blocked) {
+      const p = byId(state, id)
+      if (!p || p.dead) continue
+      const c = center(p)
+      if (pillHitsPieceCentre(bx, by, hw, hh, c.x, c.y)) return true
+    }
+    return false
   }
 
   function placeChainBubble(
@@ -452,35 +484,57 @@ export function boot(): void {
     chainLen: number,
   ): Scene['bubble'] {
     const D = layout.D
-    const bubbleR = bubbleVisualR(chainLen, chainLen >= 5, chainLen >= 7)
-    const need = bubbleR + 2
-    const margin = D * 0.45
+    const bomb = chainLen >= 5
+    const rainbow = chainLen >= 7
+    const pill = bubblePillSize(chainLen, bomb, rainbow)
+    const hw = pill.w * 0.5
+    const hh = pill.h * 0.5
+    const board = boardRect()
     const prev = rope.length >= 2 ? rope[rope.length - 2]! : anchor
     const side = anchor.x - prev.x >= 0 ? -1 : 1
-    const yMin = layout.hud + D * 0.38
-    const yMax = Math.max(yMin, layout.oy + layout.padTop - D * 0.55)
-    const ySlots = [anchor.y - D * 1.32, anchor.y - D * 1.58, layout.hud + D * 0.72]
-    let best: Scene['bubble'] | null = null
-    let bestScore = -Infinity
-    const step = D * 0.26
-    for (let by = yMin; by <= yMax; by += step) {
-      for (let bx = margin; bx <= innerWidth - margin; bx += step) {
-        const gap = bubblePieceGap(bx, by)
-        if (gap < need) continue
-        const nearFinger = Math.hypot(bx - anchor.x, by - anchor.y)
-        const bias = ySlots.reduce((s, y) => s + Math.max(0, 1 - Math.abs(by - y) / (D * 1.1)), 0)
-        const sideBias = bx * side < anchor.x * side ? 0.25 : 0
-        const score = gap + bias * D * 0.15 + sideBias * D - nearFinger * 0.06
-        if (score > bestScore) {
-          bestScore = score
-          best = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
-        }
+    const tip = dragTipPiece()
+    const blockedAbove =
+      tip != null && !!at(state, tip.c, tip.r - 1) && !at(state, tip.c, tip.r - 1)?.dead
+    let bx = anchor.x + side * (blockedAbove ? D * 0.82 : D * 0.16)
+    let by = anchor.y - D * (blockedAbove ? 1.0 : 1.25)
+    if (by - hh < board.y + D * 0.08) {
+      by = anchor.y + D * 1.22
+      bx = anchor.x + side * D * 0.35
+    }
+    const tryOffsets: { x: number; y: number }[] = []
+    for (let ring = 1.12; ring <= 1.58; ring += 0.06) {
+      for (const sx of [-0.55, -0.28, 0, 0.28, 0.55]) {
+        tryOffsets.push({ x: side * D * sx, y: -D * ring })
+        tryOffsets.push({ x: side * D * sx, y: D * ring })
       }
     }
-    if (best) return best
-    const bx = Math.min(innerWidth - margin, Math.max(margin, anchor.x + side * D * 1.05))
-    const by = Math.min(yMax, Math.max(yMin, anchor.y - D * 1.35))
-    return { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+    let bestFit: Scene['bubble'] | null = null
+    let bestDist = Infinity
+    for (const off of tryOffsets) {
+      let tx = bx + off.x
+      let ty = by + off.y
+      tx = Math.max(board.x + hw + D * 0.04, Math.min(board.x + board.w - hw - D * 0.04, tx))
+      ty = Math.max(board.y + hh + D * 0.04, Math.min(board.y + board.h - hh - D * 0.04, ty))
+      if (pillOverlapsProtected(tx, ty, hw, hh)) continue
+      const dist = Math.hypot(tx - anchor.x, ty - anchor.y)
+      if (dist <= D * 1.6 && dist < bestDist) {
+        bestDist = dist
+        bestFit = { x: tx, y: ty, n: chainLen, bomb, rainbow }
+      }
+    }
+    if (bestFit) return bestFit
+    for (const off of tryOffsets) {
+      let tx = bx + off.x
+      let ty = by + off.y
+      tx = Math.max(board.x + hw + D * 0.04, Math.min(board.x + board.w - hw - D * 0.04, tx))
+      ty = Math.max(board.y + hh + D * 0.04, Math.min(board.y + board.h - hh - D * 0.04, ty))
+      if (!pillOverlapsProtected(tx, ty, hw, hh)) {
+        return { x: tx, y: ty, n: chainLen, bomb, rainbow }
+      }
+    }
+    bx = Math.max(board.x + hw, Math.min(board.x + board.w - hw, bx))
+    by = Math.max(board.y + hh, Math.min(board.y + board.h - hh, by))
+    return { x: bx, y: by, n: chainLen, bomb, rainbow }
   }
 
   function hit(x: number, y: number): Piece | null {
@@ -681,6 +735,8 @@ export function boot(): void {
     perfLevel = 0
     perfSlowStreak = 0
     perfFastStreak = 0
+    perfFastNeed = 5
+    perfLastStep = null
     mode = nextMode
     pose = 'idle'
     particles = []
@@ -1583,16 +1639,16 @@ export function boot(): void {
     pieceCenters() {
       return state.pieces.filter((p) => !p.dead).map((p) => center(p))
     },
-    bubbleClear() {
+    bubbleCheck() {
       const sc = scene(performance.now())
-      if (!sc.bubble) return true
-      const r = bubbleVisualR(sc.bubble.n, sc.bubble.bomb, sc.bubble.rainbow)
-      return !bubbleHitsPiece(sc.bubble.x, sc.bubble.y, r)
-    },
-    bubbleGap() {
-      const sc = scene(performance.now())
-      if (!sc.bubble) return Infinity
-      return bubblePieceGap(sc.bubble.x, sc.bubble.y)
+      const D = layout.D
+      if (!sc.bubble) return { dist: Infinity, distOk: false, tipClear: true }
+      const anchor =
+        fingerOn && state.drag.length > 0 ? { x: fingerX, y: fingerY } : sc.finger ?? sc.rope[sc.rope.length - 1]!
+      const dist = Math.hypot(sc.bubble.x - anchor.x, sc.bubble.y - anchor.y)
+      const pill = bubblePillSize(sc.bubble.n, sc.bubble.bomb, sc.bubble.rainbow)
+      const tipClear = !pillOverlapsProtected(sc.bubble.x, sc.bubble.y, pill.w * 0.5, pill.h * 0.5)
+      return { dist, distOk: dist <= D * 1.6, tipClear, layoutD: D }
     },
     get ribbonThickness() {
       return state.drag.length > 1 || pose === 'chain' ? layout.D * 0.22 : 0

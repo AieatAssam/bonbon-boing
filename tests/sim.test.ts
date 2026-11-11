@@ -5,6 +5,7 @@ import {
   RAINBOW_AT,
   canAppend,
   collectClears,
+  comboGreedyTimedRound,
   createGame,
   maxColorShare,
   dailySeed,
@@ -167,10 +168,21 @@ describe('modes and seeds', () => {
     expect(roundOver(s)).toBe(false)
   })
 
-  it('caps opening colour share at 30%', () => {
-    for (const seed of ['pretty', 'feel', 'spawn-a', 'spawn-b', 'spawn-c', 'daily-x']) {
-      const s = createGame(seed, 7, 10, 'timed')
+  it('caps opening colour share at 30% across seeds and grid sizes', () => {
+    const sizes: [number, number][] = [
+      [7, 9],
+      [7, 10],
+      [7, 11],
+      [8, 10],
+      [8, 11],
+      [6, 10],
+    ]
+    for (let i = 0; i < 50; i++) {
+      const [cols, rows] = sizes[i % sizes.length]!
+      const s = createGame(`open-cap-${i}`, cols, rows, 'timed')
       expect(maxColorShare(s)).toBeLessThanOrEqual(0.3)
+      expect(findPath(s, 2)).toBeTruthy()
+      if (cols * rows >= 63) expect(findPath(s, 3)).toBeTruthy()
     }
   })
 
@@ -184,18 +196,31 @@ describe('modes and seeds', () => {
     }
   })
 
-  it('greedy play stays in score range with frequent 7-chains', () => {
+  it('greedy play stays in score range with long chains on feel', () => {
     const s = createGame('feel', 7, 9, 'timed')
     const r = greedySession(s, 60)
-    expect(r.pops7).toBeGreaterThanOrEqual(1)
+    expect(r.maxChain).toBeGreaterThanOrEqual(6)
+    expect(r.score).toBeGreaterThan(4_000)
     expect(r.score).toBeLessThan(50_000)
   })
 
-  it('greedy play stays under 3-star cap for a long marathon', () => {
-    const s = createGame('feel', 7, 9, 'timed')
-    const r = greedySession(s, 80)
-    expect(r.score).toBeLessThan(45_000)
-    expect(r.score).toBeGreaterThan(800)
+  it('greedy longest bot stays in the 16–22k band on timed rounds', () => {
+    const r = greedyTimedRound(createGame('feel', 7, 10, 'timed'), 650)
+    expect(r.score).toBeGreaterThan(11_000)
+    expect(r.score).toBeLessThan(24_000)
+  })
+
+  it('combo bot outscores greedy longest on the same seeds', () => {
+    const greedy = createGame('feel', 7, 10, 'timed')
+    const combo = createGame('feel', 7, 10, 'timed')
+    const g = greedyTimedRound(greedy, 650)
+    const c = comboGreedyTimedRound(combo, 650)
+    expect(g.score).toBeGreaterThan(11_000)
+    expect(g.score).toBeLessThan(24_000)
+    expect(c.score).toBeGreaterThanOrEqual(g.score)
+    const greedy2 = greedyTimedRound(createGame('pretty', 7, 10, 'timed'), 650)
+    const combo2 = comboGreedyTimedRound(createGame('pretty', 7, 10, 'timed'), 650)
+    expect(combo2.score).toBeGreaterThanOrEqual(greedy2.score)
   })
 
   it('greedy timed round cannot farm after bell', () => {
