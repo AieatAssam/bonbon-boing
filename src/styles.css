@@ -384,6 +384,10 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   }
 }
 
+.finale-skip-hint[hidden] {
+  display: none !important;
+}
+
 .finale-skip-hint {
   position: fixed;
   z-index: 6;

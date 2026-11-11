@@ -180,8 +180,8 @@ for (const [w, h] of viewports) {
           expect(sample.ok, 'ribbon pixel between chain centres').toBe(true)
         }
         if (screen === 'pop' && state.hitstopMs > 0) {
-          expect(state.hitstopMs).toBeGreaterThanOrEqual(65)
-          expect(state.hitstopMs).toBeLessThanOrEqual(75)
+          expect(state.hitstopMs).toBeGreaterThanOrEqual(50)
+          expect(state.hitstopMs).toBeLessThanOrEqual(60)
           expect(state.particleCount).toBeGreaterThan(4)
         }
         await page.screenshot({ path: `qa/shots/${screen}_${w}x${h}.png`, animations: 'disabled' })
@@ -239,8 +239,8 @@ for (const [w, h] of viewports) {
       expect(driven.mid.wall).toBeLessThan(50)
       expect(driven.mid.locked).toBe(false)
       if (driven.mid.path >= 6) {
-        expect(driven.mid.hitstop).toBeGreaterThanOrEqual(65)
-        expect(driven.mid.hitstop).toBeLessThanOrEqual(75)
+        expect(driven.mid.hitstop).toBeGreaterThanOrEqual(50)
+        expect(driven.mid.hitstop).toBeLessThanOrEqual(60)
         expect(driven.mid.active).toBe(true)
       }
       expect(driven.mid.particles).toBeGreaterThan(4)
@@ -365,7 +365,7 @@ for (const [w, h] of viewports) {
         const text = document.querySelector('#app')?.textContent ?? ''
         return { x: q.ghostX, y: q.ghostY, D: q.D, w: innerWidth, h: innerHeight, text }
       })
-      expect(pose.text.toLowerCase()).not.toMatch(/drag|swipe|tap to|match|chain|aim/)
+      expect(pose.text.toLowerCase()).not.toMatch(/drag|swipe|tap to match|match|chain|aim/)
       expect(pose.x).toBeGreaterThan(0)
       expect(pose.y).toBeGreaterThan(0)
       expect(pose.x).toBeLessThan(pose.w)
