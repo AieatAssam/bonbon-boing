@@ -1,3 +1,5 @@
+> **Superseded.** The live game is Squish Chain (see the README). This document describes the rejected bounce-and-pop prototype and is kept for history.
+
 # Bonbon Boing! Game design document
 
 Version 1.0, 10 Nov 2026. Author: game art director (research + design phase). Builder: Cursor cloud agent (Composer 2.5, non-fast).

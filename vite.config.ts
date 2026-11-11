@@ -14,11 +14,11 @@ export default defineConfig({
         name: 'Bonbon Boing!',
         short_name: 'Bonbon Boing',
         description:
-          'A squishy, glossy bounce-and-pop puzzle for phones.',
+          'Squish Chain: drag through touching bonbons and pop them.',
         theme_color: '#FFD6EC',
         background_color: '#B9E4FF',
         display: 'standalone',
-        orientation: 'portrait-primary',
+        orientation: 'any',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
