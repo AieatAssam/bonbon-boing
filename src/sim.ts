@@ -434,7 +434,8 @@ function paintBottom(state: GameState) {
   const len = Math.min(3, state.cols)
   const ids: number[] = []
   const r = state.rows - 1
-  for (let c = 0; c < len; c++) ids.push(setCell(state, c, r, 0, 'bonbon').id)
+  const n = activeColorCount(state)
+  for (let c = 0; c < len; c++) ids.push(setCell(state, c, r, c % n, 'bonbon').id)
   state.guideBottom = ids
 }
 
@@ -548,14 +549,80 @@ function blank(seed: string, cols: number, rows: number, mode: Mode): GameState 
   }
 }
 
+function clusterOf(
+  state: GameState,
+  startC: number,
+  startR: number,
+  colors: number[][],
+): number {
+  const color = colors[startR]?.[startC]
+  if (color === undefined || color < 0) return 0
+  const seen = new Set<string>()
+  const q: [number, number][] = [[startC, startR]]
+  seen.add(`${startC},${startR}`)
+  let n = 0
+  for (let i = 0; i < q.length; i++) {
+    const [cc, rr] = q[i]!
+    n += 1
+    for (const [dc, dr] of DIRS) {
+      const nc = cc + dc
+      const nr = rr + dr
+      if (nc < 0 || nr < 0 || nc >= state.cols || nr >= state.rows) continue
+      const k = `${nc},${nr}`
+      if (seen.has(k) || colors[nr]![nc] !== color) continue
+      seen.add(k)
+      q.push([nc, nr])
+    }
+  }
+  return n
+}
+
 export function softenClusters(state: GameState, max = 6): void {
-  const keep = new Set<number>([...(state.guide ?? []), ...(state.guideBottom ?? [])])
+  const keep = new Set<number>([...(state.guide ?? [])])
+  const nColors = () => activeColorCount(state)
   let guard = 0
-  while (maxSameColorCluster(state) > max && guard++ < 80) {
-    const live = state.pieces.filter((p) => !p.dead && p.kind === 'bonbon' && !keep.has(p.id))
-    if (!live.length) break
-    const p = live[Math.floor(state.rng() * live.length)]
-    p.color = Math.floor(state.rng() * activeColorCount(state))
+  while (maxSameColorCluster(state) > max && guard++ < 500) {
+    const colors: number[][] = []
+    for (let r = 0; r < state.rows; r++) {
+      colors[r] = []
+      for (let c = 0; c < state.cols; c++) {
+        const p = at(state, c, r)
+        colors[r][c] = p && !p.dead ? p.color : -1
+      }
+    }
+    let hot: Piece | null = null
+    let hotSize = max
+    for (let r = 0; r < state.rows; r++) {
+      for (let c = 0; c < state.cols; c++) {
+        if (colors[r][c]! < 0) continue
+        const p = at(state, c, r)!
+        if (keep.has(p.id) || p.kind !== 'bonbon') continue
+        const size = clusterOf(state, c, r, colors)
+        if (size > hotSize) {
+          hotSize = size
+          hot = p
+        }
+      }
+    }
+  if (!hot) {
+      const live = state.pieces.filter((p) => !p.dead && p.kind === 'bonbon' && !keep.has(p.id))
+      if (!live.length) break
+      hot = live[Math.floor(state.rng() * live.length)]
+    }
+    const was = hot.color
+    let picked = was
+    for (let t = 0; t < 16; t++) {
+      const tryC = Math.floor(state.rng() * nColors())
+      if (tryC === was) continue
+      hot.color = tryC
+      if (maxSameColorCluster(state) <= max) {
+        picked = tryC
+        break
+      }
+    }
+    if (picked === was) {
+      hot.color = (was + 1 + Math.floor(state.rng() * (nColors() - 1))) % nColors()
+    }
   }
 }
 

@@ -146,11 +146,144 @@ function ear(ctx: CanvasRenderingContext2D, color: number, cx: number, cy: numbe
   }
 }
 
-function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
+function paintBomb(px: number): HTMLCanvasElement {
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
   if (!ctx) return c
-  const pal = kind === 'rainbow' ? { base: '#FFF7FB', deep: '#D8A8C4', light: '#FFFFFF', ear: '#FFE0A8', rim: '#FFD8F0' } : PAL[color % PAL.length]
+  const cx = px / 2
+  const cy = px * 0.54
+  const r = px * 0.44
+  ctx.fillStyle = 'rgba(40, 12, 52, 0.22)'
+  ctx.beginPath()
+  ctx.ellipse(cx, cy + r * 0.96, r * 0.74, r * 0.19, 0, 0, Math.PI * 2)
+  ctx.fill()
+  const g = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.46, r * 0.05, cx + r * 0.05, cy + r * 0.1, r * 1.14)
+  g.addColorStop(0, '#FFE8FF')
+  g.addColorStop(0.1, '#C884E8')
+  g.addColorStop(0.45, '#6E2A8C')
+  g.addColorStop(1, '#2A1038')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#FF6EDB'
+  ctx.lineWidth = Math.max(2.5, r * 0.07)
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  ctx.beginPath()
+  ctx.ellipse(cx - r * 0.32, cy - r * 0.4, r * 0.32, r * 0.18, -0.5, 0, Math.PI * 2)
+  ctx.fill()
+  const star = r * 0.36
+  ctx.fillStyle = '#FFFFFF'
+  ctx.strokeStyle = '#FFD93A'
+  ctx.lineWidth = Math.max(2, r * 0.06)
+  ctx.beginPath()
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5
+    const b = a + Math.PI / 5
+    ctx.lineTo(cx + Math.cos(a) * star, cy + r * 0.06 + Math.sin(a) * star)
+    ctx.lineTo(cx + Math.cos(b) * star * 0.42, cy + r * 0.06 + Math.sin(b) * star * 0.42)
+  }
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.strokeStyle = '#FFB703'
+  ctx.lineWidth = Math.max(2.5, r * 0.08)
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(cx + r * 0.28, cy - r * 0.55)
+  ctx.quadraticCurveTo(cx + r * 0.95, cy - r * 1.05, cx + r * 0.75, cy - r * 1.22)
+  ctx.stroke()
+  for (const [fx, fy] of [
+    [cx + r * 0.75, cy - r * 1.22],
+    [cx + r * 0.55, cy - r * 0.92],
+    [cx + r * 0.82, cy - r * 0.88],
+  ]) {
+    ctx.fillStyle = fx === cx + r * 0.75 ? '#FFE566' : 'rgba(255,255,255,0.95)'
+    ctx.beginPath()
+    const s = fx === cx + r * 0.75 ? r * 0.14 : r * 0.07
+    if (fx === cx + r * 0.75) ctx.arc(fx, fy, s, 0, Math.PI * 2)
+    else {
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2
+        ctx.lineTo(fx + Math.cos(a) * s, fy + Math.sin(a) * s)
+        ctx.lineTo(fx + Math.cos(a + Math.PI / 4) * s * 0.35, fy + Math.sin(a + Math.PI / 4) * s * 0.35)
+      }
+      ctx.closePath()
+    }
+    ctx.fill()
+  }
+  return c
+}
+
+function paintRainbow(px: number): HTMLCanvasElement {
+  const c = canvas(px, px)
+  const ctx = c.getContext('2d')
+  if (!ctx) return c
+  const cx = px / 2
+  const cy = px * 0.54
+  const r = px * 0.44
+  ctx.fillStyle = 'rgba(48, 24, 62, 0.16)'
+  ctx.beginPath()
+  ctx.ellipse(cx, cy + r * 0.96, r * 0.72, r * 0.18, 0, 0, Math.PI * 2)
+  ctx.fill()
+  const core = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.04, cx, cy, r * 1.05)
+  core.addColorStop(0, '#FFFFFF')
+  core.addColorStop(0.35, '#FFF4FF')
+  core.addColorStop(1, '#E8C4F8')
+  ctx.fillStyle = core
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fill()
+  const hues = ['#FF5A8A', '#FFD23A', '#3DDE97', '#5B8CFF', '#C084FC', '#FF7A28']
+  hues.forEach((h, i) => {
+    ctx.strokeStyle = h
+    ctx.lineWidth = Math.max(3, r * 0.09)
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.arc(cx, cy + r * 0.08, r * (0.42 + i * 0.1), Math.PI * 1.08, Math.PI * 1.92)
+    ctx.stroke()
+  })
+  ctx.fillStyle = 'rgba(255,255,255,0.88)'
+  ctx.beginPath()
+  ctx.ellipse(cx - r * 0.3, cy - r * 0.38, r * 0.28, r * 0.16, -0.45, 0, Math.PI * 2)
+  ctx.fill()
+  for (const [tx, ty, s] of [
+    [cx - r * 0.52, cy - r * 0.72, 0.08],
+    [cx + r * 0.46, cy - r * 0.58, 0.1],
+    [cx + r * 0.2, cy - r * 0.85, 0.07],
+  ]) {
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'
+    ctx.beginPath()
+    const rad = r * s
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2
+      ctx.lineTo(tx + Math.cos(a) * rad, ty + Math.sin(a) * rad)
+      ctx.lineTo(tx + Math.cos(a + Math.PI / 4) * rad * 0.35, ty + Math.sin(a + Math.PI / 4) * rad * 0.35)
+    }
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.fillStyle = '#6A1F5C'
+  ctx.beginPath()
+  ctx.arc(cx - r * 0.18, cy + r * 0.08, r * 0.08, 0, Math.PI * 2)
+  ctx.arc(cx + r * 0.18, cy + r * 0.08, r * 0.08, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.beginPath()
+  ctx.arc(cx - r * 0.21, cy + r * 0.07, r * 0.03, 0, Math.PI * 2)
+  ctx.arc(cx + r * 0.15, cy + r * 0.07, r * 0.03, 0, Math.PI * 2)
+  ctx.fill()
+  return c
+}
+
+function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
+  if (kind === 'bomb') return paintBomb(px)
+  if (kind === 'rainbow') return paintRainbow(px)
+  const c = canvas(px, px)
+  const ctx = c.getContext('2d')
+  if (!ctx) return c
+  const pal = PAL[color % PAL.length]
   const cx = px / 2
   const cy = px * 0.54
   const r = px * 0.44
@@ -158,21 +291,7 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
   ctx.beginPath()
   ctx.ellipse(cx, cy + r * 0.96, r * 0.72, r * 0.18, 0, 0, Math.PI * 2)
   ctx.fill()
-  if (kind !== 'rainbow') ear(ctx, color, cx, cy, r, pal.deep)
-  else {
-    ctx.fillStyle = '#FFE08A'
-    ctx.strokeStyle = pal.deep
-    ctx.lineWidth = Math.max(2, r * 0.07)
-    ctx.beginPath()
-    ctx.moveTo(cx - r * 0.55, cy - r * 0.7)
-    ctx.lineTo(cx - r * 0.28, cy - r * 1.25)
-    ctx.lineTo(cx, cy - r * 0.78)
-    ctx.lineTo(cx + r * 0.28, cy - r * 1.25)
-    ctx.lineTo(cx + r * 0.55, cy - r * 0.7)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  }
+  ear(ctx, color, cx, cy, r, pal.deep)
   const g = ctx.createRadialGradient(cx - r * 0.42, cy - r * 0.5, r * 0.06, cx + r * 0.06, cy + r * 0.12, r * 1.12)
   g.addColorStop(0, '#FFFFFF')
   g.addColorStop(0.12, pal.light)
@@ -198,41 +317,6 @@ function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
   ctx.beginPath()
   ctx.ellipse(cx + r * 0.28, cy - r * 0.08, r * 0.16, r * 0.1, 0.4, 0, Math.PI * 2)
   ctx.fill()
-  if (kind === 'bomb') {
-    ctx.fillStyle = pal.deep
-    ctx.beginPath()
-    const s = r * 0.28
-    ctx.moveTo(cx, cy + r * 0.05 - s)
-    for (let i = 0; i < 5; i++) {
-      const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5
-      const b = a + Math.PI / 5
-      ctx.lineTo(cx + Math.cos(a) * s, cy + r * 0.05 + Math.sin(a) * s)
-      ctx.lineTo(cx + Math.cos(b) * s * 0.45, cy + r * 0.05 + Math.sin(b) * s * 0.45)
-    }
-    ctx.closePath()
-    ctx.fill()
-    ctx.strokeStyle = '#6A3A18'
-    ctx.lineWidth = Math.max(2, r * 0.07)
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(cx + r * 0.35, cy - r * 0.55)
-    ctx.quadraticCurveTo(cx + r * 0.85, cy - r * 0.95, cx + r * 0.7, cy - r * 1.15)
-    ctx.stroke()
-    ctx.fillStyle = '#FFB703'
-    ctx.beginPath()
-    ctx.arc(cx + r * 0.7, cy - r * 1.18, r * 0.12, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  if (kind === 'rainbow') {
-    const hues = ['#FF5A8A', '#FFD23A', '#3DDE97', '#5B8CFF', '#C084FC']
-    hues.forEach((h, i) => {
-      ctx.strokeStyle = h
-      ctx.lineWidth = Math.max(2, r * 0.07)
-      ctx.beginPath()
-      ctx.arc(cx, cy + r * 0.15, r * (0.55 + i * 0.08), Math.PI * 1.05, Math.PI * 1.95)
-      ctx.stroke()
-    })
-  }
   return c
 }
 
@@ -297,9 +381,8 @@ function sprite(key: string, paint: () => HTMLCanvasElement): HTMLCanvasElement 
 }
 
 export function bodySprite(kind: Kind, color: number, px: number): HTMLCanvasElement {
-  const c = kind === 'rainbow' ? 0 : color
-  const key = `b:${kind}:${c}:${px}`
-  return sprite(key, () => paintBody(kind, c, px))
+  const key = kind === 'bonbon' ? `b:bonbon:${color}:${px}` : `b:${kind}:${px}`
+  return sprite(key, () => paintBody(kind, color, px))
 }
 
 export function faceSprite(blink: boolean, px: number): HTMLCanvasElement {
@@ -456,7 +539,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.arc(p.x, p.y, pieceD * 0.54, 0, Math.PI * 2)
       ctx.stroke()
     }
-    if (!p.popping) {
+    if (!p.popping && p.kind === 'bonbon') {
       blit(
         ctx,
         dpr,
@@ -471,6 +554,16 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
         1,
         1,
       )
+    }
+    if (!p.popping && (p.kind === 'bomb' || p.kind === 'rainbow')) {
+      ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+      const pulse = 0.82 + Math.sin(scene.t / 180 + p.id) * 0.08
+      ctx.strokeStyle = p.kind === 'bomb' ? 'rgba(255, 120, 220, 0.75)' : 'rgba(120, 220, 255, 0.65)'
+      ctx.lineWidth = Math.max(3, D * 0.09) * pulse
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, pieceD * 0.58 * pulse, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
     }
   }
   if (scene.rope.length > 1) {
@@ -503,10 +596,15 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     const u = wave.age / wave.life
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
     ctx.strokeStyle = wave.color
-    ctx.globalAlpha = Math.max(0, 1 - u)
-    ctx.lineWidth = Math.max(3, D * 0.07) * (1 - u * 0.3)
+    ctx.globalAlpha = Math.max(0, 0.95 * (1 - u * 0.85))
+    ctx.lineWidth = Math.max(4, D * 0.12) * (1 - u * 0.35)
     ctx.beginPath()
-    ctx.arc(wave.x, wave.y, wave.r + u * D * 1.4, 0, Math.PI * 2)
+    ctx.arc(wave.x, wave.y, wave.r + u * D * 2.2, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+    ctx.lineWidth = Math.max(2, D * 0.05) * (1 - u)
+    ctx.beginPath()
+    ctx.arc(wave.x, wave.y, wave.r + u * D * 2.05, 0, Math.PI * 2)
     ctx.stroke()
     ctx.globalAlpha = 1
   }

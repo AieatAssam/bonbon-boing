@@ -11,6 +11,7 @@ import {
   release,
   roundOver,
   rush,
+  softenClusters,
   step,
   visualRow,
   type GameState,
@@ -359,10 +360,10 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean) {
-    const n = reduced ? (big ? 8 : 5) : big ? 12 : 8
+    const n = reduced ? (big ? 8 : 5) : big ? 14 : 9
     for (let i = 0; i < n; i++) {
       const a = (Math.PI * 2 * i) / n + (i % 2) * 0.15
-      const sp = (big ? 250 : 150) * (0.6 + (i % 3) * 0.18)
+      const sp = layout.D * (big ? 12 + (i % 5) * 2.2 : 7 + (i % 3) * 1.1) * (0.85 + (i % 4) * 0.05)
       const star = big && i % 4 === 0
       particles.push({
         x,
@@ -766,10 +767,10 @@ export function boot(): void {
     if (ghost) {
       for (let i = 0; i <= ghost.prefix; i++) selected.add(ghostPath[i].id)
     }
-    const ropeIds = freeze
-      ? []
-      : state.drag.length
-        ? state.drag
+    const ropeIds = state.drag.length
+      ? state.drag
+      : freeze
+        ? []
         : state.phase !== 'idle'
           ? state.showIds
           : ghost
@@ -1029,6 +1030,7 @@ export function boot(): void {
         p.popT = -1
       }
       state.pieces = state.pieces.filter((p) => !p.dead)
+      softenClusters(state, 6)
       let bomb = state.pieces.find((p) => p.kind === 'bomb')
       if (!bomb) {
         const anchor =
@@ -1059,7 +1061,7 @@ export function boot(): void {
         state.drag = through.map((p) => p.id)
         armRelease()
         let t = 0
-        while (t < 90) {
+        while (t < 120) {
           step(state, 16)
           updateParticles(16)
           t += 16
@@ -1102,7 +1104,7 @@ export function boot(): void {
         state.drag = through.map((p) => p.id)
         armRelease()
         let t = 0
-        while (t < 90) {
+        while (t < 120) {
           step(state, 16)
           updateParticles(16)
           t += 16

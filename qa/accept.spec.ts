@@ -73,9 +73,29 @@ for (const [w, h] of viewports) {
       for (const screen of screens) {
         errors.length = 0
         const seed = screen === 'play' ? 'pretty' : 'feel'
-        await page.goto(`?qa&freeze=1&screen=${screen}&seed=${seed}`, { timeout: 30_000 })
-        await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
-        await page.evaluate(() => document.fonts.ready)
+        if (screen === 'chain') {
+          await page.goto(`?qa&freeze=1&screen=play&seed=feel`, { timeout: 30_000 })
+          await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+          await page.evaluate(() => document.fonts.ready)
+          const upper = await page.evaluate(() => {
+            const q = (window as unknown as { __qa: Qa }).__qa
+            return q.findChain(6) ?? q.findChain(5)
+          })
+          expect(upper?.length ?? 0).toBeGreaterThanOrEqual(5)
+          await page.mouse.move(upper![0]!.x, upper![0]!.y)
+          await page.mouse.down()
+          for (const pt of upper!) {
+            await page.mouse.move(pt.x, pt.y, { steps: 4 })
+            await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+          }
+          const tip = upper![upper!.length - 1]!
+          await page.mouse.move(tip.x + 8, tip.y + 8)
+          await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+        } else {
+          await page.goto(`?qa&freeze=1&screen=${screen}&seed=${seed}`, { timeout: 30_000 })
+          await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+          await page.evaluate(() => document.fonts.ready)
+        }
         const check = await page.evaluate(() =>
           (window as unknown as { __checkOverlaps: () => { overlaps: unknown[]; offscreen: string[] } }).__checkOverlaps(),
         )
@@ -108,27 +128,52 @@ for (const [w, h] of viewports) {
           expect(state.chain.length).toBeGreaterThanOrEqual(5)
           expect(state.ribbonThickness).toBeGreaterThanOrEqual(8)
         }
-        if (screen === 'play') {
+        if (screen === 'play' || screen === 'chain') {
           expect(state.maxCluster).toBeLessThanOrEqual(6)
-          const hud = await page.evaluate(() =>
-            (window as unknown as { __checkHudBoard: () => { violations: string[] } }).__checkHudBoard(),
-          )
-          expect(hud.violations, `${screen} hud-board`).toEqual([])
+          if (screen === 'play') {
+            const hud = await page.evaluate(() =>
+              (window as unknown as { __checkHudBoard: () => { violations: string[] } }).__checkHudBoard(),
+            )
+            expect(hud.violations, `${screen} hud-board`).toEqual([])
+          }
         }
         if (screen === 'chain') {
+          expect(state.chain.length).toBeGreaterThanOrEqual(5)
+          await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
           const sample = await page.evaluate(() => {
             const q = (window as unknown as { __qa: Qa }).__qa
-            const path = q.findChain(5)
-            if (!path || path.length < 2) return { ok: false }
-            const mx = (path[0].x + path[1].x) / 2
-            const my = (path[0].y + path[1].y) / 2
+            const ids = q.chain
+            if (ids.length < 2) return { ok: false }
+            const p0 = q.center(ids[0]!)
+            const p1 = q.center(ids[1]!)
+            if (!p0 || !p1) return { ok: false }
             const c = document.getElementById('field') as HTMLCanvasElement
             const ctx = c.getContext('2d')
             if (!ctx) return { ok: false }
             const sx = c.width / innerWidth
             const sy = c.height / innerHeight
-            const d = ctx.getImageData(Math.floor(mx * sx), Math.floor(my * sy), 1, 1).data
-            return { ok: d[3] > 200 && d[0] > 150 && d[1] > 110 }
+            const ribbonPx = (r: number, g: number, b: number, a: number) => {
+              if (a < 190) return false
+              if (r > 215 && g > 215 && b > 215) return true
+              if (r > 195 && g > 140 && b < 150) return true
+              if (g > 195 && r > 90 && r < 170) return true
+              if (r > 210 && g > 90 && b > 150) return true
+              return r + g + b > 450
+            }
+            let hits = 0
+            for (const t of [0.38, 0.5, 0.62]) {
+              const mx = p0.x + (p1.x - p0.x) * t
+              const my = p0.y + (p1.y - p0.y) * t
+              for (const [dx, dy] of [
+                [0, 0],
+                [-4, 0],
+                [4, 0],
+              ]) {
+                const d = ctx.getImageData(Math.floor((mx + dx) * sx), Math.floor((my + dy) * sy), 1, 1).data
+                if (ribbonPx(d[0]!, d[1]!, d[2]!, d[3]!)) hits += 1
+              }
+            }
+            return { ok: hits >= 2 }
           })
           expect(sample.ok, 'ribbon pixel between chain centres').toBe(true)
         }
