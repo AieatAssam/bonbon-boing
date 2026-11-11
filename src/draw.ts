@@ -64,6 +64,7 @@ export type Scene = {
   screen: 'title' | 'play' | 'pause' | 'results'
   heap: { color: number; kind: Kind; x: number; y: number; sx: number; sy: number; id: number }[]
   mat: { x: number; y: number; w: number; h: number } | null
+  pieceClip: { x: number; y: number; w: number; h: number } | null
   peeks: { color: number; x: number; y: number }[]
   dim: number
   waves: { x: number; y: number; r: number; age: number; life: number; color: string }[]
@@ -591,6 +592,12 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   ctx.translate(scene.bumpX, scene.bumpY)
   const ox = scene.bumpX
   const oy = scene.bumpY
+  if (scene.pieceClip) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(scene.pieceClip.x, scene.pieceClip.y, scene.pieceClip.w, scene.pieceClip.h)
+    ctx.clip()
+  }
   for (const h of scene.heap) {
     blit(ctx, dpr, ox, oy, bodySprite(h.kind, h.color, px), h.x, h.y, pieceD, pieceD, h.sx, h.sy)
     blit(ctx, dpr, ox, oy, faceSprite(false, px), h.x, h.y + pieceD * (1 - h.sy) * 0.08, pieceD, pieceD, 1, 1)
@@ -650,6 +657,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.globalAlpha = 1
     }
   }
+  if (scene.pieceClip) ctx.restore()
   if (scene.titleHint && scene.titleHint.rope.length > 1) {
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
     drawRibbon(ctx, scene.titleHint.rope, scene.titleHint.ropeColor, D * 0.2, scene.liteRibbon)

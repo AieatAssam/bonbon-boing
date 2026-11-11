@@ -6,7 +6,7 @@ Scoring uses combo chains, bombs, and rainbows (see `release()` in `src/sim.ts`)
 |------:|----------------:|-------|
 | 1 | any finish | Completed the round |
 | 2 | 20,000+ | Strong run |
-| 3 | 38,000+ | Skilled long-chain play |
+| 3 | 35,000+ | Skilled long-chain play |
 
 Greedy longest-chain touch QA ~**26–33k**; skilled long-chain ~**39k**.
 

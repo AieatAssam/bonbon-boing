@@ -302,6 +302,8 @@ export function boot(): void {
   let freeze = params.has('freeze')
   let ghostOn = false
   let frame = 0
+  let pieceClipFrames = 0
+  let lastSimPhase: GameState['phase'] = 'idle'
   let highlightFrame = 0
   let popWallMs = 0
   let last = performance.now()
@@ -347,7 +349,7 @@ export function boot(): void {
   }
 
   const STAR2_SCORE = 20_000
-  const STAR3_SCORE = 38_000
+  const STAR3_SCORE = 35_000
 
   function nativeDprCap(): number {
     return Math.min(2, devicePixelRatio || 1)
@@ -790,6 +792,8 @@ export function boot(): void {
     clockTickAt = 0
     ghostDemoDone = save.tut || qaMode
     ghostCycleStart = 0
+    pieceClipFrames = 0
+    lastSimPhase = 'idle'
   }
 
   function showPlay() {
@@ -1073,6 +1077,10 @@ export function boot(): void {
     if (!frozen && !liteSprings) updateSprings(dt, now)
     updateParticles(dt)
     const popped = step(state, dt)
+    if (lastSimPhase === 'clearing' && state.phase === 'falling') {
+      if (state.lastChainLen >= 6 || state.hitstopTotal > 0) pieceClipFrames = 3
+    }
+    lastSimPhase = state.phase
     if (popped.length) notePops(popped)
     if (roundOver(state)) showResults()
     syncHud()
@@ -1287,6 +1295,15 @@ export function boot(): void {
           : rope[rope.length - 1]!
       bubble = placeChainBubble(anchor, rope, chainLen)
     }
+    const mat =
+      screen === 'title'
+        ? null
+        : {
+            x: layout.ox - D * 0.1,
+            y: Math.max(layout.hud, layout.oy - D * 0.08),
+            w: layout.cols * D + D * 0.2,
+            h: layout.padTop + layout.rows * D + D * 0.12,
+          }
     return {
       w: innerWidth,
       h: innerHeight,
@@ -1320,15 +1337,8 @@ export function boot(): void {
       screen,
       dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
-      mat:
-        screen === 'title'
-          ? null
-          : {
-              x: layout.ox - D * 0.1,
-              y: Math.max(layout.hud, layout.oy - D * 0.08),
-              w: layout.cols * D + D * 0.2,
-              h: layout.padTop + layout.rows * D + D * 0.12,
-            },
+      mat,
+      pieceClip: screen === 'play' && pieceClipFrames > 0 && mat ? mat : null,
       peeks,
       liteRibbon: perfLevel > 0,
     }
@@ -1338,6 +1348,7 @@ export function boot(): void {
     const now = performance.now()
     const blink = !freeze && !reduced && now % 3200 < 140
     renderScene(gfx, scene(now), blink)
+    if (pieceClipFrames > 0) pieceClipFrames -= 1
     frame += 1
   }
 
