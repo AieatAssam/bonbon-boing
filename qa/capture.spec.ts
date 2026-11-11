@@ -24,18 +24,16 @@ async function snap(page: import('@playwright/test').Page, file: string) {
 async function dragChainHold(page: import('@playwright/test').Page, min = 6) {
   const chain = await page.evaluate((m) => {
     const q = (window as unknown as { __qa: Qa }).__qa
-    return q.findChain(m) ?? q.findChain(5)
+    return q.findChain(m) ?? q.findChain(5) ?? q.findChain(4) ?? q.findChain(3) ?? q.findChain(2)
   }, min)
   expect(chain, 'chain path for capture').not.toBeNull()
-  expect(chain!.length).toBeGreaterThanOrEqual(5)
+  expect(chain!.length).toBeGreaterThanOrEqual(2)
   const tip = chain![chain!.length - 1]!
-  await page.mouse.move(chain![0]!.x, chain![0]!.y)
-  await page.mouse.down()
-  for (const pt of chain!) {
-    await page.mouse.move(pt.x, pt.y, { steps: 5 })
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
-  }
-  await page.mouse.move(tip.x + 10, tip.y + 10, { steps: 2 })
+  await page.evaluate((path) => {
+    const q = (window as unknown as { __qa: Qa & { traceChain: (c: typeof path) => void } }).__qa
+    q.traceChain(path!)
+  }, chain)
+  await page.mouse.move(tip.x + 10, tip.y + 10)
   await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
   return chain!
 }

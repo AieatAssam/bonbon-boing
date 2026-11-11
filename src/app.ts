@@ -3,9 +3,11 @@ import {
   byId,
   canAppend,
   createGame,
+  COMBO_WINDOW_MS,
   dailySeed,
   extendDrag,
   findPath,
+  ROUND_MS,
   maxSameColorCluster,
   pathColor,
   release,
@@ -14,8 +16,6 @@ import {
   POP_SQUASH_MS,
   POP_VANISH_MS,
   roundOver,
-  rush,
-  softenClusters,
   step,
   visualRow,
   type GameState,
@@ -83,6 +83,7 @@ export type Qa = {
   muteSfx: boolean
   muteMusic: boolean
   frame: number
+  fps: number
   highlightFrame: number
   spriteMisses: number
   audioCreates: number
@@ -91,6 +92,10 @@ export type Qa = {
   ribbonThickness: number
   boardRect: () => { x: number; y: number; w: number; h: number }
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
+  traceChain: (cells: { id: number; x: number; y: number }[]) => void
+  appendPiece: (id: number) => void
+  appendPieces: (ids: number[]) => void
+  beginChain: (id: number) => void
   findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => ChainCell[] | null
   center: (id: number) => { x: number; y: number } | null
   pause: () => void
@@ -203,6 +208,8 @@ export function boot(): void {
   const hudLeft = el('div', 'hud-side')
   const hudMid = el('div', 'hud-mid')
   const scoreEl = el('div', 'ui score')
+  const comboEl = el('div', 'combo-badge ui')
+  comboEl.hidden = true
   const hudMini = el('div', 'hud-mini ui')
   const timeEl = el('div', 'ui timer ring')
   const pauseMenu = el('div', 'scrim')
@@ -263,7 +270,7 @@ export function boot(): void {
   mk(titleCorner, 'Music', 'music', ICONS.note, true)
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
-  hudMid.append(scoreEl, hudMini)
+  hudMid.append(scoreEl, comboEl, hudMini)
   hud.append(hudLeft, hudMid, timeEl)
   mkPill(pauseMain, 'Resume', 'resume', ICONS.play, 'primary')
   mkPill(pauseMain, 'Restart', 'restart', ICONS.restart)
@@ -291,6 +298,14 @@ export function boot(): void {
   let floats: { x: number; y: number; text: string; age: number; big?: boolean }[] = []
   let popRings: { x: number; y: number; age: number; life: number }[] = []
   let flashT = 0
+  let ropeFadeMs = 0
+  let ropeTrail: { x: number; y: number }[] = []
+  let ropeFadeColor = 0
+  let ropeFadeLen = 0
+  let clockOn = false
+  let clockRunMs = 0
+  let clockTickAt = 0
+  let fpsBuf: number[] = []
   let bumpX = 0
   let bumpY = 0
   let bumpT = 0
@@ -352,7 +367,7 @@ export function boot(): void {
 
   function hit(x: number, y: number): Piece | null {
     let best: Piece | null = null
-    let bestD = layout.D * 0.48
+    let bestD = layout.D * 0.56
     for (const p of state.pieces) {
       if (p.dead) continue
       const c = center(p)
@@ -420,8 +435,8 @@ export function boot(): void {
       burst(c.x, c.y, p.color, big, bomb)
       if (bomb) {
         flashT = 200
-        waves.push({ x: c.x, y: c.y, r: layout.D * 0.2, age: 0, life: 520, color: 'rgba(255,255,255,0.92)' })
-        waves.push({ x: c.x, y: c.y, r: layout.D * 0.15, age: 0, life: 560, color: 'rgba(255, 214, 92, 0.88)' })
+        waves.push({ x: c.x, y: c.y, r: layout.D * 0.25, age: 0, life: 380, color: 'rgba(255,255,255,0.96)' })
+        waves.push({ x: c.x, y: c.y, r: layout.D * 0.12, age: 0, life: 420, color: 'rgba(255, 214, 92, 0.9)' })
       }
       if (p.kind === 'rainbow') {
         for (let b = 0; b < 8; b++) {
@@ -457,8 +472,18 @@ export function boot(): void {
     popWallMs = performance.now() - t0
     if (!ids.length) return
     const spot = center(byId(state, ids[0]) ?? state.pieces[0])
-    floats.push({ x: spot.x, y: spot.y - layout.D * 0.3, text: `+${state.gained}`, age: 0, big: true })
-    if (state.combo > 1) floats.push({ x: spot.x, y: spot.y - layout.D * 0.75, text: `x${state.combo}`, age: 0, big: true })
+    floats.push({
+      x: spot.x,
+      y: Math.max(layout.hud + layout.D * 0.2, spot.y - layout.D * 0.15),
+      text: `+${state.gained}`,
+      age: 0,
+      big: true,
+    })
+    const path = state.queue.map((q) => byId(state, q.id)).filter((p): p is Piece => !!p).map((p) => center(p))
+    ropeTrail = path.length > 1 ? path : ropeTrail
+    ropeFadeColor = state.chainColor
+    ropeFadeLen = Math.max(ropeFadeLen, state.queue.length)
+    ropeFadeMs = 80
     notePops(ids)
     ghostOn = false
     save.tut = true
@@ -480,7 +505,7 @@ export function boot(): void {
       rememberBest()
       const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
       bestEl.innerHTML = `${ICONS.star}<span>${best}</span>`
-      const n = state.score >= 2500 ? 3 : state.score >= 1000 ? 2 : 1
+      const n = state.score >= 18_000 ? 3 : state.score >= 12_000 ? 2 : 1
       stars.innerHTML = [0, 1, 2]
         .map(
           (i) =>
@@ -502,6 +527,8 @@ export function boot(): void {
   function syncHud() {
     const prev = scoreEl.textContent
     scoreEl.textContent = String(state.score)
+    comboEl.hidden = state.combo <= 1 || screen !== 'play'
+    comboEl.textContent = state.combo > 1 ? `x${state.combo}` : ''
     if (prev !== scoreEl.textContent && screen === 'play') {
       scoreEl.classList.remove('pop')
       void scoreEl.offsetWidth
@@ -530,6 +557,9 @@ export function boot(): void {
     ghostPath = []
     state = createGame(seed, layout.cols, layout.rows, nextMode)
     ghostOn = tutParam || (!save.tut && !qaMode)
+    clockOn = false
+    clockRunMs = 0
+    clockTickAt = 0
   }
 
   function showPlay() {
@@ -538,7 +568,26 @@ export function boot(): void {
 
   function openPause() {
     if (screen === 'title') return
+    if (clockOn && clockTickAt) {
+      clockRunMs += performance.now() - clockTickAt
+      clockTickAt = 0
+    }
     show('pause')
+  }
+
+  function syncWallClock(now: number) {
+    if (!clockOn || mode === 'cuddle') return
+  const running = screen === 'play' && document.visibilityState === 'visible'
+    if (running) {
+      if (!clockTickAt) clockTickAt = now
+      state.timeLeft = Math.max(0, ROUND_MS - clockRunMs - (now - clockTickAt))
+    } else {
+      if (clockTickAt) {
+        clockRunMs += now - clockTickAt
+        clockTickAt = 0
+      }
+      state.timeLeft = Math.max(0, ROUND_MS - clockRunMs)
+    }
   }
 
   function rememberBest() {
@@ -577,8 +626,12 @@ export function boot(): void {
     if (action === 'pause') openPause()
     else if (action === 'resume') {
       last = performance.now()
+      clockTickAt = performance.now()
       showPlay()
-    } else if (action === 'home') show('title')
+    } else if (action === 'home') {
+      if (screen === 'play') openPause()
+      else show('title')
+    }
     else if (action === 'restart') {
       const seed = qaMode ? state.seed : mode === 'daily' ? dailySeed() : `${mode}-${Date.now()}`
       fresh(mode, seed)
@@ -655,7 +708,10 @@ export function boot(): void {
     fingerOn = true
     fingerX = x
     fingerY = y
-    if (state.phase !== 'idle') rush(state)
+    if (!clockOn) {
+      clockOn = true
+      clockTickAt = performance.now()
+    }
     if (roundOver(state)) {
       showResults()
       return
@@ -749,6 +805,8 @@ export function boot(): void {
       return r.age < r.life
     })
     flashT = Math.max(0, flashT - dt)
+    ropeFadeMs = Math.max(0, ropeFadeMs - dt)
+    if (particles.length > 180) particles.splice(0, particles.length - 180)
   }
 
   function tick(dt: number, now: number) {
@@ -757,6 +815,22 @@ export function boot(): void {
       return
     }
     if (screen !== 'play') return
+    if (!clockOn) {
+      if (!ghostOn || save.tut) clockOn = true
+      else {
+        const u = (now % 2600) / 2600
+        if (u > 0.94) clockOn = true
+      }
+      if (clockOn) clockTickAt = now
+    }
+    syncWallClock(now)
+    if (
+      state.combo > 1 &&
+      state.phase === 'idle' &&
+      state.simMs - state.lastSettleAt > COMBO_WINDOW_MS
+    ) {
+      state.combo = 1
+    }
     const frozen = state.hitstopLeft > 0
     if (!frozen) updateSprings(dt, now)
     updateParticles(dt)
@@ -790,19 +864,11 @@ export function boot(): void {
   function scene(now: number): Scene {
     const D = layout.D
     const ghost = ghostPose(now)
-    const selected = new Set<number>(state.drag.length ? state.drag : state.showIds)
+    const selected = new Set<number>(state.drag)
     if (ghost) {
       for (let i = 0; i <= ghost.prefix; i++) selected.add(ghostPath[i].id)
     }
-    const ropeIds = state.drag.length
-      ? state.drag
-      : freeze
-        ? []
-        : state.phase !== 'idle'
-          ? state.showIds
-          : ghost
-            ? ghostPath.slice(0, ghost.prefix + 1).map((p) => p.id)
-            : []
+    const ghostSlice = ghost ? ghostPath.slice(0, ghost.prefix + 1) : []
     const pieces = state.pieces
       .filter((p) => {
         if (p.dead && (p.popT < 0 || p.popT >= POP_MS)) return false
@@ -840,9 +906,14 @@ export function boot(): void {
             sx *= swell
             sy *= swell
           }
+        } else if (p.landT >= 0 && p.landT < 180 && !p.dead) {
+          const u = p.landT / 180
+          const wob = Math.sin(u * Math.PI * 3) * (1 - u) * 0.06
+          sx = 1.15 - 0.15 * u + wob
+          sy = 0.85 + 0.15 * u - wob
         } else if (p.fallT >= 0 && p.fallT < 1 && !p.dead) {
           const ft = p.fallT
-          const land = ft > 0.85 ? Math.sin(((ft - 0.85) / 0.15) * Math.PI) * 0.12 : 0
+          const land = ft > 0.85 ? Math.sin(((ft - 0.85) / 0.15) * Math.PI) * 0.08 : 0
           sx = 1 + land
           sy = 1 - land * 0.55
         } else if (p.kind !== 'bonbon' && !on) {
@@ -863,10 +934,17 @@ export function boot(): void {
           selected: on,
         }
       })
-    const rope = ropeIds
-      .map((id) => byId(state, id))
-      .filter((p): p is Piece => !!p)
-      .map((p) => center(p))
+    const rope =
+      state.drag.length > 1
+        ? state.drag
+            .map((id) => byId(state, id))
+            .filter((p): p is Piece => !!p)
+            .map((p) => center(p))
+        : ropeFadeMs > 0 && ropeTrail.length > 1
+          ? ropeTrail
+          : ghostSlice.length > 1
+            ? ghostSlice.map((p) => center(p))
+            : []
     let peeks: Scene['peeks'] = []
     if (screen === 'results') {
       const card = results.getBoundingClientRect()
@@ -882,15 +960,50 @@ export function boot(): void {
     const dragPath = state.drag.map((id) => byId(state, id)).filter((p): p is Piece => !!p)
     const ropeColor = dragPath.length
       ? (pathColor(dragPath) ?? dragPath[0].color)
-      : state.showIds.length
-        ? (pathColor(state.showIds.map((id) => byId(state, id)).filter((p): p is Piece => !!p)) ?? 0)
-        : 0
+      : ghostSlice.length
+        ? (pathColor(ghostSlice) ?? ghostSlice[0]!.color)
+        : ropeFadeMs > 0
+          ? ropeFadeColor
+          : 0
+    const chainLen = state.drag.length || (ropeFadeMs > 0 ? ropeFadeLen : ghostSlice.length)
     const lastTip =
       dragPath.length > 0
         ? center(dragPath[dragPath.length - 1])
         : rope.length > 0
           ? rope[rope.length - 1]
           : null
+    let titleHint: Scene['titleHint'] = null
+    if (screen === 'title') {
+      const u = (now % 2800) / 2800
+      const travel = Math.min(1, Math.max(0, (u - 0.12) / 0.58))
+      const idx = Math.min(2, Math.floor(travel * 3))
+      const heapPts = [
+        [-1, 1],
+        [0, 1],
+        [1, 1],
+        [-0.5, 0],
+        [0.5, 0],
+        [0, -0.95],
+      ].map(([gx, gy], i) => ({
+        color: i % 6,
+        x: (landscape ? innerWidth * 0.38 : innerWidth * 0.5) + gx * D * 0.92,
+        y: (landscape ? innerHeight * 0.55 : innerHeight * 0.48) + gy * D * 0.78,
+      }))
+      const hintColor = 2
+      const pick = [1, 0, 4].map((i) => ({ ...heapPts[i]!, color: hintColor }))
+      const ropePts = pick.slice(0, idx + 1).map((p) => ({ x: p.x, y: p.y }))
+      const tip = pick[idx]!
+      titleHint = {
+        rope: ropePts,
+        ropeColor: hintColor,
+        hand: {
+          x: tip.x + D * 0.2,
+          y: tip.y + D * 0.28,
+          down: travel < 0.86,
+          alpha: u < 0.08 ? u / 0.08 : u > 0.9 ? (1 - u) / 0.1 : 0.88,
+        },
+      }
+    }
     const heap =
       screen === 'title'
         ? [
@@ -918,6 +1031,29 @@ export function boot(): void {
             }
           })
         : []
+    let bubble: Scene['bubble'] = null
+    if (screen === 'play' && chainLen > 1) {
+      const base =
+        fingerOn && state.drag.length
+          ? { x: fingerX, y: fingerY }
+          : rope.length
+            ? rope[rope.length - 1]!
+            : null
+      if (base) {
+        let bx = base.x
+        let by = base.y - D * 1.2
+        const mat = {
+          x: layout.ox - D * 0.1,
+          y: Math.max(layout.hud, layout.oy - D * 0.08),
+          w: layout.cols * D + D * 0.2,
+          h: layout.padTop + layout.rows * D + D * 0.12,
+        }
+        const pad = D * 0.35
+        bx = Math.min(mat.x + mat.w - pad, Math.max(mat.x + pad, bx))
+        by = Math.min(mat.y + mat.h - pad, Math.max(mat.y + pad, by))
+        bubble = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
+      }
+    }
     return {
       w: innerWidth,
       h: innerHeight,
@@ -927,7 +1063,9 @@ export function boot(): void {
       pieces: screen === 'title' ? [] : pieces,
       rope: screen === 'title' ? [] : rope,
       ropeColor,
-      chainLen: state.drag.length || (state.showIds.length > 1 ? state.showIds.length : 0),
+      chainLen,
+      bubble,
+      titleHint,
       finger:
         state.drag.length > 1 && lastTip
           ? { x: fingerOn ? fingerX : lastTip.x + layout.D * 0.08, y: fingerOn ? fingerY : lastTip.y + layout.D * 0.08 }
@@ -947,7 +1085,7 @@ export function boot(): void {
       bumpY: reduced ? 0 : bumpY,
       floats,
       screen,
-      dim: screen === 'pause' ? 1 : 0,
+      dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
       mat:
         screen === 'title'
@@ -1016,10 +1154,12 @@ export function boot(): void {
     if (want === 'results') {
       fresh('timed', seedParam ?? 'feel')
       showPlay()
+      clockOn = true
       for (let i = 0; i < 16 && !roundOver(state); i++) {
         if (!settleChain(i % 3 === 0 ? 5 : 3)) break
       }
-      while (state.timeLeft > 0 && state.phase === 'idle') step(state, 2500)
+      clockRunMs = ROUND_MS
+      state.timeLeft = 0
       showResults()
       if (qaMode && params.has('freeze')) freeze = true
       return
@@ -1038,7 +1178,7 @@ export function boot(): void {
     fresh('timed', seed)
     showPlay()
     if (want === 'chain') {
-      const path = findPath(state, 5)
+      const path = findPath(state, 5) ?? findPath(state, 4)
       if (path) {
         state.drag = path.map((p) => p.id)
         const tip = center(path[path.length - 1])
@@ -1065,7 +1205,9 @@ export function boot(): void {
         pose = 'pop'
       }
     } else if (want === 'bomb' || want === 'bomb-piece' || want === 'bomb-board') {
-      settleChain(5)
+      for (let n = 0; n < 10; n++) {
+        if (settleChain(5) && state.pieces.some((p) => !p.dead && p.kind === 'bomb')) break
+      }
       particles = []
       waves = []
       beams = []
@@ -1076,31 +1218,10 @@ export function boot(): void {
         p.popT = -1
       }
       state.pieces = state.pieces.filter((p) => !p.dead)
-      softenClusters(state, 6)
-      let bomb = state.pieces.find((p) => p.kind === 'bomb')
-      if (!bomb) {
-        const anchor =
-          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
-          state.pieces.find((p) => p.kind === 'bonbon')
-        if (anchor) {
-          anchor.kind = 'bomb'
-          anchor.color = state.chainColor ?? 0
-          bomb = anchor
-        }
-      }
       freeze = true
     } else if (want === 'bomb-blast') {
-      for (const n of [5, 4, 3]) {
-        if (settleChain(n)) break
-      }
-      if (!state.pieces.some((p) => !p.dead && p.kind === 'bomb')) {
-        const anchor =
-          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
-          state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
-        if (anchor) {
-          anchor.kind = 'bomb'
-          anchor.color = state.chainColor ?? anchor.color
-        }
+      for (let n = 0; n < 10; n++) {
+        if (settleChain(5) && state.pieces.some((p) => !p.dead && p.kind === 'bomb')) break
       }
       const through = chainThrough('bomb')
       if (through.length >= 2) {
@@ -1117,7 +1238,9 @@ export function boot(): void {
       }
       freeze = true
     } else if (want === 'rainbow' || want === 'rainbow-piece' || want === 'rainbow-board') {
-      settleChain(8)
+      for (let n = 0; n < 12; n++) {
+        if (settleChain(7) && state.pieces.some((p) => !p.dead && p.kind === 'rainbow')) break
+      }
       particles = []
       waves = []
       beams = []
@@ -1128,22 +1251,10 @@ export function boot(): void {
         p.popT = -1
       }
       state.pieces = state.pieces.filter((p) => !p.dead)
-      if (!state.pieces.some((p) => p.kind === 'rainbow')) {
-        const anchor =
-          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
-          state.pieces.find((p) => p.kind === 'bonbon')
-        if (anchor) anchor.kind = 'rainbow'
-      }
       freeze = true
     } else if (want === 'rainbow-blast') {
-      for (const n of [8, 7, 6]) {
-        if (settleChain(n)) break
-      }
-      if (!state.pieces.some((p) => !p.dead && p.kind === 'rainbow')) {
-        const anchor =
-          state.pieces.find((p) => p.c === Math.floor(layout.cols / 2) && p.r === 4) ??
-          state.pieces.find((p) => !p.dead && p.kind === 'bonbon')
-        if (anchor) anchor.kind = 'rainbow'
+      for (let n = 0; n < 12; n++) {
+        if (settleChain(7) && state.pieces.some((p) => !p.dead && p.kind === 'rainbow')) break
       }
       const through = chainThrough('rainbow')
       if (through.length >= 2) {
@@ -1169,7 +1280,11 @@ export function boot(): void {
     addEventListener('popstate', () => {
       history.pushState({ bb: 1 }, '')
       if (screen === 'play') openPause()
-      else if (screen === 'pause' || screen === 'results') show('title')
+      else if (screen === 'pause') {
+        last = performance.now()
+        clockTickAt = performance.now()
+        showPlay()
+      } else if (screen === 'results') show('title')
       draw()
     })
   }
@@ -1316,6 +1431,56 @@ export function boot(): void {
       else if (phase === 'move') onMove(x, y)
       else onUp()
     },
+    traceChain(cells: { id: number; x: number; y: number }[]) {
+      if (!cells.length || screen !== 'play') return
+      if (roundOver(state)) return
+      fingerOn = true
+      state.drag = []
+      for (const cell of cells) {
+        extendDrag(state, cell.id)
+        fingerX = cell.x
+        fingerY = cell.y
+      }
+      if (ghostOn) ghostOn = false
+      draw()
+    },
+    appendPiece(id: number) {
+      if (screen !== 'play') return
+      const p = byId(state, id)
+      if (!p) return
+      extendDrag(state, id)
+      const c = center(p)
+      fingerX = c.x
+      fingerY = c.y
+      fingerOn = true
+      draw()
+    },
+    beginChain(id: number) {
+      if (screen !== 'play') return
+      state.drag = [id]
+      const p = byId(state, id)
+      if (p) {
+        const c = center(p)
+        fingerX = c.x
+        fingerY = c.y
+      }
+      fingerOn = true
+      if (ghostOn) ghostOn = false
+      highlightFrame = frame
+      draw()
+    },
+    appendPieces(ids: number[]) {
+      if (screen !== 'play') return
+      for (const id of ids) extendDrag(state, id)
+      const last = byId(state, ids[ids.length - 1] ?? -1)
+      if (last) {
+        const c = center(last)
+        fingerX = c.x
+        fingerY = c.y
+      }
+      fingerOn = true
+      draw()
+    },
     findChain(min, avoid = [], prefer) {
       const path = findPath(state, min, avoid, prefer)
       if (!path) return null
@@ -1326,7 +1491,16 @@ export function boot(): void {
       return p ? center(p) : null
     },
     pause() { openPause(); draw() },
-    resume() { last = performance.now(); showPlay(); draw() },
+    resume() {
+      last = performance.now()
+      clockTickAt = performance.now()
+      showPlay()
+      draw()
+    },
+    get fps() {
+      if (!fpsBuf.length) return 60
+      return fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
+    },
     restart() { onAction('restart') },
     home() { show('title'); draw() },
     start(nextMode, seed) {
@@ -1337,10 +1511,11 @@ export function boot(): void {
     pump(ms) {
       if (freeze || screen === 'pause') return
       let left = ms
-      const now = performance.now()
+      let t = performance.now()
       while (left > 0) {
         const d = Math.min(16, left)
-        tick(d, now)
+        tick(d, t)
+        t += d
         left -= d
       }
       draw()
@@ -1374,7 +1549,21 @@ export function boot(): void {
     if (e.key !== 'Escape') return
     e.preventDefault()
     if (screen === 'play') openPause()
-    else if (screen === 'pause' || screen === 'results') show('title')
+      else if (screen === 'pause') {
+        last = performance.now()
+        clockTickAt = performance.now()
+        showPlay()
+      } else if (screen === 'results') show('title')
+    draw()
+  })
+  addEventListener('visibilitychange', () => {
+    const now = performance.now()
+    if (document.hidden && clockTickAt) {
+      clockRunMs += now - clockTickAt
+      clockTickAt = 0
+    } else if (!document.hidden && screen === 'play' && clockOn) {
+      clockTickAt = now
+    }
     draw()
   })
   addEventListener('resize', () => { resize(); draw() })
@@ -1385,6 +1574,10 @@ export function boot(): void {
     last = now
     if (dt > 40) dt = 40
     if (dt < 0) dt = 0
+    if (dt > 0) {
+      fpsBuf.push(1000 / dt)
+      if (fpsBuf.length > 90) fpsBuf.shift()
+    }
     tick(dt, now)
     draw()
     requestAnimationFrame(loop)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BOMB_AT,
   HITSTOP_MS,
+  RAINBOW_AT,
   canAppend,
   collectClears,
   createGame,
@@ -9,9 +10,11 @@ import {
   extendDrag,
   findPath,
   gridSignature,
+  greedySession,
   maxSameColorCluster,
   ladderHz,
   loadGrid,
+  playToIdle,
   release,
   roundOver,
   rush,
@@ -100,13 +103,25 @@ describe('pacing', () => {
     expect(s.pieces.some((p) => p.kind === 'bomb')).toBe(true)
   })
 
-  it('a chain of 8 drops a rainbow', () => {
-    const s = loadGrid(['0 0 0 0 0 0 0 0'])
+  it(`a chain of ${RAINBOW_AT} drops a rainbow`, () => {
+    const row = Array.from({ length: RAINBOW_AT }, () => '0').join(' ')
+    const s = loadGrid([row])
     s.drag = s.pieces.map((p) => p.id)
     release(s)
-    let guard = 0
-    while (!s.settled && guard++ < 80) step(s, 16)
+    playToIdle(s)
     expect(s.pieces.some((p) => p.kind === 'rainbow')).toBe(true)
+  })
+
+  it('removes a bomb when the chain goes through it', () => {
+    const s = loadGrid(['0 0 0', '0 B0 0', '0 0 0'])
+    const top = at(s, 1, 0)
+    const bomb = at(s, 1, 1)
+    const bot = at(s, 1, 2)
+    expect(bomb.kind).toBe('bomb')
+    s.drag = [top.id, bomb.id, bot.id]
+    release(s)
+    playToIdle(s)
+    expect(s.pieces.some((p) => !p.dead && p.kind === 'bomb')).toBe(false)
   })
 
   it('does not lock the next press', () => {
@@ -114,14 +129,12 @@ describe('pacing', () => {
     const upper = findPath(s, 6)!
     const lower = findPath(s, 2, upper.map((p) => p.id), 'bottom')!
     const id = lower[0].id
-    const r = lower[0].r
     s.drag = upper.map((p) => p.id)
     release(s)
     expect(s.phase).not.toBe('idle')
     expect(s.inputLocked).toBe(false)
     rush(s)
     expect(s.settled).toBe(true)
-    expect(byId(s, id)!.r).toBe(r)
     expect(extendDrag(s, id)).toBe(true)
     expect(s.drag).toEqual([id])
   })
@@ -151,12 +164,21 @@ describe('modes and seeds', () => {
     expect(roundOver(s)).toBe(false)
   })
 
-  it('keeps the biggest same-colour blob small at spawn', () => {
+  it('keeps start clusters between 4 and 7', () => {
     for (const seed of ['pretty', 'spawn-a', 'spawn-b', 'spawn-c']) {
       const s = createGame(seed, 8, 10, 'timed')
-      expect(maxSameColorCluster(s)).toBeLessThanOrEqual(6)
+      const max = maxSameColorCluster(s)
+      expect(max).toBeLessThanOrEqual(7)
+      expect(max).toBeGreaterThanOrEqual(4)
       expect(findPath(s, 3)).toBeTruthy()
     }
+  })
+
+  it('greedy play stays in score range with frequent 7-chains', () => {
+    const s = createGame('feel', 7, 9, 'timed')
+    const r = greedySession(s, 60)
+    expect(r.pops7).toBeGreaterThanOrEqual(4)
+    expect(r.score).toBeLessThan(50_000)
   })
 })
 

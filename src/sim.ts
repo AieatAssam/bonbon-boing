@@ -10,7 +10,9 @@ export const FALL_DELAY = 70
 export const STAGGER_CAP = 32
 export const STAGGER_BUDGET = 360
 export const BOMB_AT = 5
-export const RAINBOW_AT = 8
+export const RAINBOW_AT = 7
+export const COMBO_WINDOW_MS = 1500
+export const COMBO_CAP = 5
 
 export type Mode = 'timed' | 'cuddle' | 'daily'
 export type Kind = 'bonbon' | 'bomb' | 'rainbow'
@@ -26,6 +28,7 @@ export type Piece = {
   fallFrom: number
   fallTo: number
   fallT: number
+  landT: number
 }
 
 export type GameState = {
@@ -57,7 +60,9 @@ export type GameState = {
   /** Always false. A new press rushes the clear instead of ignoring the finger. */
   inputLocked: false
   special: 'bomb' | 'rainbow' | null
+  specialAt: { c: number; r: number } | null
   chainColor: number
+  lastChainLen: number
   gained: number
   guide: number[] | null
   guideBottom: number[] | null
@@ -124,6 +129,7 @@ function makePiece(state: GameState, c: number, r: number, color: number, kind: 
     fallFrom: r,
     fallTo: r,
     fallT: -1,
+    landT: -1,
   }
   return p
 }
@@ -170,9 +176,8 @@ export function visualRow(p: Piece): number {
   if (p.fallT < 0 || p.fallT >= 1) return p.r
   const t = p.fallT
   const ease = 1 - (1 - t) ** 2.2
-  const overshoot = t > 0.72 ? Math.sin(((t - 0.72) / 0.28) * Math.PI) * 0.22 * (1 - t) : 0
-  const wobble = Math.sin(t * Math.PI * 2.4) * 0.06 * (1 - t)
-  return p.fallFrom + (p.fallTo - p.fallFrom) * ease + overshoot + wobble
+  const overshoot = t > 0.62 ? Math.sin(((t - 0.62) / 0.38) * Math.PI) * 0.12 : 0
+  return p.fallFrom + (p.fallTo - p.fallFrom) * ease + overshoot
 }
 
 function gridMaxCluster(colors: number[][], cols: number, rows: number): number {
@@ -241,17 +246,27 @@ function gridChainCount(colors: number[][], cols: number, rows: number, min: num
 
 function pickSpawnColor(state: GameState, colors: number[][], c: number, r: number): number {
   const n = activeColorCount(state)
+  const below = r + 1 < state.rows ? colors[r + 1][c] : -1
+  const side = c > 0 ? colors[r][c - 1] : -1
+  const buddy = below >= 0 ? below : side
+  if (buddy >= 0 && buddy < n && state.rng() < 0.42) {
+    colors[r][c] = buddy
+    const cap = state.rng() < 0.38 ? 7 : 6
+    if (gridMaxCluster(colors, state.cols, state.rows) <= cap) return buddy
+  }
   let best = Math.floor(state.rng() * n)
   let bestScore = 1e9
   for (let t = 0; t < 7; t++) {
     const color = Math.floor(state.rng() * n)
     colors[r][c] = color
+    const cap = state.rng() < 0.35 ? 7 : 6
     const score = gridMaxCluster(colors, state.cols, state.rows)
+    if (score > cap) continue
     if (score < bestScore) {
       bestScore = score
       best = color
     }
-    if (score <= 6) return color
+    if (score <= cap) return color
   }
   return best
 }
@@ -372,6 +387,13 @@ function takeIds(state: GameState, ids: number[], avoid: Set<number>): Piece[] |
   return path
 }
 
+function validDragPath(path: Piece[]): boolean {
+  for (let i = 1; i < path.length; i++) {
+    if (!canAppend(path.slice(0, i), path[i])) return false
+  }
+  return true
+}
+
 export function findPath(
   state: GameState,
   min: number,
@@ -381,11 +403,11 @@ export function findPath(
   const avoidSet = new Set(avoid)
   if (prefer === 'bottom' && state.guideBottom) {
     const path = takeIds(state, state.guideBottom, avoidSet)
-    if (path && path.length >= min) return path
+    if (path && path.length >= min && validDragPath(path)) return path
   }
   if (prefer !== 'bottom' && state.guide) {
     const path = takeIds(state, state.guide, avoidSet)
-    if (path && path.length >= min) return path
+    if (path && path.length >= min && validDragPath(path)) return path
   }
   let best: Piece[] | null = null
   for (let color = 0; color < activeColorCount(state); color++) {
@@ -498,8 +520,9 @@ function fillBoard(state: GameState) {
       for (let r = 0; r < rows; r++) colors[r] = next[r]
     }
     const max = gridMaxCluster(colors, cols, rows)
-  const chains = gridChainCount(colors, cols, rows, 3)
-    if (max <= 6 && chains >= 3) break
+    const chains = gridChainCount(colors, cols, rows, 3)
+    const long = gridChainCount(colors, cols, rows, 7)
+    if (max <= 7 && max >= 4 && chains >= 3 && (long >= 1 || tries >= 36)) break
   }
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) state.pieces.push(makePiece(state, c, r, colors[r][c], 'bonbon'))
@@ -548,7 +571,9 @@ function blank(seed: string, cols: number, rows: number, mode: Mode): GameState 
     settled: true,
     inputLocked: false,
     special: null,
+    specialAt: null,
     chainColor: 0,
+    lastChainLen: 0,
     gained: 0,
     guide: null,
     guideBottom: null,
@@ -584,7 +609,7 @@ function clusterOf(
   return n
 }
 
-export function softenClusters(state: GameState, max = 6): void {
+export function softenClusters(state: GameState, max = 7): void {
   const keep = new Set<number>([...(state.guide ?? [])])
   const nColors = () => activeColorCount(state)
   let guard = 0
@@ -636,7 +661,27 @@ export function softenClusters(state: GameState, max = 6): void {
 export function createGame(seed: string, cols: number, rows: number, mode: Mode): GameState {
   const state = blank(seed, cols, rows, mode)
   fillBoard(state)
-  softenClusters(state, 6)
+  softenClusters(state, 7)
+  let guard = 0
+  while (maxSameColorCluster(state) > 7 && guard++ < 120) softenClusters(state, 7)
+  if (!findPath(state, 7)) {
+    boostChains(state)
+    if (!findPath(state, 7)) boostChains(state)
+    let fix = 0
+    while (maxSameColorCluster(state) > 7 && fix++ < 80) softenClusters(state, 7)
+  }
+  if (lineSeed(state.seed) && !findPath(state, 2)) {
+    const r = state.rows - 1
+    const n = Math.min(3, state.cols)
+    for (let c = 0; c < n; c++) {
+      const p = at(state, c, r)
+      if (p) p.color = 0
+    }
+    state.guideBottom = state.pieces
+      .filter((p) => !p.dead && p.r === r && p.c < n)
+      .sort((a, b) => a.c - b.c)
+      .map((p) => p.id)
+  }
   return state
 }
 
@@ -666,6 +711,24 @@ export function gridSignature(state: GameState): string {
     lines.push(line)
   }
   return lines.join('|')
+}
+
+function boostChains(state: GameState) {
+  if (state.rng() > 0.42) return
+  const n = activeColorCount(state)
+  const color = state.chainColor >= 0 ? state.chainColor : Math.floor(state.rng() * n)
+  const len = 6 + Math.floor(state.rng() * 3)
+  const vert = state.rng() < 0.55
+  const c0 = Math.floor(state.rng() * state.cols)
+  const r0 = Math.floor(state.rng() * Math.max(1, state.rows - len))
+  for (let i = 0; i < len; i++) {
+    const c = vert ? c0 : Math.min(state.cols - 1, c0 + i)
+    const r = vert ? Math.min(state.rows - 1, r0 + i) : r0
+    const p = at(state, c, r)
+    if (!p || p.dead) continue
+    p.color = color
+    p.kind = 'bonbon'
+  }
 }
 
 function beginFall(state: GameState) {
@@ -702,15 +765,20 @@ function beginFall(state: GameState) {
       spawned.push(p)
     }
   }
-  if (state.special && spawned.length > 0) {
-    const pick = spawned[Math.floor(state.rng() * spawned.length)]
-    if (state.special === 'rainbow') pick.kind = 'rainbow'
-    else {
-      pick.kind = 'bomb'
-      pick.color = state.chainColor
-    }
-  }
   state.pieces = [...live, ...spawned, ...dead]
+  if (state.special && state.specialAt) {
+    let target = at(state, state.specialAt.c, state.specialAt.r)
+    if (!target || target.dead) {
+      const col = state.pieces.filter((p) => !p.dead && p.c === state.specialAt!.c)
+      target = col.sort((a, b) => a.r - b.r)[0]
+    }
+    if (target) {
+      target.kind = state.special === 'rainbow' ? 'rainbow' : 'bomb'
+      if (target.kind === 'bomb') target.color = state.chainColor
+    }
+    state.special = null
+    state.specialAt = null
+  }
 }
 
 export function release(state: GameState): number[] {
@@ -742,7 +810,8 @@ export function release(state: GameState): number[] {
     }))
   }
   const lastAt = state.queue.length ? state.queue[state.queue.length - 1]!.at : 0
-  state.showIds = clears.map((p) => p.id)
+  state.showIds = []
+  state.specialAt = path.length ? { c: path[path.length - 1]!.c, r: path[path.length - 1]!.r } : null
   state.fired = 0
   state.resolveMs = 0
   state.elapsed = 0
@@ -754,17 +823,22 @@ export function release(state: GameState): number[] {
   state.hitstopLeft = 0
   state.hitstopPending = big
   state.chainColor = pathColor(path) ?? path[0].color
-  state.combo = state.simMs - state.lastSettleAt < 1400 && state.score > 0 ? state.combo + 1 : 1
+  state.lastChainLen = path.length
+  const comboFresh = state.simMs - state.lastSettleAt > COMBO_WINDOW_MS || state.score === 0
+  state.combo = comboFresh ? 1 : Math.min(COMBO_CAP, state.combo + 1)
   let pts = 0
   clears.forEach((_, i) => {
-    pts += 10 * (i + 1)
+    pts += 4 * (i + 1)
   })
-  if (clears.some((p) => p.kind === 'bomb')) pts += 80
-  if (clears.some((p) => p.kind === 'rainbow')) pts += 200
-  state.gained = pts * state.combo
+  if (clears.some((p) => p.kind === 'bomb')) pts += 45
+  if (clears.some((p) => p.kind === 'rainbow')) pts += 120
+  state.gained = Math.round(pts * state.combo)
   state.score += state.gained
   state.popAt = []
-  const first = clears[0]
+  const kick = state.queue[0]
+  if (!kick) return []
+  const first = byId(state, kick.id)
+  if (!first) return []
   first.dead = true
   first.popT = 0
   state.fired = 1
@@ -776,7 +850,6 @@ export function step(state: GameState, dt: number): number[] {
   if (dt < 0) dt = 0
   const popped: number[] = []
   if (state.phase === 'idle') {
-    if (state.mode !== 'cuddle') state.timeLeft = Math.max(0, state.timeLeft - dt)
     state.simMs += dt
     return popped
   }
@@ -816,11 +889,19 @@ export function step(state: GameState, dt: number): number[] {
       if (p.fallT >= 0 && p.fallT < 1) {
         p.fallT = Math.min(1, p.fallT + dt / FALL_MS)
         if (p.fallT < 1) pending = true
+        else if (p.landT < 0) p.landT = 0
       }
+      if (p.landT >= 0 && p.landT < 180) p.landT += dt
     }
     if (!pending) {
       state.pieces = state.pieces.filter((p) => !p.dead)
-      for (const p of state.pieces) p.fallT = -1
+      for (const p of state.pieces) {
+        p.fallT = -1
+        p.landT = -1
+      }
+      if (state.lastChainLen >= 5 && state.rng() < 0.72) boostChains(state)
+      else if (state.lastChainLen >= 3 && state.rng() < 0.48) boostChains(state)
+      state.lastChainLen = 0
       state.phase = 'idle'
       state.settled = true
       state.settleMs = state.elapsed
@@ -843,6 +924,33 @@ export function rush(state: GameState): number[] {
 
 export function roundOver(state: GameState): boolean {
   return state.mode !== 'cuddle' && state.timeLeft <= 0 && state.phase === 'idle' && state.drag.length === 0
+}
+
+export function playToIdle(state: GameState, maxSteps = 240): void {
+  let guard = 0
+  while (state.phase !== 'idle' && guard++ < maxSteps) step(state, 16)
+}
+
+export function greedySession(
+  state: GameState,
+  moves = 60,
+): { score: number; pops7: number; maxChain: number } {
+  let pops7 = 0
+  let maxChain = 0
+  for (let m = 0; m < moves; m++) {
+    let best = findPath(state, 2)
+    for (let min = 3; min <= 14; min++) {
+      const p = findPath(state, min)
+      if (p && (!best || p.length > best.length)) best = p
+    }
+    if (!best || best.length < 2) break
+    maxChain = Math.max(maxChain, best.length)
+    state.drag = best.map((p) => p.id)
+    release(state)
+    if (best.length >= 7) pops7 += 1
+    playToIdle(state)
+  }
+  return { score: state.score, pops7, maxChain }
 }
 
 export function extendDrag(state: GameState, id: number): boolean {

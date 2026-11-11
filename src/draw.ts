@@ -48,6 +48,12 @@ export type Scene = {
   rope: { x: number; y: number }[]
   ropeColor: number
   chainLen: number
+  bubble: { x: number; y: number; n: number; bomb: boolean; rainbow: boolean } | null
+  titleHint: {
+    rope: { x: number; y: number }[]
+    ropeColor: number
+    hand: { x: number; y: number; down: boolean; alpha: number }
+  } | null
   finger: { x: number; y: number } | null
   particles: DrawParticle[]
   ghost: { x: number; y: number; down: boolean; alpha: number } | null
@@ -147,27 +153,28 @@ function ear(ctx: CanvasRenderingContext2D, color: number, cx: number, cy: numbe
   }
 }
 
-function paintBomb(px: number): HTMLCanvasElement {
+function paintBomb(color: number, px: number): HTMLCanvasElement {
+  const pal = PAL[color % PAL.length]
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
   if (!ctx) return c
   const cx = px / 2
   const cy = px * 0.54
   const r = px * 0.44
-  ctx.fillStyle = 'rgba(40, 12, 52, 0.22)'
+  ctx.fillStyle = 'rgba(40, 12, 52, 0.18)'
   ctx.beginPath()
   ctx.ellipse(cx, cy + r * 0.96, r * 0.74, r * 0.19, 0, 0, Math.PI * 2)
   ctx.fill()
   const g = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.46, r * 0.05, cx + r * 0.05, cy + r * 0.1, r * 1.14)
-  g.addColorStop(0, '#FFE8FF')
-  g.addColorStop(0.1, '#C884E8')
-  g.addColorStop(0.45, '#6E2A8C')
-  g.addColorStop(1, '#2A1038')
+  g.addColorStop(0, '#FFFFFF')
+  g.addColorStop(0.12, pal.light)
+  g.addColorStop(0.5, pal.base)
+  g.addColorStop(1, pal.deep)
   ctx.fillStyle = g
   ctx.beginPath()
   ctx.arc(cx, cy, r, 0, Math.PI * 2)
   ctx.fill()
-  ctx.strokeStyle = '#FF6EDB'
+  ctx.strokeStyle = pal.deep
   ctx.lineWidth = Math.max(2.5, r * 0.07)
   ctx.stroke()
   ctx.fillStyle = 'rgba(255,255,255,0.9)'
@@ -279,7 +286,7 @@ function paintRainbow(px: number): HTMLCanvasElement {
 }
 
 function paintBody(kind: Kind, color: number, px: number): HTMLCanvasElement {
-  if (kind === 'bomb') return paintBomb(px)
+  if (kind === 'bomb') return paintBomb(color, px)
   if (kind === 'rainbow') return paintRainbow(px)
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
@@ -382,7 +389,7 @@ function sprite(key: string, paint: () => HTMLCanvasElement): HTMLCanvasElement 
 }
 
 export function bodySprite(kind: Kind, color: number, px: number): HTMLCanvasElement {
-  const key = kind === 'bonbon' ? `b:bonbon:${color}:${px}` : `b:${kind}:${px}`
+  const key = kind === 'bonbon' ? `b:bonbon:${color}:${px}` : `b:${kind}:${color}:${px}`
   return sprite(key, () => paintBody(kind, color, px))
 }
 
@@ -521,7 +528,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   for (const p of scene.pieces) {
     const alpha = p.popping ? Math.max(0, 1 - p.popU) : 1
     if (p.popping && p.popU >= 0.99) continue
-    const drawKind = p.popping ? 'bonbon' : p.kind
+    const drawKind = p.kind
     blit(ctx, dpr, ox, oy, bodySprite(drawKind, p.color, px), p.x, p.y, pieceD, pieceD, p.sx, p.sy, alpha)
     if (p.selected && !p.popping) {
       ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
@@ -567,20 +574,24 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
       ctx.globalAlpha = 1
     }
   }
+  if (scene.titleHint && scene.titleHint.rope.length > 1) {
+    ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
+    drawRibbon(ctx, scene.titleHint.rope, scene.titleHint.ropeColor, D * 0.2)
+    drawHand(
+      ctx,
+      scene.titleHint.hand.x,
+      scene.titleHint.hand.y,
+      D,
+      scene.titleHint.hand.down,
+      scene.titleHint.hand.alpha,
+    )
+  }
   if (scene.rope.length > 1) {
     ctx.setTransform(dpr, 0, 0, dpr, dpr * ox, dpr * oy)
     drawRibbon(ctx, scene.rope, scene.ropeColor, D * 0.22)
-    const tip = scene.rope[scene.rope.length - 1]
-    if (scene.chainLen > 1) {
-      drawChainBubble(
-        ctx,
-        tip.x,
-        tip.y - pieceD * 0.72,
-        scene.chainLen,
-        D,
-        scene.chainLen >= 5,
-        scene.chainLen >= 8,
-      )
+    if (scene.bubble) {
+      const b = scene.bubble
+      drawChainBubble(ctx, b.x, b.y, b.n, D, b.bomb, b.rainbow)
     }
     if (scene.finger) {
       const fp = scene.finger
@@ -611,7 +622,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
     ctx.globalAlpha = Math.max(0, 0.95 * (1 - u * 0.85))
     ctx.lineWidth = Math.max(4, D * 0.12) * (1 - u * 0.35)
     ctx.beginPath()
-    ctx.arc(wave.x, wave.y, wave.r + u * D * 3.5, 0, Math.PI * 2)
+    ctx.arc(wave.x, wave.y, wave.r + u * D * 3.5 * 1.05, 0, Math.PI * 2)
     ctx.stroke()
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'
     ctx.lineWidth = Math.max(2, D * 0.05) * (1 - u)
