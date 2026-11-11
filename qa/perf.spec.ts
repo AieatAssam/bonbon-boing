@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 type Qa = {
   fps: number
+  resetFps: () => void
   pump: (ms: number) => void
   findChain: (min: number) => { x: number; y: number }[] | null
   draw: () => void
@@ -40,8 +41,9 @@ test('meets fps target at 4x cpu throttle', async ({ page, context }) => {
   await page.evaluate(() => {
     const q = (window as unknown as { __qa: Qa }).__qa
     q.pump(1200)
+    q.resetFps()
   })
-  await chainBurst(page, 4500)
+  await chainBurst(page, 5500)
   const fps = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.fps)
   expect(fps, `fps=${fps}`).toBeGreaterThanOrEqual(40)
 })

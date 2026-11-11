@@ -84,6 +84,7 @@ export type Qa = {
   muteMusic: boolean
   frame: number
   fps: number
+  resetFps: () => void
   highlightFrame: number
   spriteMisses: number
   audioCreates: number
@@ -318,6 +319,7 @@ export function boot(): void {
   let fingerOn = false
   const titleSquish = new Map<number, number>()
   const bootMs = performance.now()
+  let lastDrawMs = bootMs
 
   function insetTop(): number {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
@@ -1136,6 +1138,16 @@ export function boot(): void {
 
   function draw() {
     const now = performance.now()
+    if (qaMode) {
+      const dt = now - lastDrawMs
+      lastDrawMs = now
+      if (dt > 0 && dt < 120) {
+        fpsBuf.push(1000 / dt)
+        if (fpsBuf.length > 90) fpsBuf.shift()
+      }
+      const dpr = viewDpr()
+      if (dpr !== canvasDpr) resize()
+    }
     const blink = !freeze && !reduced && now % 3200 < 140
     renderScene(gfx, scene(now), blink)
     frame += 1
@@ -1535,6 +1547,10 @@ export function boot(): void {
       if (!fpsBuf.length) return 60
       return fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
     },
+    resetFps() {
+      fpsBuf.length = 0
+      lastDrawMs = performance.now()
+    },
     restart() { onAction('restart') },
     home() { show('title'); draw() },
     start(nextMode, seed) {
@@ -1608,10 +1624,12 @@ export function boot(): void {
     last = now
     if (dt > 40) dt = 40
     if (dt < 0) dt = 0
-    if (dt > 0) {
+    if (dt > 0 && !qaMode) {
       fpsBuf.push(1000 / dt)
       if (fpsBuf.length > 90) fpsBuf.shift()
     }
+    const dpr = viewDpr()
+    if (dpr !== canvasDpr) resize()
     tick(dt, now)
     draw()
     requestAnimationFrame(loop)

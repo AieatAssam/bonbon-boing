@@ -416,7 +416,7 @@ function blit(
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh)
 }
 
-/** Cached static sky + tray; clouds drift on top each frame. */
+/** Cached static sky + tray (includes clouds). */
 let bgKey = ''
 let bgCanvas: HTMLCanvasElement | null = null
 
@@ -440,13 +440,10 @@ function drawSkyStatic(ctx: CanvasRenderingContext2D, w: number, h: number) {
     ctx.arc(sx, sy, 2 + (i % 3), 0, Math.PI * 2)
     ctx.fill()
   }
-}
-
-function drawSkyClouds(ctx: CanvasRenderingContext2D, w: number, _h: number, t: number) {
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
   for (let i = 0; i < 5; i++) {
-    const cx = ((i * 173 + t * 0.008) % (w + 120)) - 60
-    const cy = 40 + (i % 3) * 50 + Math.sin(t / 900 + i) * 8
-    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    const cx = ((i * 173 + 90) % (w + 120)) - 60
+    const cy = 40 + (i % 3) * 50
     ctx.beginPath()
     ctx.ellipse(cx, cy, 42 + (i % 2) * 12, 22, 0, 0, Math.PI * 2)
     ctx.ellipse(cx + 32, cy + 6, 34, 18, 0, 0, Math.PI * 2)
@@ -548,7 +545,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, blink: 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.drawImage(bg, 0, 0)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  drawSkyClouds(ctx, w, h, scene.t)
   ctx.save()
   ctx.translate(scene.bumpX, scene.bumpY)
   const ox = scene.bumpX
