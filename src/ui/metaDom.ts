@@ -145,6 +145,10 @@ export function renderMap(save: SaveV3, opts: MapRenderOpts = {}): HTMLElement {
   panel.append(head, scroll, hint)
   const scrim = el('div', 'meta-scrim')
   scrim.append(panel)
+  queueMicrotask(() => {
+    const cur = scroll.querySelector('.map-path-node.current') as HTMLElement | null
+    cur?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' in Element.prototype ? 'instant' : 'auto' })
+  })
   return scrim
 }
 

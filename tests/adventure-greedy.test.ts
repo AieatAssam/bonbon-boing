@@ -51,8 +51,9 @@ function greedyAdventureLevel(id: number, cols = 7, rows = 9) {
     }
     if (state.movesLeft <= 0) break
   }
-  const ev = evaluateStars(goals, level)
-  return { level: id, stars: ev.stars, won: ev.goalMet, score: state.score }
+  const movesLeftAtGoal = Math.max(0, state.movesLeft)
+  const ev = evaluateStars(goals, level, movesLeftAtGoal)
+  return { level: id, stars: ev.stars, won: ev.goalMet, score: state.score, movesLeft: movesLeftAtGoal }
 }
 
 const benchLevels = [1, 4, 8, 16] as const

@@ -521,25 +521,21 @@ export function faceSprite(blink: boolean, px: number): HTMLCanvasElement {
 
 const goalIconCache = new Map<string, string>()
 
-/** ~20px HUD bonbon / blocker art (body + face when bonbon). */
-export function goalPieceIconDataUrl(kind: Kind, color: number, size = 20): string {
-  const key = `goal:${kind}:${color}:${size}:${equippedSkin}`
+/** HUD goal icon — bitmap filled so CSS 24px shows a full bonbon face. */
+export function goalPieceIconDataUrl(kind: Kind, color: number, sizeCss = 24): string {
+  const key = `goal:${kind}:${color}:${sizeCss}:${equippedSkin}`
   const hit = goalIconCache.get(key)
   if (hit) return hit
-  const px = Math.max(32, Math.round(size * 2.2))
+  const px = Math.max(48, Math.round(sizeCss * 2.75))
   const c = canvas(px, px)
   const ctx = c.getContext('2d')
   if (!ctx) return ''
-  const dpr = 1
-  const pieceD = size * 0.92
-  const cx = size / 2
-  const cy = size / 2
-  ctx.clearRect(0, 0, px, px)
-  const scale = px / size
-  ctx.scale(scale, scale)
-  blit(ctx, dpr, 0, 0, bodySprite(kind, color, px), cx, cy, pieceD, pieceD, 1, 1)
+  const pieceD = px * 0.94
+  const cx = px / 2
+  const cy = px / 2
+  blit(ctx, 1, 0, 0, bodySprite(kind, color, px), cx, cy, pieceD, pieceD, 1, 1)
   if (kind === 'bonbon') {
-    blit(ctx, dpr, 0, 0, faceSprite(false, px), cx, cy, pieceD, pieceD, 1, 1)
+    blit(ctx, 1, 0, 0, faceSprite(false, px), cx, cy, pieceD, pieceD, 1, 1)
   }
   const url = c.toDataURL('image/png')
   goalIconCache.set(key, url)

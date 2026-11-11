@@ -142,7 +142,6 @@ export type Qa = {
   startAdventure: (levelId: number) => void
   capturePopBurst: () => void
   settleChain: (min: number) => boolean
-  greedyPlayLevel: () => { stars: number; won: boolean; score: number }
   hasBomb: () => boolean
   lastChainLen: number
 }
@@ -206,31 +205,81 @@ export function boot(): void {
   let lastFinishedAdventureLevel: AdventureLevelDef | null = null
   let lastRunRewards = { coins: 0, xp: 0 }
   let lastRunRewardNote = ''
-  type BonusFinale = { popsLeft: number; nextAt: number; endAt: number }
+  type BonusFinale = { popsLeft: number; nextAt: number; endAt: number; startMs: number }
   let bonusFinale: BonusFinale | null = null
-  const BONUS_POP_GAP_MS = 170
-  const BONUS_CAP_MS = 3000
+  let movesLeftAtGoal = 0
+  let resultsLocked = false
+  const BONUS_SCORE_PER_MOVE = 500
+  const BONUS_POP_GAP_MS = 250
+  const BONUS_CAP_MS = 4000
 
-  function finishBonusFinale() {
+  function resetRunPhase() {
+    bonusFinale = null
+    movesLeftAtGoal = 0
+    resultsLocked = false
+    if (state) state.inputLocked = false
+  }
+
+  function finishBonusFinale(skip = false) {
+    if (!bonusFinale) return
+    if (skip && bonusFinale.popsLeft > 0) {
+      const lump = bonusFinale.popsLeft * BONUS_SCORE_PER_MOVE
+      state.score += lump
+      if (adventureGoals) adventureGoals.score = state.score
+      floats.push({
+        x: layout.ox + (layout.cols * layout.D) / 2,
+        y: layout.oy + layout.padTop,
+        text: `+${lump}`,
+        age: 0,
+        big: true,
+      })
+      bonusFinale.popsLeft = 0
+    }
     bonusFinale = null
     state.inputLocked = false
+    state.movesLeft = 0
     syncAdventureGoalsFromTrack()
     showResults()
   }
 
-  function doBonusSquish() {
-    const live = state.pieces.filter((p) => !p.dead && p.popT < 0 && (p.kind === 'bonbon' || p.kind === 'bomb'))
-    if (!live.length) return
-    const p = live[Math.floor(state.rng() * live.length)]!
-    const c = center(p)
-    const big = state.rng() < 0.14
-    const gain = 48 + Math.floor(state.rng() * 52) + (big ? 45 : 0)
-    state.score += gain
+  function doBonusFinalePop() {
+    const live = state.pieces.filter((p) => !p.dead && p.popT < 0 && p.kind === 'bonbon')
+  const pick = live.length ? live[Math.floor(state.rng() * live.length)]! : null
+    const useRow = state.rng() < 0.55
+    let pts = 0
+    const hits: Piece[] = []
+    if (pick && useRow) {
+      hits.push(...state.pieces.filter((p) => !p.dead && p.popT < 0 && p.r === pick.r).slice(0, 5))
+    } else if (pick) {
+      hits.push(...state.pieces.filter((p) => !p.dead && p.popT < 0 && p.c === pick.c).slice(0, 5))
+    } else if (pick) {
+      hits.push(pick)
+    }
+    for (const p of hits.length ? hits : live.slice(0, 1)) {
+      const c = center(p)
+      burst(c.x, c.y, p.color, hits.length > 2, hits.length > 3)
+      p.landT = 0
+    }
+    pts = BONUS_SCORE_PER_MOVE + (hits.length > 2 ? 80 : 0)
+    state.score += pts
     if (adventureGoals) adventureGoals.score = state.score
-    burst(c.x, c.y, p.color, big, p.kind === 'bomb')
-    if (!save.muteSfx) playPop(p.color, big)
-    state.gained = gain
-    p.landT = 0
+    state.gained = pts
+    if (!save.muteSfx) playPop(pick?.color ?? 0, hits.length > 2)
+    floats.push({
+      x: layout.ox + (layout.cols * layout.D) * 0.5,
+      y: layout.oy + layout.padTop + layout.D * 2,
+      text: `+${pts}`,
+      age: 0,
+      big: true,
+    })
+  }
+
+  function playRoundOver(): boolean {
+    if (bonusFinale) return false
+    if (mode === 'adventure' && adventureLevel && adventureGoals && allGoalsMet(adventureGoals, adventureLevel.goals)) {
+      return false
+    }
+    return roundOver(state)
   }
 
   function syncAdventureGoalsFromTrack() {
@@ -247,6 +296,7 @@ export function boot(): void {
   }
 
   function startAdventureLevel(level: AdventureLevelDef) {
+    resetRunPhase()
     perfLevel = 0
     perfSlowStreak = 0
     perfFastStreak = 0
@@ -941,7 +991,19 @@ export function boot(): void {
     } else if (mode === 'adventure') {
       timeEl.classList.remove('pulse')
       const moves = Math.max(0, state.movesLeft)
-      timeEl.innerHTML = `<span class="moves-left" aria-label="Moves left">${moves}</span><span class="moves-lbl">moves</span>`
+      const limit = adventureLevel?.moves ?? (moves || 1)
+      const t2 = Math.ceil(limit * 0.25)
+      const t3 = Math.ceil(limit * 0.45)
+      const pct2 = ((limit - t2) / limit) * 100
+      const pct3 = ((limit - t3) / limit) * 100
+      const bonus = bonusFinale ? ' bonus-active' : ''
+      timeEl.innerHTML = `<div class="moves-meter${bonus}" aria-label="Moves left ${moves} of ${limit}">
+        <span class="moves-left">${moves}</span><span class="moves-lbl">moves</span>
+        <div class="moves-track" aria-hidden="true">
+          <span class="star-notch star2" style="left:${pct2}%">★</span>
+          <span class="star-notch star3" style="left:${pct3}%">★</span>
+        </div>
+      </div>`
       if (adventureLevel && adventureGoals) {
         hudMini.hidden = false
         hudMini.className = 'hud-mini ui goal-strip'
@@ -961,6 +1023,7 @@ export function boot(): void {
   }
 
   function fresh(nextMode: Mode, seed: string) {
+    resetRunPhase()
     perfLevel = 0
     perfSlowStreak = 0
     perfFastStreak = 0
@@ -1024,6 +1087,7 @@ export function boot(): void {
 
   function rememberBest() {
     if (mode === 'adventure') return
+    if (state.track.movesUsed <= 0 && clockRunMs < 2000 && state.timeLeft > ROUND_MS - 2500) return
     if (mode === 'daily') {
       if (save.dailyDay !== state.seed) {
         save.dailyDay = state.seed
@@ -1036,18 +1100,23 @@ export function boot(): void {
   }
 
   function showResults(score?: number) {
+    if (bonusFinale) return
+    if (resultsLocked) return
     if (score !== undefined) state.score = score
     const coinsBefore = save.profile.coins
     const xpBefore = save.profile.xp
   const pops = state.track.clearedByColor.reduce((a, b) => a + b, 0)
     if (mode === 'adventure' && adventureLevel && adventureGoals) {
+      if (adventureGoals.movesUsed <= 0 && !allGoalsMet(adventureGoals, adventureLevel.goals)) return
       syncAdventureGoalsFromTrack()
-      const ev = evaluateStars(adventureGoals, adventureLevel)
+      const ev = evaluateStars(adventureGoals, adventureLevel, movesLeftAtGoal)
       lastAdventureWon = ev.goalMet
       lastResultStars = lastAdventureWon ? ev.stars : 0
       lastFinishedAdventureLevel = adventureLevel
-      meta.onAdventureEnd(adventureLevel, adventureGoals, lastAdventureWon)
+      resultsLocked = true
+      meta.onAdventureEnd(adventureLevel, adventureGoals, lastAdventureWon, movesLeftAtGoal)
     } else {
+      resultsLocked = true
       lastResultStars = null
       meta.onRunEnd({
         mode,
@@ -1192,13 +1261,13 @@ export function boot(): void {
       return
     }
     if (bonusFinale) {
-      finishBonusFinale()
+      finishBonusFinale(true)
       return
     }
     if (screen !== 'play') return
     if (!mayBeginChain(state)) {
       state.drag = []
-      if (roundOver(state)) showResults()
+      if (playRoundOver()) showResults()
       draw()
       return
     }
@@ -1210,7 +1279,7 @@ export function boot(): void {
       clockTickAt = performance.now()
       ghostOn = false
     }
-    if (roundOver(state)) {
+    if (playRoundOver()) {
       showResults()
       return
     }
@@ -1244,7 +1313,7 @@ export function boot(): void {
       state.drag = []
       if (!save.tut) ghostOn = tutParam || !qaMode
     }
-    if (state.phase === 'idle' && roundOver(state)) showResults()
+    if (state.phase === 'idle' && playRoundOver()) showResults()
     draw()
     highlightFrame = frame
   }
@@ -1337,30 +1406,33 @@ export function boot(): void {
     if (popped.length) notePops(popped)
     if (bonusFinale) {
       const tNow = performance.now()
-      while (tNow >= bonusFinale.nextAt && bonusFinale.popsLeft > 0) {
-        doBonusSquish()
+      const minTime = bonusFinale.startMs + BONUS_POP_GAP_MS
+      if (tNow >= bonusFinale.nextAt && bonusFinale.popsLeft > 0 && tNow >= minTime) {
+        doBonusFinalePop()
         bonusFinale.popsLeft -= 1
-        bonusFinale.nextAt += BONUS_POP_GAP_MS
+        bonusFinale.nextAt = tNow + BONUS_POP_GAP_MS
       }
       if (bonusFinale.popsLeft <= 0 || tNow >= bonusFinale.endAt) {
         finishBonusFinale()
         return
       }
+      syncHud()
+      return
     }
-    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length && !bonusFinale) {
+    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length) {
       syncAdventureGoalsFromTrack()
       if (allGoalsMet(adventureGoals, adventureLevel.goals)) {
         const left = state.movesLeft
+        movesLeftAtGoal = left
         if (left > 0) {
+          const now = performance.now()
           bonusFinale = {
             popsLeft: left,
-            nextAt: performance.now() + BONUS_POP_GAP_MS,
-            endAt: performance.now() + BONUS_CAP_MS,
+            nextAt: now + BONUS_POP_GAP_MS,
+            endAt: now + Math.min(BONUS_CAP_MS, left * BONUS_POP_GAP_MS + 800),
+            startMs: now,
           }
-          state.movesLeft = 0
           state.inputLocked = true
-          doBonusSquish()
-          bonusFinale.popsLeft -= 1
           syncHud()
           return
         }
@@ -1368,7 +1440,7 @@ export function boot(): void {
         return
       }
     }
-    if (roundOver(state)) showResults()
+    if (playRoundOver()) showResults()
     syncHud()
   }
 
@@ -2247,57 +2319,6 @@ export function boot(): void {
     },
     settleChain(min: number) {
       return settleChain(min)
-    },
-    greedyPlayLevel() {
-      let guard = 0
-      while (screen === 'play' && guard++ < 500) {
-        if (bonusFinale) {
-          tick(24, performance.now())
-          continue
-        }
-        let played = false
-        for (let m = 8; m >= 2; m--) {
-          if (settleChain(m)) {
-            played = true
-            break
-          }
-        }
-        if (!played) {
-          tick(20, performance.now())
-          if (roundOver(state)) {
-            showResults()
-            break
-          }
-          continue
-        }
-        for (let t = 0; t < 800; t += 40) tick(40, performance.now())
-        if (roundOver(state)) {
-          showResults()
-          break
-        }
-      }
-      if (screen === 'play') {
-        for (let i = 0; i < 180; i++) tick(32, performance.now())
-        if (bonusFinale) finishBonusFinale()
-        else if (roundOver(state)) showResults()
-        else if (mode === 'adventure' && adventureGoals && adventureLevel && allGoalsMet(adventureGoals, adventureLevel.goals)) {
-          if (state.movesLeft > 0) {
-            bonusFinale = {
-              popsLeft: state.movesLeft,
-              nextAt: performance.now() + BONUS_POP_GAP_MS,
-              endAt: performance.now() + BONUS_CAP_MS,
-            }
-            state.movesLeft = 0
-            state.inputLocked = true
-            doBonusSquish()
-            bonusFinale.popsLeft -= 1
-            for (let i = 0; i < 120; i++) tick(32, performance.now())
-            finishBonusFinale()
-          } else showResults()
-        }
-      }
-      draw()
-      return { stars: lastResultStars ?? 0, won: lastAdventureWon, score: state.score, screen }
     },
     hasBomb() {
       return state.pieces.some((p) => !p.dead && p.kind === 'bomb')

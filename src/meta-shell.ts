@@ -21,7 +21,7 @@ export type MetaLayer = {
   open: (which: 'map' | 'shop' | 'achievements' | 'collection', opts?: { mapChapter?: 1 | 2 | 3 | 4 }) => void
   close: () => void
   onRunEnd: (summary: RunSummary, extra?: AchievementFacts) => void
-  onAdventureEnd: (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean) => void
+  onAdventureEnd: (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean, movesLeftAtGoal?: number) => void
   applyCosmetics: () => void
   touchStreak: () => void
   notifyFacts: (facts: AchievementFacts) => void
@@ -189,11 +189,12 @@ export function createMetaLayer(
     }
   }
 
-  const onAdventureEnd = (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean) => {
-    const ev = evaluateStars(goal, level)
+  const onAdventureEnd = (level: AdventureLevelDef, goal: AdventureGoalState, won: boolean, movesLeftAtGoal = 0) => {
+    const ev = evaluateStars(goal, level, movesLeftAtGoal)
     const key = String(level.id)
     const prior = save.adventure.levels[key]
-    const best = Math.max(prior?.bestScore ?? 0, goal.score)
+    const best =
+      won && goal.movesUsed > 0 ? Math.max(prior?.bestScore ?? 0, goal.score) : (prior?.bestScore ?? 0)
     const prevStars = prior?.stars ?? 0
     const stars = won ? (Math.max(prevStars, ev.stars) as 0 | 1 | 2 | 3) : (prevStars as 0 | 1 | 2 | 3)
     const starGain = won ? stars - prevStars : 0

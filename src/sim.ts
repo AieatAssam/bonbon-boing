@@ -32,7 +32,7 @@ export type Piece = {
   fallTo: number
   fallT: number
   landT: number
-  /** In-board refill pop-in (0..1); -1 = none. */
+  /** In-board refill pop-in: -2 = wait for column fall, -1 = none, 0..1 = animating. */
   spawnT: number
   /** Ice / sleepy hits remaining before pop. */
   hits: number
@@ -955,7 +955,7 @@ function beginFall(state: GameState) {
       p.fallTo = i
       p.r = i
       p.fallT = -1
-      p.spawnT = 0
+      p.spawnT = -2
       spawned.push(p)
     }
   }
@@ -1138,6 +1138,12 @@ export function step(state: GameState, dt: number): number[] {
     let pending = false
     for (const p of state.pieces) {
       if (p.dead) continue
+      if (p.spawnT === -2) {
+        const colBusy = state.pieces.some(
+          (q) => !q.dead && q.c === p.c && q.id !== p.id && q.fallT >= 0 && q.fallT < 1,
+        )
+        if (!colBusy) p.spawnT = 0
+      }
       if (p.spawnT >= 0 && p.spawnT < 1) {
         p.spawnT = Math.min(1, p.spawnT + dt / SPAWN_MS)
         if (p.spawnT < 1) pending = true

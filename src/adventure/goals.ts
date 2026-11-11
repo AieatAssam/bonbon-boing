@@ -58,7 +58,7 @@ function goalIcon(goal: AdventureGoal): string {
     case 'pop_bombs': {
       const kind = goalKind(goal) as Kind
       const src = goalPieceIconDataUrl(kind, goalColor(goal), 20)
-      return `<img class="goal-bonbon-ico" src="${src}" width="20" height="20" alt="" />`
+      return `<img class="goal-bonbon-ico" src="${src}" width="24" height="24" alt="" />`
     }
     case 'score_moves':
       return `<span class="goal-ico">${PLUSH_ICONS.rush}</span>`
@@ -143,16 +143,27 @@ export function allGoalsMet(state: AdventureGoalState, goals: AdventureGoal[]): 
   return goals.every((g) => evaluateGoal(state, g).met)
 }
 
-export function evaluateStars(state: AdventureGoalState, level: AdventureLevelDef): StarEval {
+/** 1★ goal; 2★ ~25% moves left; 3★ ~45% moves left when the goal is met (Candy-style). */
+export function evaluateStars(
+  state: AdventureGoalState,
+  level: AdventureLevelDef,
+  movesLeftAtGoal: number,
+): StarEval {
   const goalMet = allGoalsMet(state, level.goals)
-  const [, t2, t3] = level.starScore
+  const t2Moves = Math.ceil(level.moves * 0.25)
+  const t3Moves = Math.ceil(level.moves * 0.45)
   let stars: 0 | 1 | 2 | 3 = 0
   if (goalMet) {
     stars = 1
-    if (state.score >= t2) stars = 2
-    if (state.score >= t3) stars = 3
+    if (movesLeftAtGoal >= t2Moves) stars = 2
+    if (movesLeftAtGoal >= t3Moves) stars = 3
   }
-  return { stars, goalMet, score: state.score, thresholds: level.starScore }
+  return {
+    stars,
+    goalMet,
+    score: state.score,
+    thresholds: [0, t2Moves, t3Moves],
+  }
 }
 
 export function emptyGoalState(movesLimit: number): AdventureGoalState {
