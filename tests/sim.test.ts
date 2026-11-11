@@ -11,6 +11,8 @@ import {
   findPath,
   gridSignature,
   greedySession,
+  greedyTimedRound,
+  mayBeginChain,
   maxSameColorCluster,
   ladderHz,
   loadGrid,
@@ -37,7 +39,7 @@ describe('size unit D', () => {
       const L = boardLayout(w, h)
       expect(L.D).toBeGreaterThanOrEqual(46)
       expect(L.cols * L.D).toBeLessThanOrEqual(w)
-      expect(L.padTop).toBeGreaterThanOrEqual(Math.round(L.D * 0.18) - 1)
+      expect(L.padTop).toBeGreaterThanOrEqual(Math.round(L.D * 0.1) - 1)
       expect(L.oy).toBeGreaterThanOrEqual(L.hud - 1)
       expect(L.ox).toBeGreaterThanOrEqual(0)
     }
@@ -178,10 +180,30 @@ describe('modes and seeds', () => {
     const s = createGame('feel', 7, 9, 'timed')
     const r = greedySession(s, 60)
     expect(r.pops7).toBeGreaterThanOrEqual(1)
-    expect(r.score).toBeGreaterThanOrEqual(10_000)
-    expect(r.score).toBeLessThan(80_000)
-    const stars = r.score >= 28_000 ? 3 : r.score >= 12_000 ? 2 : 1
-    expect(stars).toBeGreaterThanOrEqual(2)
+    expect(r.score).toBeLessThan(50_000)
+  })
+
+  it('greedy play stays under 3-star cap for a long marathon', () => {
+    const s = createGame('feel', 7, 9, 'timed')
+    const r = greedySession(s, 80)
+    expect(r.score).toBeLessThan(28_000)
+    expect(r.score).toBeGreaterThan(800)
+  })
+
+  it('greedy timed round cannot farm after bell', () => {
+    const s = createGame('feel', 7, 9, 'timed')
+    const atZero = greedyTimedRound(s, 650)
+    s.timeLeft = 0
+    const extra = greedySession(s, 20)
+    expect(extra.score).toBe(atZero.score)
+  })
+
+  it('blocks new chains after time expires', () => {
+    const s = createGame('feel', 7, 9, 'timed')
+    s.timeLeft = 0
+    expect(mayBeginChain(s)).toBe(false)
+    s.timeLeft = 1
+    expect(mayBeginChain(s)).toBe(true)
   })
 })
 

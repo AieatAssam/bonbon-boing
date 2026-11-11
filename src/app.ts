@@ -9,6 +9,7 @@ import {
   findPath,
   ROUND_MS,
   maxSameColorCluster,
+  mayBeginChain,
   pathColor,
   release,
   POP_GROW_MS,
@@ -307,9 +308,12 @@ export function boot(): void {
   let clockRunMs = 0
   let clockTickAt = 0
   let ghostDemoDone = false
+  let ghostCycleStart = 0
   let perfDprScale = 1
   let canvasDpr = 0
   let fpsBuf: number[] = []
+  let fpsWinStart = 0
+  let fpsWinFrames = 0
   let bumpX = 0
   let bumpY = 0
   let bumpT = 0
@@ -319,7 +323,6 @@ export function boot(): void {
   let fingerOn = false
   const titleSquish = new Map<number, number>()
   const bootMs = performance.now()
-  let lastDrawMs = bootMs
 
   function insetTop(): number {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
@@ -333,10 +336,10 @@ export function boot(): void {
     const native = Math.min(2, devicePixelRatio || 1)
     const area = Math.max(1, innerWidth * innerHeight)
     const areaCap = Math.sqrt(1_400_000 / area)
-    if (fpsBuf.length >= 24) {
+    if (fpsBuf.length >= 2) {
       const fps = fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
-      if (fps < 45) perfDprScale = Math.max(0.72, perfDprScale - 0.02)
-      else if (fps > 52) perfDprScale = Math.min(1, perfDprScale + 0.008)
+      if (fps < 42) perfDprScale = Math.max(0.65, perfDprScale - 0.04)
+      else if (fps > 52) perfDprScale = Math.min(1, perfDprScale + 0.01)
     }
     return Math.max(1, Math.min(native, areaCap * perfDprScale))
   }
@@ -403,7 +406,8 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean, bomb = false) {
-    const dotN = reduced ? 8 : 10 + Math.floor(state.rng() * 5)
+    const lite = perfDprScale < 0.88 || fpsBuf.some((f) => f < 44)
+    const dotN = reduced || lite ? 7 : 10 + Math.floor(state.rng() * 5)
     const extra = bomb ? 8 : big ? 4 : 0
     for (let i = 0; i < dotN + extra; i++) {
       const a = state.rng() * Math.PI * 2
@@ -443,7 +447,8 @@ export function boot(): void {
       })
     }
     popRings.push({ x, y, age: 0, life: 180 })
-    while (particles.length > 160) particles.shift()
+    const cap = lite ? 110 : 160
+    while (particles.length > cap) particles.shift()
   }
 
   function notePops(ids: number[]) {
@@ -594,6 +599,7 @@ export function boot(): void {
     clockRunMs = 0
     clockTickAt = 0
     ghostDemoDone = save.tut || qaMode
+    ghostCycleStart = 0
   }
 
   function showPlay() {
@@ -742,12 +748,19 @@ export function boot(): void {
       return
     }
     if (screen !== 'play') return
+    if (!mayBeginChain(state)) {
+      state.drag = []
+      if (roundOver(state)) showResults()
+      draw()
+      return
+    }
     fingerOn = true
     fingerX = x
     fingerY = y
     if (!clockOn) {
       clockOn = true
       clockTickAt = performance.now()
+      ghostOn = false
     }
     if (roundOver(state)) {
       showResults()
@@ -765,6 +778,7 @@ export function boot(): void {
     if (screen !== 'play') return
     fingerX = x
     fingerY = y
+    if (!mayBeginChain(state) && state.drag.length === 0) return
     if (state.drag.length === 0) return
     const before = state.drag.length
     const p = hit(x, y)
@@ -878,11 +892,13 @@ export function boot(): void {
     if (!ghostPath.length) {
       ghostPath = findPath(state, 3) ?? findPath(state, 2) ?? []
       if (!ghostPath.length) return null
+      ghostCycleStart = now
     }
-    const u = (now % 2600) / 2600
+  if (!ghostCycleStart) ghostCycleStart = now
+    const u = Math.min(1, Math.max(0, (now - ghostCycleStart) / 2600))
     const travel = Math.min(1, Math.max(0, (u - 0.1) / 0.62))
     const idx = Math.min(ghostPath.length - 1, Math.floor(travel * ghostPath.length))
-    if (idx >= ghostPath.length - 1 && u > 0.86) ghostDemoDone = true
+    if (idx >= ghostPath.length - 1 && u > 0.88) ghostDemoDone = true
     const c = center(ghostPath[idx])
     const alpha = u < 0.08 ? u / 0.08 : u > 0.88 ? (1 - u) / 0.12 : 1
     const towardX = c.x < innerWidth / 2 ? layout.D * 0.28 : -layout.D * 0.28
@@ -1070,24 +1086,20 @@ export function boot(): void {
         : []
     let bubble: Scene['bubble'] = null
     if (screen === 'play' && chainLen > 1 && rope.length > 1) {
-      const tip = rope[rope.length - 1]!
-      const prev = rope[rope.length - 2]!
-      const dx = tip.x - prev.x
-      const dy = tip.y - prev.y
-      const len = Math.hypot(dx, dy) || 1
-      const px = -dy / len
-      const py = dx / len
-      let bx = tip.x + px * D * 0.62 - (dx / len) * D * 0.2
-      let by = tip.y + py * D * 0.62 - (dy / len) * D * 0.2 - D * 0.35
-      const mat = {
-        x: layout.ox - D * 0.1,
-        y: Math.max(layout.hud, layout.oy - D * 0.08),
-        w: layout.cols * D + D * 0.2,
-        h: layout.padTop + layout.rows * D + D * 0.12,
+      const anchor =
+        fingerOn && state.drag.length > 1
+          ? { x: fingerX, y: fingerY }
+          : rope[rope.length - 1]!
+      let bx = anchor.x
+      let by = anchor.y - D * 1.28
+      const boardTop = layout.oy
+      if (by > boardTop - D * 0.45) {
+        by = Math.min(anchor.y - D * 1.35, layout.hud + D * 0.85)
+        bx = anchor.x
       }
-      const pad = D * 0.35
-      bx = Math.min(mat.x + mat.w - pad, Math.max(mat.x + pad, bx))
-      by = Math.min(mat.y + mat.h - pad, Math.max(mat.y + pad, by))
+      const margin = D * 0.45
+      bx = Math.min(innerWidth - margin, Math.max(margin, bx))
+      by = Math.min(innerHeight - margin, Math.max(layout.hud + D * 0.55, by))
       bubble = { x: bx, y: by, n: chainLen, bomb: chainLen >= 5, rainbow: chainLen >= 7 }
     }
     return {
@@ -1119,7 +1131,7 @@ export function boot(): void {
       popRings,
       bumpX: reduced ? 0 : bumpX,
       bumpY: reduced ? 0 : bumpY,
-      floats,
+      floats: screen === 'results' ? [] : floats,
       screen,
       dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
@@ -1138,19 +1150,23 @@ export function boot(): void {
 
   function draw() {
     const now = performance.now()
-    if (qaMode) {
-      const dt = now - lastDrawMs
-      lastDrawMs = now
-      if (dt > 0 && dt < 120) {
-        fpsBuf.push(1000 / dt)
-        if (fpsBuf.length > 90) fpsBuf.shift()
-      }
-      const dpr = viewDpr()
-      if (dpr !== canvasDpr) resize()
-    }
     const blink = !freeze && !reduced && now % 3200 < 140
     renderScene(gfx, scene(now), blink)
     frame += 1
+  }
+
+  function recordFpsFrame(now: number) {
+    if (!fpsWinStart) fpsWinStart = now
+    fpsWinFrames += 1
+    const elapsed = now - fpsWinStart
+    if (elapsed >= 1000) {
+      fpsBuf.push((fpsWinFrames * 1000) / elapsed)
+      if (fpsBuf.length > 12) fpsBuf.shift()
+      fpsWinStart = now
+      fpsWinFrames = 0
+      const dpr = viewDpr()
+      if (dpr !== canvasDpr) resize()
+    }
   }
 
   function settleChain(min: number): boolean {
@@ -1544,12 +1560,19 @@ export function boot(): void {
       draw()
     },
     get fps() {
+      const now = performance.now()
+      if (fpsWinFrames > 4 && now > fpsWinStart) {
+        const live = (fpsWinFrames * 1000) / (now - fpsWinStart)
+        if (!fpsBuf.length) return live
+        return fpsBuf.reduce((a, b) => a + b, live) / (fpsBuf.length + 1)
+      }
       if (!fpsBuf.length) return 60
       return fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length
     },
     resetFps() {
       fpsBuf.length = 0
-      lastDrawMs = performance.now()
+      fpsWinStart = performance.now()
+      fpsWinFrames = 0
     },
     restart() { onAction('restart') },
     home() { show('title'); draw() },
@@ -1620,16 +1643,11 @@ export function boot(): void {
 
   function loop(now: number) {
     if (freeze) return
+    recordFpsFrame(now)
     let dt = now - last
     last = now
-    if (dt > 40) dt = 40
     if (dt < 0) dt = 0
-    if (dt > 0 && !qaMode) {
-      fpsBuf.push(1000 / dt)
-      if (fpsBuf.length > 90) fpsBuf.shift()
-    }
-    const dpr = viewDpr()
-    if (dpr !== canvasDpr) resize()
+    if (dt > 200) dt = 200
     tick(dt, now)
     draw()
     requestAnimationFrame(loop)

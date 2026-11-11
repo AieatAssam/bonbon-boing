@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { boardFillMetrics } from '../src/layout'
 
 mkdirSync('/opt/cursor/artifacts', { recursive: true })
 mkdirSync('qa/shots', { recursive: true })
@@ -59,5 +60,13 @@ test('six-viewport contact sheet', async ({ browser }) => {
   writeFileSync('/opt/cursor/artifacts/viewport-contact-sheet.png', Buffer.from(b64, 'base64'))
   writeFileSync('qa/shots/viewport-contact-sheet.png', Buffer.from(b64, 'base64'))
   expect(shots.length).toBe(6)
+  const metrics = viewports.map(([w, h]) => ({
+    viewport: `${w}x${h}`,
+  ...boardFillMetrics(w, h),
+  }))
+  writeFileSync('/opt/cursor/artifacts/layout-metrics.json', JSON.stringify(metrics, null, 2))
+  writeFileSync('qa/shots/layout-metrics.json', JSON.stringify(metrics, null, 2))
+  expect(metrics.find((m) => m.viewport === '390x844')!.fillHeight).toBeGreaterThanOrEqual(0.88)
+  expect(metrics.find((m) => m.viewport === '430x932')!.fillHeight).toBeGreaterThanOrEqual(0.88)
   await page.close()
 })
