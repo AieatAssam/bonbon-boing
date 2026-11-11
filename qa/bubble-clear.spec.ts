@@ -1,48 +1,59 @@
 import { expect, test } from '@playwright/test'
 
 type Qa = {
-  findChain: (min: number, avoid?: number[], prefer?: 'top' | 'bottom') => { x: number; y: number }[] | null
-  bubbleCheck: () => { dist: number; distOk: boolean; tipClear: boolean; layoutD: number }
+  findEdgeChain: (edge: 'top' | 'bottom' | 'left' | 'right' | 'corner-tl' | 'corner-br') =>
+    | { id: number; x: number; y: number }[]
+    | null
+  findChain: (min: number) => { id: number; x: number; y: number }[] | null
+  beginChain: (id: number) => void
+  appendPiece: (id: number) => void
+  pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
+  bubbleCheck: () => {
+    dist: number
+    distOk: boolean
+    tipClear: boolean
+    neighbourCover: boolean
+    layoutD: number
+  }
 }
 
 const viewports = [
   { width: 390, height: 844 },
   { width: 360, height: 740 },
-  { width: 844, height: 390 },
+  { width: 412, height: 915 },
   { width: 768, height: 1024 },
   { width: 820, height: 1180 },
   { width: 1024, height: 768 },
+  { width: 844, height: 390 },
 ]
 
+const edges = ['top', 'bottom', 'left', 'right', 'corner-tl', 'corner-br'] as const
+
 for (const vp of viewports) {
-  test(`chain bubble stays near finger and clears tip neighbours @ ${vp.width}x${vp.height}`, async ({ page }) => {
+  test(`pill placement at edge tips @ ${vp.width}x${vp.height}`, async ({ page }) => {
     await page.setViewportSize(vp)
-    await page.goto('?screen=play&seed=feel', { timeout: 30_000 })
+    await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
     await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
-    let metrics = { dist: Infinity, distOk: false, tipClear: false, layoutD: 1 }
-    const preferBottom = vp.height > vp.width && vp.width >= 500
-    for (const min of [4, 3, 2]) {
-      const path = await page.evaluate(
-        ({ m, bottom }) => {
-          const q = (window as unknown as { __qa: Qa }).__qa
-          return bottom ? q.findChain(m, [], 'bottom') ?? q.findChain(m) : q.findChain(m)
-        },
-        { m: min, bottom: preferBottom },
-      )
-      if (!path?.length) continue
-      await page.mouse.move(path[0]!.x, path[0]!.y)
-      await page.mouse.down()
-      for (const pt of path) await page.mouse.move(pt.x, pt.y, { steps: 2 })
-      const tip = path[path.length - 1]!
-      await page.mouse.move(tip.x + 6, tip.y + 8, { steps: 2 })
-      await page.waitForTimeout(48)
-      metrics = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.bubbleCheck())
-      if (metrics.distOk && metrics.tipClear) break
+    let holds = 0
+    let neighbourCovers = 0
+    for (const edge of edges) {
+      const m = await page.evaluate((e) => {
+        const q = (window as unknown as { __qa: Qa }).__qa
+        const path = q.findEdgeChain(e) ?? q.findChain(3)
+        if (!path?.length) return null
+        q.beginChain(path[0]!.id)
+        for (const cell of path.slice(1)) q.appendPiece(cell.id)
+        const tip = path[path.length - 1]!
+        q.pointer('move', tip.x + 4, tip.y + 5)
+        return q.bubbleCheck()
+      }, edge)
+      if (!m) continue
+      holds += 1
+      expect(m.tipClear, `tip overlap ${edge}`).toBe(true)
+      expect(m.distOk, `dist ${m.dist} D=${m.layoutD} ${edge}`).toBe(true)
+      if (m.neighbourCover) neighbourCovers += 1
     }
-    expect(metrics.tipClear).toBe(true)
-    const cap = vp.width <= 430 ? 1.6 : 2.4
-    expect(metrics.dist, `finger dist ${metrics.dist} (D=${metrics.layoutD})`).toBeLessThanOrEqual(
-      metrics.layoutD * cap,
-    )
+    expect(holds, 'need edge holds').toBeGreaterThan(2)
+    if (holds > 0) expect(neighbourCovers / holds).toBeLessThan(0.05)
   })
 }

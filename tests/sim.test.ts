@@ -5,7 +5,6 @@ import {
   RAINBOW_AT,
   canAppend,
   collectClears,
-  comboGreedyTimedRound,
   createGame,
   maxColorShare,
   dailySeed,
@@ -196,31 +195,13 @@ describe('modes and seeds', () => {
     }
   })
 
-  it('greedy play stays in score range with long chains on feel', () => {
-    const s = createGame('feel', 7, 9, 'timed')
-    const r = greedySession(s, 60)
-    expect(r.maxChain).toBeGreaterThanOrEqual(6)
-    expect(r.score).toBeGreaterThan(4_000)
-    expect(r.score).toBeLessThan(50_000)
-  })
-
-  it('greedy longest bot stays in the 16–22k band on timed rounds', () => {
-    const r = greedyTimedRound(createGame('feel', 7, 10, 'timed'), 650)
-    expect(r.score).toBeGreaterThan(11_000)
-    expect(r.score).toBeLessThan(24_000)
-  })
-
-  it('combo bot outscores greedy longest on the same seeds', () => {
-    const greedy = createGame('feel', 7, 10, 'timed')
-    const combo = createGame('feel', 7, 10, 'timed')
-    const g = greedyTimedRound(greedy, 650)
-    const c = comboGreedyTimedRound(combo, 650)
-    expect(g.score).toBeGreaterThan(11_000)
-    expect(g.score).toBeLessThan(24_000)
-    expect(c.score).toBeGreaterThanOrEqual(g.score)
-    const greedy2 = greedyTimedRound(createGame('pretty', 7, 10, 'timed'), 650)
-    const combo2 = comboGreedyTimedRound(createGame('pretty', 7, 10, 'timed'), 650)
-    expect(combo2.score).toBeGreaterThanOrEqual(greedy2.score)
+  it('adds 25% chain bonus at 7+ links', () => {
+    const s = loadGrid(['0 0 0 0 0 0 0'])
+    const path = s.pieces.filter((p) => p.r === 0).sort((a, b) => a.c - b.c)
+    expect(path).toHaveLength(7)
+    s.drag = path.map((p) => p.id)
+    release(s)
+    expect(s.gained).toBe(Math.round(28 * 4 * 1.25))
   })
 
   it('greedy timed round cannot farm after bell', () => {

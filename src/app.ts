@@ -8,6 +8,7 @@ import {
   dailySeed,
   extendDrag,
   findPath,
+  findPathEndingAt,
   ROUND_MS,
   maxSameColorCluster,
   mayBeginChain,
@@ -96,7 +97,14 @@ export type Qa = {
   boardRect: () => { x: number; y: number; w: number; h: number }
   backingDpr: () => number
   pieceCenters: () => { x: number; y: number }[]
-  bubbleCheck: () => { dist: number; distOk: boolean; tipClear: boolean }
+  bubbleCheck: () => {
+    dist: number
+    distOk: boolean
+    tipClear: boolean
+    neighbourCover: boolean
+    layoutD: number
+  }
+  findEdgeChain: (edge: 'top' | 'bottom' | 'left' | 'right' | 'corner-tl' | 'corner-br') => ChainCell[] | null
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   traceChain: (cells: { id: number; x: number; y: number }[]) => void
   appendPiece: (id: number) => void
@@ -338,8 +346,8 @@ export function boot(): void {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
   }
 
-  const STAR2_SCORE = 15_000
-  const STAR3_SCORE = 30_000
+  const STAR2_SCORE = 20_000
+  const STAR3_SCORE = 38_000
 
   function nativeDprCap(): number {
     return Math.min(2, devicePixelRatio || 1)
@@ -446,36 +454,39 @@ export function boot(): void {
     return id != null ? (byId(state, id) ?? null) : null
   }
 
-  function bubbleProtectedIds(): Set<number> {
-    const tip = dragTipPiece()
-    if (!tip) return new Set()
-    const dragSet = new Set(state.drag)
-    const ids = new Set<number>([tip.id])
-    for (let dc = -1; dc <= 1; dc++) {
-      for (let dr = -1; dr <= 1; dr++) {
-        if (!dc && !dr) continue
-        const p = at(state, tip.c + dc, tip.r + dr)
-        if (p && !p.dead && !dragSet.has(p.id)) ids.add(p.id)
-      }
-    }
-    return ids
-  }
-
-  function pillHitsPieceCentre(bx: number, by: number, _hw: number, _hh: number, px: number, py: number): boolean {
-    const bubbleR = layout.D * 0.32
+  function pillHitsPieceCentre(bx: number, by: number, px: number, py: number, forPlace = false): boolean {
+    const bubbleR = layout.D * (forPlace ? 0.28 : 0.32)
     const pieceR = layout.D * 0.34
     return Math.hypot(bx - px, by - py) < bubbleR + pieceR
   }
 
-  function pillOverlapsProtected(bx: number, by: number, hw: number, hh: number): boolean {
-    const blocked = bubbleProtectedIds()
-    for (const id of blocked) {
-      const p = byId(state, id)
-      if (!p || p.dead) continue
-      const c = center(p)
-      if (pillHitsPieceCentre(bx, by, hw, hh, c.x, c.y)) return true
+  function neighbourCoverCounts(
+    bx: number,
+    by: number,
+    tip: Piece,
+    dragSet: Set<number>,
+  ): { nonChain: number; inChain: number } {
+    let nonChain = 0
+    let inChain = 0
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (!dc && !dr) continue
+        const p = at(state, tip.c + dc, tip.r + dr)
+        if (!p || p.dead) continue
+        if (!pillHitsPieceCentre(bx, by, center(p).x, center(p).y, true)) continue
+        if (dragSet.has(p.id)) inChain += 1
+        else nonChain += 1
+      }
     }
-    return false
+    return { nonChain, inChain }
+  }
+
+  function clampPillInBoard(tx: number, ty: number, hw: number, hh: number, board: ReturnType<typeof boardRect>) {
+    const D = layout.D
+    return {
+      x: Math.max(board.x + hw + D * 0.04, Math.min(board.x + board.w - hw - D * 0.04, tx)),
+      y: Math.max(board.y + hh + D * 0.04, Math.min(board.y + board.h - hh - D * 0.04, ty)),
+    }
   }
 
   function placeChainBubble(
@@ -491,50 +502,77 @@ export function boot(): void {
     const hh = pill.h * 0.5
     const board = boardRect()
     const prev = rope.length >= 2 ? rope[rope.length - 2]! : anchor
-    const side = anchor.x - prev.x >= 0 ? -1 : 1
+    const dragAway = anchor.x - prev.x >= 0 ? -1 : 1
     const tip = dragTipPiece()
-    const blockedAbove =
-      tip != null && !!at(state, tip.c, tip.r - 1) && !at(state, tip.c, tip.r - 1)?.dead
-    let bx = anchor.x + side * (blockedAbove ? D * 0.82 : D * 0.16)
-    let by = anchor.y - D * (blockedAbove ? 1.0 : 1.25)
-    if (by - hh < board.y + D * 0.08) {
-      by = anchor.y + D * 1.22
-      bx = anchor.x + side * D * 0.35
+    const tipPt = tip ? center(tip) : anchor
+    const dragSet = new Set(state.drag)
+    const boardMidX = board.x + board.w * 0.5
+    const boardMidY = board.y + board.h * 0.5
+    type Cand = {
+      x: number
+      y: number
+      nonChain: number
+      inChain: number
+      dist: number
+      up: number
+      side: number
+      inward: number
     }
-    const tryOffsets: { x: number; y: number }[] = []
-    for (let ring = 1.12; ring <= 1.58; ring += 0.06) {
-      for (const sx of [-0.55, -0.28, 0, 0.28, 0.55]) {
-        tryOffsets.push({ x: side * D * sx, y: -D * ring })
-        tryOffsets.push({ x: side * D * sx, y: D * ring })
+    const cands: Cand[] = []
+    for (const radius of [1.0, 1.25, 1.5]) {
+      for (let i = 0; i < 8; i++) {
+        const ang = -Math.PI / 2 + i * (Math.PI / 4)
+        let tx = tipPt.x + Math.cos(ang) * D * radius
+        let ty = tipPt.y + Math.sin(ang) * D * radius
+        const clamped = clampPillInBoard(tx, ty, hw, hh, board)
+        tx = clamped.x
+        ty = clamped.y
+        if (pillHitsPieceCentre(tx, ty, tipPt.x, tipPt.y, true)) continue
+        const dist = Math.hypot(tx - anchor.x, ty - anchor.y)
+        if (dist > D * 1.6) continue
+        if (!tip) continue
+        const cover = neighbourCoverCounts(tx, ty, tip, dragSet)
+        cands.push({
+          x: tx,
+          y: ty,
+          nonChain: cover.nonChain,
+          inChain: cover.inChain,
+          dist,
+          up: -ty,
+          side: dragAway * tx,
+          inward: -Math.hypot(tx - boardMidX, ty - boardMidY),
+        })
       }
     }
-    let bestFit: Scene['bubble'] | null = null
-    let bestDist = Infinity
-    for (const off of tryOffsets) {
-      let tx = bx + off.x
-      let ty = by + off.y
-      tx = Math.max(board.x + hw + D * 0.04, Math.min(board.x + board.w - hw - D * 0.04, tx))
-      ty = Math.max(board.y + hh + D * 0.04, Math.min(board.y + board.h - hh - D * 0.04, ty))
-      if (pillOverlapsProtected(tx, ty, hw, hh)) continue
-      const dist = Math.hypot(tx - anchor.x, ty - anchor.y)
-      if (dist <= D * 1.6 && dist < bestDist) {
-        bestDist = dist
-        bestFit = { x: tx, y: ty, n: chainLen, bomb, rainbow }
+    const pick = (pool: Cand[]) =>
+      pool.sort((a, b) => {
+        if (a.nonChain !== b.nonChain) return a.nonChain - b.nonChain
+        if (a.inChain !== b.inChain) return b.inChain - a.inChain
+        if (a.up !== b.up) return a.up - b.up
+        if (a.side !== b.side) return a.side - b.side
+        if (a.inward !== b.inward) return a.inward - b.inward
+        return a.dist - b.dist
+      })[0]!
+    let chosen: Cand | undefined
+    const clear = cands.filter((c) => c.nonChain === 0)
+    if (clear.length) chosen = pick(clear)
+    else if (cands.length) chosen = pick(cands)
+    else {
+      chosen = {
+        x: tipPt.x,
+        y: tipPt.y - D * 1.25,
+        nonChain: 0,
+        inChain: 0,
+        dist: D * 1.25,
+        up: -(tipPt.y - D * 1.25),
+        side: dragAway * tipPt.x,
+        inward: -Math.hypot(tipPt.x - boardMidX, tipPt.y - D * 1.25 - boardMidY),
       }
+      const clamped = clampPillInBoard(chosen.x, chosen.y, hw, hh, board)
+      chosen.x = clamped.x
+      chosen.y = clamped.y
     }
-    if (bestFit) return bestFit
-    for (const off of tryOffsets) {
-      let tx = bx + off.x
-      let ty = by + off.y
-      tx = Math.max(board.x + hw + D * 0.04, Math.min(board.x + board.w - hw - D * 0.04, tx))
-      ty = Math.max(board.y + hh + D * 0.04, Math.min(board.y + board.h - hh - D * 0.04, ty))
-      if (!pillOverlapsProtected(tx, ty, hw, hh)) {
-        return { x: tx, y: ty, n: chainLen, bomb, rainbow }
-      }
-    }
-    bx = Math.max(board.x + hw, Math.min(board.x + board.w - hw, bx))
-    by = Math.max(board.y + hh, Math.min(board.y + board.h - hh, by))
-    return { x: bx, y: by, n: chainLen, bomb, rainbow }
+    return { x: chosen.x, y: chosen.y, n: chainLen, bomb, rainbow }
   }
 
   function hit(x: number, y: number): Piece | null {
@@ -1642,13 +1680,46 @@ export function boot(): void {
     bubbleCheck() {
       const sc = scene(performance.now())
       const D = layout.D
-      if (!sc.bubble) return { dist: Infinity, distOk: false, tipClear: true }
+      if (!sc.bubble) return { dist: Infinity, distOk: false, tipClear: true, neighbourCover: false, layoutD: D }
       const anchor =
         fingerOn && state.drag.length > 0 ? { x: fingerX, y: fingerY } : sc.finger ?? sc.rope[sc.rope.length - 1]!
       const dist = Math.hypot(sc.bubble.x - anchor.x, sc.bubble.y - anchor.y)
-      const pill = bubblePillSize(sc.bubble.n, sc.bubble.bomb, sc.bubble.rainbow)
-      const tipClear = !pillOverlapsProtected(sc.bubble.x, sc.bubble.y, pill.w * 0.5, pill.h * 0.5)
-      return { dist, distOk: dist <= D * 1.6, tipClear, layoutD: D }
+      const tip = dragTipPiece()
+      const dragSet = new Set(state.drag)
+      const tipClear = !tip || !pillHitsPieceCentre(sc.bubble.x, sc.bubble.y, center(tip).x, center(tip).y)
+      const cover = tip ? neighbourCoverCounts(sc.bubble.x, sc.bubble.y, tip, dragSet) : { nonChain: 0, inChain: 0 }
+      return {
+        dist,
+        distOk: dist <= D * 1.6,
+        tipClear,
+        neighbourCover: cover.nonChain > 0,
+        layoutD: D,
+      }
+    },
+    findEdgeChain(edge) {
+      const cols = state.cols
+      const rows = state.rows
+      const tips: { c: number; r: number }[] = []
+      if (edge === 'top') {
+        for (let c = 0; c < cols; c++) tips.push({ c, r: 0 })
+      } else if (edge === 'bottom') {
+        for (let c = 0; c < cols; c++) tips.push({ c, r: rows - 1 })
+      } else if (edge === 'left') {
+        for (let r = 0; r < rows; r++) tips.push({ c: 0, r })
+      } else if (edge === 'right') {
+        for (let r = 0; r < rows; r++) tips.push({ c: cols - 1, r })
+      } else if (edge === 'corner-tl') {
+        tips.push({ c: 0, r: 0 })
+      } else {
+        tips.push({ c: cols - 1, r: rows - 1 })
+      }
+      for (const tip of tips) {
+        for (let min = 4; min >= 2; min--) {
+          const path = findPathEndingAt(state, min, tip.c, tip.r)
+          if (path) return path.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      return null
     },
     get ribbonThickness() {
       return state.drag.length > 1 || pose === 'chain' ? layout.D * 0.22 : 0

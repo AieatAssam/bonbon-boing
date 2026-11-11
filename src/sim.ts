@@ -487,6 +487,25 @@ export function findPath(
   return best
 }
 
+/** Longest valid drag path that ends on a given cell (for QA edge-tip drags). */
+export function findPathEndingAt(state: GameState, min: number, endC: number, endR: number): Piece[] | null {
+  const end = at(state, endC, endR)
+  if (!end || end.dead) return null
+  let best: Piece[] | null = null
+  for (let color = 0; color < activeColorCount(state); color++) {
+    const path = diameterPath(state, color, min, new Set())
+    if (!path) continue
+    for (const cand of [path, [...path].reverse()] as Piece[][]) {
+      if (!validDragPath(cand)) continue
+      const tip = cand[cand.length - 1]!
+      if (tip.c === endC && tip.r === endR && cand.length >= min) {
+        if (!best || cand.length > best.length) best = cand
+      }
+    }
+  }
+  return best
+}
+
 function setCell(state: GameState, c: number, r: number, color: number, kind: Kind): Piece {
   const p = state.pieces.find((q) => !q.dead && q.c === c && q.r === r)
   if (p) {
@@ -946,21 +965,12 @@ export function release(state: GameState): number[] {
   state.lastChainLen = path.length
   const comboFresh = state.simMs - state.lastSettleAt > COMBO_WINDOW_MS || state.score === 0
   state.combo = comboFresh ? 1 : Math.min(COMBO_CAP, state.combo + 1)
-  let pts = 0
-  clears.forEach((_, i) => {
-    pts += 7 * (i + 1)
-  })
-  const chainLen = path.length
-  if (chainLen >= 7) pts = Math.round(pts * 3.2)
-  else if (chainLen >= 6) pts = Math.round(pts * 2.45)
-  let bombPts = clears.some((p) => p.kind === 'bomb') ? 58 : 0
-  let rainbowPts = clears.some((p) => p.kind === 'rainbow') ? 150 : 0
-  if (!comboFresh && chainLen >= BOMB_AT && (bombPts || rainbowPts)) {
-    if (bombPts) bombPts = Math.round(bombPts * 1.5)
-    if (rainbowPts) rainbowPts = Math.round(rainbowPts * 1.5)
-  }
-  pts += bombPts + rainbowPts
-  if (chainLen >= 5) pts += chainLen * 42
+  let chainPts = 0
+  for (let i = 0; i < path.length; i++) chainPts += 4 * (i + 1)
+  let pts = chainPts
+  if (path.length >= 7) pts += Math.round(chainPts * 0.25)
+  if (clears.some((p) => p.kind === 'bomb')) pts += 45
+  if (clears.some((p) => p.kind === 'rainbow')) pts += 120
   state.gained = Math.round(pts * state.combo)
   state.score += state.gained
   state.popAt = []
