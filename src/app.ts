@@ -144,6 +144,12 @@ export type Qa = {
   settleChain: (min: number) => boolean
   hasBomb: () => boolean
   lastChainLen: number
+  setMovesLeft: (n: number) => void
+  bonusActive: () => boolean
+  lastMovesLeftAtGoal: number
+  forceBonusFinale: (moves: number) => void
+  finalePopsTotal: () => number
+  findGoalChain: (min?: number) => ChainCell[] | null
 }
 
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
@@ -205,10 +211,16 @@ export function boot(): void {
   let lastFinishedAdventureLevel: AdventureLevelDef | null = null
   let lastRunRewards = { coins: 0, xp: 0 }
   let lastRunRewardNote = ''
-  type BonusFinale = { popsLeft: number; nextAt: number; endAt: number; startMs: number }
+  type BonusFinale = {
+    popsLeft: number
+    popsTotal: number
+    elapsed: number
+    nextPopAt: number
+  }
   let bonusFinale: BonusFinale | null = null
   let movesLeftAtGoal = 0
   let resultsLocked = false
+  let hudStarsLive = { s25: true, s45: true, s90: true }
   const BONUS_SCORE_PER_MOVE = 500
   const BONUS_POP_GAP_MS = 250
   const BONUS_CAP_MS = 4000
@@ -217,19 +229,21 @@ export function boot(): void {
     bonusFinale = null
     movesLeftAtGoal = 0
     resultsLocked = false
+    hudStarsLive = { s25: true, s45: true, s90: true }
     if (state) state.inputLocked = false
   }
 
-  function finishBonusFinale(skip = false) {
+  function finishBonusFinale() {
     if (!bonusFinale) return
-    if (skip && bonusFinale.popsLeft > 0) {
-      const lump = bonusFinale.popsLeft * BONUS_SCORE_PER_MOVE
+    if (bonusFinale.popsLeft > 0) {
+      const n = bonusFinale.popsLeft
+      const lump = n * BONUS_SCORE_PER_MOVE
       state.score += lump
       if (adventureGoals) adventureGoals.score = state.score
       floats.push({
         x: layout.ox + (layout.cols * layout.D) / 2,
         y: layout.oy + layout.padTop,
-        text: `+${lump}`,
+        text: `+${n} × ${BONUS_SCORE_PER_MOVE}`,
         age: 0,
         big: true,
       })
@@ -238,7 +252,7 @@ export function boot(): void {
     bonusFinale = null
     state.inputLocked = false
     state.movesLeft = 0
-    syncAdventureGoalsFromTrack()
+    if (finaleHintEl) finaleHintEl.hidden = true
     showResults()
   }
 
@@ -260,7 +274,7 @@ export function boot(): void {
       burst(c.x, c.y, p.color, hits.length > 2, hits.length > 3)
       p.landT = 0
     }
-    pts = BONUS_SCORE_PER_MOVE + (hits.length > 2 ? 80 : 0)
+    pts = BONUS_SCORE_PER_MOVE
     state.score += pts
     if (adventureGoals) adventureGoals.score = state.score
     state.gained = pts
@@ -433,8 +447,20 @@ export function boot(): void {
   })
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
+  const hudTimerCol = el('div', 'hud-timer-col')
+  const movesPillEl = el('div', 'ui timer ring moves-pill')
+  const adventureHud = el('div', 'adventure-hud')
+  adventureHud.hidden = true
+  const starBarEl = el('div', 'star-progress ui')
+  starBarEl.setAttribute('aria-label', 'Star targets by moves left')
+  adventureHud.append(movesPillEl, starBarEl)
+  const finaleHintEl = el('div', 'finale-skip-hint ui')
+  finaleHintEl.hidden = true
+  finaleHintEl.innerHTML = '<span class="finale-skip-ico" aria-hidden="true">👆</span><span>Tap to skip</span>'
   hudMid.append(scoreEl, comboEl, hudMini)
-  hud.append(hudLeft, hudMid, timeEl)
+  hudTimerCol.append(timeEl, adventureHud)
+  hud.append(hudLeft, hudMid, hudTimerCol)
+  root.append(finaleHintEl)
   mkPill(pauseMain, 'Resume', 'resume', ICONS.play, 'primary')
   mkPill(pauseMain, 'Restart', 'restart', ICONS.restart)
   mkPill(pauseMain, 'Home', 'home', ICONS.home)
@@ -989,21 +1015,32 @@ export function boot(): void {
       timeEl.classList.remove('pulse')
       timeEl.innerHTML = `<span aria-hidden="true">${ICONS.heart}</span>`
     } else if (mode === 'adventure') {
+      const showAdvHud = screen === 'play'
+      timeEl.hidden = showAdvHud
+      adventureHud.hidden = !showAdvHud
       timeEl.classList.remove('pulse')
-      const moves = Math.max(0, state.movesLeft)
-      const limit = adventureLevel?.moves ?? (moves || 1)
+      const limit = adventureLevel?.moves ?? Math.max(1, state.movesLeft)
+      const moves = bonusFinale ? bonusFinale.popsLeft : Math.max(0, state.movesLeft)
+      const fillPct = Math.max(0, Math.min(100, (moves / limit) * 100))
       const t2 = Math.ceil(limit * 0.25)
       const t3 = Math.ceil(limit * 0.45)
-      const pct2 = ((limit - t2) / limit) * 100
-      const pct3 = ((limit - t3) / limit) * 100
+      const t90 = Math.ceil(limit * 0.9)
+      const on25 = moves >= t2
+      const on45 = moves >= t3
+      const on90 = moves >= t90
+      const pop25 = hudStarsLive.s25 && !on25
+      const pop45 = hudStarsLive.s45 && !on45
+      const pop90 = hudStarsLive.s90 && !on90
+      hudStarsLive = { s25: on25, s45: on45, s90: on90 }
       const bonus = bonusFinale ? ' bonus-active' : ''
-      timeEl.innerHTML = `<div class="moves-meter${bonus}" aria-label="Moves left ${moves} of ${limit}">
-        <span class="moves-left">${moves}</span><span class="moves-lbl">moves</span>
-        <div class="moves-track" aria-hidden="true">
-          <span class="star-notch star2" style="left:${pct2}%">★</span>
-          <span class="star-notch star3" style="left:${pct3}%">★</span>
-        </div>
-      </div>`
+      movesPillEl.className = `ui timer ring moves-pill${bonus}`
+      movesPillEl.setAttribute('aria-label', `Moves left ${moves} of ${limit}`)
+      movesPillEl.innerHTML = `<span class="moves-num">${moves}</span><span class="moves-lbl">moves</span>`
+      starBarEl.innerHTML = `<div class="star-fill" style="width:${fillPct}%"></div>
+        <span class="star-marker pos25 ${on25 ? 'on' : 'off'}${pop25 ? ' pop' : ''}" style="left:25%">★</span>
+        <span class="star-marker pos45 ${on45 ? 'on' : 'off'}${pop45 ? ' pop' : ''}" style="left:45%">★</span>
+        <span class="star-marker pos90 ${on90 ? 'on' : 'off'}${pop90 ? ' pop' : ''}" style="left:90%">★</span>`
+      if (finaleHintEl) finaleHintEl.hidden = !bonusFinale
       if (adventureLevel && adventureGoals) {
         hudMini.hidden = false
         hudMini.className = 'hud-mini ui goal-strip'
@@ -1012,6 +1049,9 @@ export function boot(): void {
           .join('')
       }
     } else {
+      timeEl.hidden = false
+      adventureHud.hidden = true
+      if (finaleHintEl) finaleHintEl.hidden = true
       hudMini.hidden = true
       hudMini.className = 'hud-mini ui'
       hudMini.innerHTML = ''
@@ -1107,8 +1147,19 @@ export function boot(): void {
     const xpBefore = save.profile.xp
   const pops = state.track.clearedByColor.reduce((a, b) => a + b, 0)
     if (mode === 'adventure' && adventureLevel && adventureGoals) {
-      if (adventureGoals.movesUsed <= 0 && !allGoalsMet(adventureGoals, adventureLevel.goals)) return
+      const bonusClear = movesLeftAtGoal > 0
+      if (adventureGoals.movesUsed <= 0 && !allGoalsMet(adventureGoals, adventureLevel.goals) && !bonusClear) return
       syncAdventureGoalsFromTrack()
+      if (bonusClear && !allGoalsMet(adventureGoals, adventureLevel.goals)) {
+        adventureGoals.movesUsed = Math.max(1, adventureGoals.movesUsed)
+        for (const g of adventureLevel.goals) {
+          if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+          else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+          else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+          else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+          else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+        }
+      }
       const ev = evaluateStars(adventureGoals, adventureLevel, movesLeftAtGoal)
       lastAdventureWon = ev.goalMet
       lastResultStars = lastAdventureWon ? ev.stars : 0
@@ -1261,7 +1312,7 @@ export function boot(): void {
       return
     }
     if (bonusFinale) {
-      finishBonusFinale(true)
+      finishBonusFinale()
       return
     }
     if (screen !== 'play') return
@@ -1405,14 +1456,14 @@ export function boot(): void {
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
     if (bonusFinale) {
-      const tNow = performance.now()
-      const minTime = bonusFinale.startMs + BONUS_POP_GAP_MS
-      if (tNow >= bonusFinale.nextAt && bonusFinale.popsLeft > 0 && tNow >= minTime) {
+      bonusFinale.elapsed += dt
+      if (bonusFinale.elapsed >= bonusFinale.nextPopAt && bonusFinale.popsLeft > 0) {
         doBonusFinalePop()
         bonusFinale.popsLeft -= 1
-        bonusFinale.nextAt = tNow + BONUS_POP_GAP_MS
+        state.movesLeft = bonusFinale.popsLeft
+        bonusFinale.nextPopAt += BONUS_POP_GAP_MS
       }
-      if (bonusFinale.popsLeft <= 0 || tNow >= bonusFinale.endAt) {
+      if (bonusFinale.popsLeft <= 0 || bonusFinale.elapsed >= BONUS_CAP_MS) {
         finishBonusFinale()
         return
       }
@@ -1425,13 +1476,13 @@ export function boot(): void {
         const left = state.movesLeft
         movesLeftAtGoal = left
         if (left > 0) {
-          const now = performance.now()
           bonusFinale = {
             popsLeft: left,
-            nextAt: now + BONUS_POP_GAP_MS,
-            endAt: now + Math.min(BONUS_CAP_MS, left * BONUS_POP_GAP_MS + 800),
-            startMs: now,
+            popsTotal: left,
+            elapsed: 0,
+            nextPopAt: BONUS_POP_GAP_MS,
           }
+          if (finaleHintEl) finaleHintEl.hidden = false
           state.inputLocked = true
           syncHud()
           return
@@ -2159,6 +2210,19 @@ export function boot(): void {
       if (!path) return null
       return path.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
     },
+    findGoalChain(min = 2) {
+      const goalColor = adventureLevel?.goals.find((g) => g.type === 'clear_color')?.color
+      for (let n = 8; n >= min; n--) {
+        const cand = findPath(state, n)
+        if (!cand) continue
+        if (goalColor == null || cand[0]!.color === goalColor) {
+          return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const fallback = findPath(state, min)
+      if (!fallback) return null
+      return fallback.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+    },
     center(id) {
       const p = byId(state, id)
       return p ? center(p) : null
@@ -2322,6 +2386,46 @@ export function boot(): void {
     },
     hasBomb() {
       return state.pieces.some((p) => !p.dead && p.kind === 'bomb')
+    },
+    setMovesLeft(n: number) {
+      if (!qaMode) return
+      state.movesLeft = Math.max(0, n)
+      syncHud()
+      draw()
+    },
+    bonusActive() {
+      return bonusFinale !== null
+    },
+    get lastMovesLeftAtGoal() {
+      return movesLeftAtGoal
+    },
+    finalePopsTotal() {
+      return bonusFinale?.popsTotal ?? 0
+    },
+    forceBonusFinale(moves: number) {
+      if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return
+      const n = Math.max(1, moves)
+      movesLeftAtGoal = n
+      state.movesLeft = n
+      syncAdventureGoalsFromTrack()
+      adventureGoals.movesUsed = Math.max(1, adventureGoals.movesUsed)
+      for (const g of adventureLevel.goals) {
+        if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+        else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+        else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+        else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+        else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+      }
+      bonusFinale = {
+        popsLeft: n,
+        popsTotal: n,
+        elapsed: 0,
+        nextPopAt: BONUS_POP_GAP_MS,
+      }
+      state.inputLocked = true
+      if (finaleHintEl) finaleHintEl.hidden = false
+      syncHud()
+      draw()
     },
   }
 

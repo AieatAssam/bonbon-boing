@@ -85,12 +85,24 @@ test('achievement toast 390x844', async ({ page }) => {
 
 test('adventure blockers 390x844', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await ready(page)
+  await page.goto('?qa&freeze=1&screen=title', { timeout: 30_000 })
+  await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+  await page.evaluate(() => document.fonts.ready)
+  await page.addStyleTag({
+    content: '.map-path-node.current { animation: none !important; transform: none !important; }',
+  })
   await page.evaluate(() => {
-    const q = (window as unknown as { __qa: Qa }).__qa
+    const q = (window as unknown as { __qa: Qa & { prepAdventureLevel: (n: number) => void; markTipsSeen: () => void } }).__qa
     q.prepPromoSave()
-    q.startAdventure(22)
-    q.draw()
+    q.prepAdventureLevel(4)
+    q.markTipsSeen()
+  })
+  await page.locator('#title .meta-row button').filter({ hasText: 'Adventure' }).click()
+  await page.locator('button.map-path-node .map-node-num', { hasText: '4' }).click()
+  await page.waitForFunction(() => (window as unknown as { __qa: { screen: string } }).__qa.screen === 'play')
+  await page.evaluate(() => {
+    document.querySelector('.tip-scrim')?.remove()
+    ;(window as unknown as { __qa: Qa }).__qa.draw()
   })
   await snap(page, 'meta-adventure-play-390x844.png')
 })

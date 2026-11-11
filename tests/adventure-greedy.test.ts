@@ -42,7 +42,7 @@ function greedyAdventureLevel(id: number, cols = 7, rows = 9) {
     syncGoals(goals, state)
     if (allGoalsMet(goals, level.goals)) {
       if (state.movesLeft > 0) {
-        const bonus = state.movesLeft * 75
+        const bonus = state.movesLeft * 500
         state.score += bonus
         goals.score = state.score
         state.movesLeft = 0

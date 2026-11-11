@@ -43,11 +43,28 @@ export function buildLevel(id: number): AdventureLevelDef {
   const colorCount =
     id <= 3 ? 3 : chapter === 1 && id < 8 ? 3 : chapter === 1 ? 4 : chapter === 2 ? 5 : Math.min(6, 4 + Math.floor(chapter / 2))
   const moves =
-    id <= 3 ? 28 : id <= 7 ? 22 : chapter === 1 ? Math.max(16, 20 - Math.floor(id / 6)) : chapter === 2 ? Math.max(14, 18 - Math.floor(id / 8)) : Math.max(12, 16 - Math.floor(id / 10))
+    id === 1
+      ? 26
+      : id <= 4
+        ? 30 - (id - 1)
+      : id <= 7
+        ? 25
+      : id === 8
+        ? 26
+      : id === 12 || id === 16
+        ? 24
+            : chapter === 1
+              ? 22
+              : chapter === 2
+                ? Math.max(16, 20 - Math.floor(id / 8))
+                : Math.max(14, 18 - Math.floor(id / 10))
   const baseScore = 3500 + id * 220 + chapter * 520 + tier * 80
 
   const blockers: BlockerHints = {}
-  if (id >= 1) blockers.ice = Math.min(14, 2 + Math.floor(id / 4))
+  if (id === 1) blockers.ice = 1
+  else if (id === 2) blockers.ice = 4
+  else if (id <= 7) blockers.ice = Math.min(12, 5 + Math.floor(id / 2))
+  else blockers.ice = Math.min(14, 2 + Math.floor(id / 4))
   if (id >= 5) blockers.jelly = Math.min(6, 1 + Math.floor((id - 4) / 6))
   if (id >= 10) blockers.sleepy = id % 9 === 0 || id === 12 ? 1 : 0
   if (id >= 25) blockers.starburst = id % 11 === 0 ? 1 : 0
@@ -55,13 +72,27 @@ export function buildLevel(id: number): AdventureLevelDef {
 
   const goals: AdventureGoal[] = []
   const color = id % Math.max(3, colorCount)
+  const clearCount =
+    id === 1
+      ? 15
+      : id <= 7
+        ? 11 + id * 2
+      : id === 8
+        ? 21
+        : id === 12
+          ? 22
+          : id === 16
+            ? 24
+            : id <= 12
+              ? 10 + Math.floor(tier * 0.65)
+              : 8 + Math.floor(tier * 0.9)
   goals.push({
     type: 'clear_color',
     color,
-    count: id <= 3 ? 4 : id <= 8 ? 7 + Math.floor(tier * 0.5) : 8 + Math.floor(tier * 0.9),
+    count: clearCount,
   })
   if (id >= 6) goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 10) })
-  if (id >= 3) goals.push({ type: 'break_ice', count: Math.min(10, 2 + Math.floor(id / 5)) })
+  if (id >= 3) goals.push({ type: 'break_ice', count: Math.min(12, id === 3 ? 2 : 3 + Math.floor(id / 2)) })
   if (id >= 20) goals.push({ type: 'clear_choco', count: Math.min(8, 2 + Math.floor((id - 19) / 6)) })
   if (indexInChapter === 15) {
     goals.push({ type: 'score_moves', score: baseScore, moves: moves })

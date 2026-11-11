@@ -182,7 +182,7 @@ for (const style of ['goal', 'chain'] as const) {
       }
       const stars = await page.locator('#results .stars .star.on').count()
       const movesLeft = await page.evaluate(() => {
-        const el = document.querySelector('.moves-left')
+        const el = document.querySelector('.moves-num')
         return el ? Number(el.textContent) : -1
       })
       rows.push({ level: id, stars, movesLeft, style })
