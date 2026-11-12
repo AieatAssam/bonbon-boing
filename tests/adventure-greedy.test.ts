@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { allGoalsMet, emptyGoalState, evaluateStars } from '../src/adventure/goals'
 import { levelById } from '../src/adventure/levels'
-import { createAdventureGame, findPath, mayBeginChain, playToIdle, release } from '../src/sim'
+import {
+  createAdventureGame,
+  findPath,
+  findPathTouchingKind,
+  mayBeginChain,
+  playToIdle,
+  release,
+} from '../src/sim'
 
 function syncGoals(
   goals: ReturnType<typeof emptyGoalState>,
@@ -20,15 +27,31 @@ function greedyAdventureLevel(id: number, cols = 7, rows = 9) {
   const state = createAdventureGame(level, cols, rows)
   const goals = emptyGoalState(level.moves)
   let guard = 0
-  while (mayBeginChain(state) && guard++ < 220) {
-    const goalColor = level.goals.find((g) => g.type === 'clear_color')?.color
+  while (mayBeginChain(state) && guard++ < 400) {
     let path: ReturnType<typeof findPath> = null
-    for (let min = 8; min >= 2; min--) {
-      const cand = findPath(state, min)
-      if (!cand) continue
-      if (goalColor == null || cand[0]!.color === goalColor) {
-        path = cand
-        break
+    const needIce = level.goals.some((g) => g.type === 'break_ice' && goals.iceBroken < g.count)
+    const needChoco = level.goals.some((g) => g.type === 'clear_choco' && goals.chocoCleared < g.count)
+    if (needIce) {
+      for (let min = 8; min >= 2; min--) {
+        path = findPathTouchingKind(state, min, 'ice')
+        if (path) break
+      }
+    }
+    if (!path && needChoco) {
+      for (let min = 8; min >= 2; min--) {
+        path = findPathTouchingKind(state, min, 'choco')
+        if (path) break
+      }
+    }
+  const goalColor = level.goals.find((g) => g.type === 'clear_color')?.color
+  if (!path) {
+      for (let min = 8; min >= 2; min--) {
+        const cand = findPath(state, min)
+        if (!cand) continue
+        if (goalColor == null || cand[0]!.color === goalColor) {
+          path = cand
+          break
+        }
       }
     }
     path ??= findPath(state, 2)
@@ -57,6 +80,7 @@ function greedyAdventureLevel(id: number, cols = 7, rows = 9) {
 }
 
 const benchLevels = [1, 4, 8, 16] as const
+const mustWin = [8] as const
 
 describe('adventure greedy stars', () => {
   it('prints star table for benchmark', () => {
@@ -65,4 +89,10 @@ describe('adventure greedy stars', () => {
     expect(table).toHaveLength(4)
   })
 
+  it('wins blocker-heavy benchmark levels', () => {
+    for (const id of mustWin) {
+      const r = greedyAdventureLevel(id, 7, 9)
+      expect(r.won, `level ${id}`).toBe(true)
+    }
+  })
 })

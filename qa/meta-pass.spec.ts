@@ -4,6 +4,8 @@ import { mkdirSync } from 'node:fs'
 mkdirSync('/opt/cursor/artifacts', { recursive: true })
 mkdirSync('qa/shots', { recursive: true })
 
+test.use({ hasTouch: true })
+
 const viewports = [
   [360, 640],
   [390, 844],
@@ -42,31 +44,39 @@ for (const [w, h] of viewports) {
     await snap(page, `meta-title_${tag}.png`)
 
     await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.prepPromoSave())
+    await page.addStyleTag({
+      content: '.map-path-node.current { animation: none !important; transform: none !important; }',
+    })
 
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.openMeta('map'))
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+    const touchNav = w <= 430
+    const openMeta = async (label: string, which: 'map' | 'shop' | 'achievements' | 'collection') => {
+      if (touchNav) {
+        await page.locator('#title .meta-row button').filter({ hasText: label }).tap()
+      } else {
+        await page.evaluate((w) => (window as unknown as { __qa: Qa }).__qa.openMeta(w), which)
+      }
+      await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+    }
+    const closeMeta = async () => {
+      if (touchNav) await page.locator('.meta-back').tap().catch(() => {})
+      await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.closeMeta())
+    }
+
+    await openMeta('Adventure', 'map')
     await snap(page, `meta-map_${tag}.png`)
+    await closeMeta()
 
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.closeMeta())
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.openMeta('shop'))
-    await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+    await openMeta('Shop', 'shop')
     await snap(page, `meta-shop_${tag}.png`)
+    await closeMeta()
 
-    await page.evaluate(() => {
-      const q = (window as unknown as { __qa: Qa }).__qa
-      q.closeMeta()
-      q.openMeta('achievements')
-      q.draw()
-    })
+    await openMeta('Stickers', 'achievements')
     await snap(page, `meta-achievements_${tag}.png`)
+    await closeMeta()
 
-    await page.evaluate(() => {
-      const q = (window as unknown as { __qa: Qa }).__qa
-      q.closeMeta()
-      q.openMeta('collection')
-      q.draw()
-    })
+    await openMeta('Collection', 'collection')
     await snap(page, `meta-collection_${tag}.png`)
+    await closeMeta()
 
   })
 }

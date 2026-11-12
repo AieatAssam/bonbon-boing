@@ -290,7 +290,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
-  width: 118px;
+  width: 150px;
 }
 
 .moves-pill {
@@ -328,11 +328,13 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
 
 .star-progress {
   position: relative;
-  height: 16px;
+  width: 150px;
+  height: 20px;
   border-radius: 999px;
   background: #ffe8f2;
   border: 2px solid var(--line);
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .star-fill {
@@ -348,7 +350,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
   z-index: 1;
   color: #c4a000;
@@ -356,6 +358,13 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   filter: grayscale(0.35);
   pointer-events: none;
   transition: opacity 160ms ease, transform 200ms ease, filter 160ms ease;
+}
+
+.star-marker.star-goal {
+  opacity: 0.95;
+  color: #ff7a28;
+  filter: drop-shadow(0 1px 0 #fff);
+  font-size: 14px;
 }
 
 .star-marker.on {
@@ -484,7 +493,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   width: min(420px, calc(100vw - 16px));
   min-height: 52px;
   display: grid;
-  grid-template-columns: auto minmax(72px, 1fr) minmax(52px, 118px);
+  grid-template-columns: auto minmax(72px, 1fr) minmax(52px, 150px);
   align-items: start;
   gap: 8px;
   padding: 0 2px;
@@ -684,10 +693,15 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
     flex-direction: row;
     min-height: 46px;
   }
-  .meta-toast {
+  body > .meta-toast.ui {
     bottom: auto;
     top: calc(10px + var(--sat));
+    left: 50%;
     transform: translateX(-50%);
+    max-height: min(56px, 18vh);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   #results.card {
     top: calc(10px + max(12px, env(safe-area-inset-top, 0px)));
@@ -748,6 +762,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
 }
 
 .meta-panel {
+  position: relative;
   margin: auto;
   max-width: min(420px, 100% - 24px);
   max-height: min(92vh, 720px);
@@ -758,9 +773,16 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   background: var(--card);
   border: 3px solid var(--line);
   border-radius: 24px;
-  padding: 16px 14px 20px;
+  padding: 16px 14px calc(76px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 8px 0 #f3b6d4;
   pointer-events: auto;
+}
+
+.meta-back {
+  position: absolute;
+  left: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  z-index: 3;
 }
 
 .meta-head {

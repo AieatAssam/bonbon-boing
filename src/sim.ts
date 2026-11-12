@@ -1,7 +1,7 @@
 import type { AdventureLevelDef } from './adventure/levels'
 
 export const ROUND_MS = 60_000
-export const HITSTOP_MS = 56
+export const HITSTOP_MS = 48
 export const POP_MS = 140
 export const POP_GROW_MS = 40
 export const POP_SQUASH_MS = 40
@@ -526,6 +526,39 @@ function validDragPath(path: Piece[]): boolean {
     if (!canAppend(path.slice(0, i), path[i])) return false
   }
   return true
+}
+
+/** Longest valid chain that includes at least one live piece of `kind`. */
+export function findPathTouchingKind(state: GameState, min: number, kind: Kind): Piece[] | null {
+  let best: Piece[] | null = null
+  for (let color = 0; color < activeColorCount(state); color++) {
+    const path = diameterPath(state, color, min, new Set())
+    if (!path || !path.some((p) => p.kind === kind)) continue
+    if (!best || path.length > best.length) best = path
+  }
+  return best
+}
+
+export function countBlockersAtStart(state: GameState): Record<'ice' | 'choco', number> {
+  let ice = 0
+  let choco = 0
+  for (const p of state.pieces) {
+    if (p.dead) continue
+    if (p.kind === 'ice') ice += 1
+    if (p.kind === 'choco') choco += 1
+  }
+  return { ice, choco }
+}
+
+export function countBonbonsOfColor(state: GameState, color: number): number {
+  let n = 0
+  for (const p of state.pieces) {
+    if (p.dead) continue
+    if (p.kind === 'bonbon' && p.color === color) n += 1
+    if (p.kind === 'ice' && p.color === color) n += 1
+    if (p.kind === 'jelly' && p.color === color) n += 1
+  }
+  return n
 }
 
 export function findPath(
@@ -1373,7 +1406,13 @@ export function createAdventureGame(level: AdventureLevelDef, cols: number, rows
     if (p.color >= cap) p.color = p.color % cap
     if (p.kind === 'bonbon' && p.color >= cap) p.color = p.color % cap
   }
-  const visibleRows = Math.min(4, rows)
+  const iceN = level.blockers.ice ?? 0
+  const jellyN = level.blockers.jelly ?? 0
+  const chocoN = level.blockers.choco ?? 0
+  const sleepyN = level.blockers.sleepy ?? 0
+  const burstN = level.blockers.starburst ?? 0
+  const blockerTotal = iceN + jellyN + chocoN + sleepyN + burstN
+  const visibleRows = Math.min(rows, Math.max(4, Math.ceil(blockerTotal / cols) + 1))
   const spots: { c: number; r: number }[] = []
   for (let r = 0; r < visibleRows; r++) {
     for (let c = 0; c < cols; c++) spots.push({ c, r })
@@ -1392,23 +1431,18 @@ export function createAdventureGame(level: AdventureLevelDef, cols: number, rows
     p.hits = kind === 'ice' ? 2 : kind === 'sleepy' ? 3 : 0
     p.locked = locked || kind === 'jelly'
   }
-  const iceN = level.blockers.ice ?? 0
   for (let i = 0; i < iceN; i++) {
     placeAt('ice', i % cap, takeSpot())
   }
-  const jellyN = level.blockers.jelly ?? 0
   for (let i = 0; i < jellyN; i++) {
     placeAt('jelly', (i + 1) % cap, takeSpot(), true)
   }
-  const chocoN = level.blockers.choco ?? 0
   for (let i = 0; i < chocoN; i++) {
     placeAt('choco', 0, takeSpot())
   }
-  const sleepyN = level.blockers.sleepy ?? 0
   for (let i = 0; i < sleepyN; i++) {
     placeAt('sleepy', (i + 2) % cap, takeSpot())
   }
-  const burstN = level.blockers.starburst ?? 0
   for (let i = 0; i < burstN; i++) {
     placeAt('starburst', (i + 3) % cap, takeSpot())
   }

@@ -121,12 +121,7 @@ export function createMetaLayer(
     panel.style.pointerEvents = 'auto'
     const back = document.createElement('button')
     back.type = 'button'
-    back.className = 'ui pill meta-card tap'
-    back.style.position = 'absolute'
-    back.style.top = 'auto'
-    back.style.bottom = '14px'
-    back.style.left = '14px'
-    back.style.right = 'auto'
+    back.className = 'ui pill meta-card tap meta-back'
     back.style.minHeight = '48px'
     back.style.pointerEvents = 'auto'
     back.textContent = 'Back'

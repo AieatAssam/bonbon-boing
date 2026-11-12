@@ -10,6 +10,7 @@ import {
   extendDrag,
   findPath,
   findPathEndingAt,
+  findPathTouchingKind,
   ROUND_MS,
   maxSameColorCluster,
   mayBeginChain,
@@ -220,7 +221,7 @@ export function boot(): void {
   let bonusFinale: BonusFinale | null = null
   let movesLeftAtGoal = 0
   let resultsLocked = false
-  let hudStarsLive = { s25: true, s45: true, s90: true }
+  let hudStarsLive = { s2: true, s3: true }
   const BONUS_SCORE_PER_MOVE = 500
   const BONUS_POP_GAP_MS = 250
   const BONUS_CAP_MS = 4000
@@ -229,7 +230,7 @@ export function boot(): void {
     bonusFinale = null
     movesLeftAtGoal = 0
     resultsLocked = false
-    hudStarsLive = { s25: true, s45: true, s90: true }
+    hudStarsLive = { s2: true, s3: true }
     if (state) state.inputLocked = false
   }
 
@@ -253,6 +254,7 @@ export function boot(): void {
     state.inputLocked = false
     state.movesLeft = 0
     if (finaleHintEl) finaleHintEl.hidden = true
+    setToastBlocked(false)
     showResults()
   }
 
@@ -1024,22 +1026,21 @@ export function boot(): void {
       const fillPct = Math.max(0, Math.min(100, (moves / limit) * 100))
       const t2 = Math.ceil(limit * 0.25)
       const t3 = Math.ceil(limit * 0.45)
-      const t90 = Math.ceil(limit * 0.9)
-      const on25 = moves >= t2
-      const on45 = moves >= t3
-      const on90 = moves >= t90
-      const pop25 = hudStarsLive.s25 && !on25
-      const pop45 = hudStarsLive.s45 && !on45
-      const pop90 = hudStarsLive.s90 && !on90
-      hudStarsLive = { s25: on25, s45: on45, s90: on90 }
+      const pct2 = (t2 / limit) * 100
+      const pct3 = (t3 / limit) * 100
+      const on2 = moves >= t2
+      const on3 = moves >= t3
+      const pop2 = hudStarsLive.s2 && !on2
+      const pop3 = hudStarsLive.s3 && !on3
+      hudStarsLive = { s2: on2, s3: on3 }
       const bonus = bonusFinale ? ' bonus-active' : ''
       movesPillEl.className = `ui timer ring moves-pill${bonus}`
       movesPillEl.setAttribute('aria-label', `Moves left ${moves} of ${limit}`)
       movesPillEl.innerHTML = `<span class="moves-num">${moves}</span><span class="moves-lbl">moves</span>`
       starBarEl.innerHTML = `<div class="star-fill" style="width:${fillPct}%"></div>
-        <span class="star-marker pos25 ${on25 ? 'on' : 'off'}${pop25 ? ' pop' : ''}" style="left:25%">★</span>
-        <span class="star-marker pos45 ${on45 ? 'on' : 'off'}${pop45 ? ' pop' : ''}" style="left:45%">★</span>
-        <span class="star-marker pos90 ${on90 ? 'on' : 'off'}${pop90 ? ' pop' : ''}" style="left:90%">★</span>`
+        <span class="star-marker star-goal on" style="left:6%" title="Beat the level">★</span>
+        <span class="star-marker star-s2 ${on2 ? 'on' : 'off'}${pop2 ? ' pop' : ''}" style="left:${pct2}%">★</span>
+        <span class="star-marker star-s3 ${on3 ? 'on' : 'off'}${pop3 ? ' pop' : ''}" style="left:${pct3}%">★</span>`
       if (finaleHintEl) finaleHintEl.hidden = !bonusFinale
       if (adventureLevel && adventureGoals) {
         hudMini.hidden = false
@@ -1483,6 +1484,7 @@ export function boot(): void {
             nextPopAt: BONUS_POP_GAP_MS,
           }
           if (finaleHintEl) finaleHintEl.hidden = false
+          setToastBlocked(true)
           state.inputLocked = true
           syncHud()
           return
@@ -2211,7 +2213,26 @@ export function boot(): void {
       return path.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
     },
     findGoalChain(min = 2) {
-      const goalColor = adventureLevel?.goals.find((g) => g.type === 'clear_color')?.color
+      const levelGoals = adventureLevel?.goals ?? []
+      const needIce =
+        adventureGoals &&
+        levelGoals.some((g) => g.type === 'break_ice' && adventureGoals!.iceBroken < g.count)
+      if (needIce) {
+        for (let n = 8; n >= min; n--) {
+          const cand = findPathTouchingKind(state, n, 'ice')
+          if (cand) return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const needChoco =
+        adventureGoals &&
+        levelGoals.some((g) => g.type === 'clear_choco' && adventureGoals!.chocoCleared < g.count)
+      if (needChoco) {
+        for (let n = 8; n >= min; n--) {
+          const cand = findPathTouchingKind(state, n, 'choco')
+          if (cand) return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const goalColor = levelGoals.find((g) => g.type === 'clear_color')?.color
       for (let n = 8; n >= min; n--) {
         const cand = findPath(state, n)
         if (!cand) continue
@@ -2424,6 +2445,7 @@ export function boot(): void {
       }
       state.inputLocked = true
       if (finaleHintEl) finaleHintEl.hidden = false
+      setToastBlocked(true)
       syncHud()
       draw()
     },
