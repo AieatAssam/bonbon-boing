@@ -1,41 +1,53 @@
 # Bonbon Boing!
 
-**Bonbon Boing!** is Squish Chain, a squishy connect-and-pop puzzle for phones. Drag through bonbons that touch and share a colour, let go, and they squish-pop up a squeaky note ladder. Long chains drop a Boing Bomb or a Rainbow. Play a 60-second round, an untimed Cuddle mode, or the daily board.
+**Squish Chain** — drag through cuddly same-colour bonbons, release to pop. Five-link chains sprout **Boing Bombs**; seven-link hugs drop **Rainbows**. String quick pops for combo ×2–×5. Kids can read the icons; adults can chase scores, Adventure stars, and cosmetics.
 
-Play now: https://aieatassam.github.io/bonbon-boing/
+[Play now](https://aieatassam.github.io/bonbon-boing/)
 
-![A chain on a phone](qa/shots/chain_390x844.png)
+![Chain on a phone](qa/shots/chain_390x844.png)
 
 ## How to play
 
-Drag through bonbons that are touching and the same colour. A Rainbow counts as any colour. Release and they squish-pop. Each pop plays the next squeak in the ladder.
+1. **Drag** through touching bonbons that share a colour (Rainbows match any colour).
+2. **Release** to squish-pop — each note climbs the squeak ladder.
+3. **Boing Bomb** (5+ chain): drag through the bomb to pop neighbours.
+4. **Rainbow** (7+ chain): clears that colour from the board.
+5. **Starburst** (Adventure level 25+): on a 5–6 link chain you have an **18%** chance to spawn a sparkly 3×3 blast instead of a bomb.
 
-- A chain of 5 or more drops a **Boing Bomb**. Drag through the bomb and the candies around it pop too.
-- A chain of 8 or more drops a **Rainbow**. Popping it clears that colour.
-- Pop again quickly and the score combo climbs.
+The first visit shows a glossy white-glove hint (no wall-of-text tutorial). Drag back along the chain to undo the last step.
 
-The first visit shows a ghost hand (no “how to play” text on the board). The title uses labelled **Play**, **Cuddle** and **Daily** pills plus a tap-to-squish hero pile.
+## Modes
 
-**Modes**
+| Mode | Button | What it is |
+|------|--------|------------|
+| **Score Rush** | Score Rush | 60-second scored round — the main hustle. |
+| **Cuddle** | Cuddle | Same juicy pops, no clock. |
+| **Daily** | Daily | One shared board per local day (`bonbon-YYYY-MM-DD`). |
+| **Adventure** | Adventure | 60 goal levels in four chapters — ice, choco, jelly, sleepy giants. |
 
-| Mode | What it is |
-|---|---|
-| **60-second round** | The play button. Score as much as you can before the clock ends. |
-| **Cuddle** | The heart. Same pops, no clock. |
-| **Daily** | The sun. One shared board for the local day, seed `bonbon-YYYY-MM-DD`. |
+## Meta & collection
+
+- **Sugar Stars** ⭐ — earn from runs, missions, and Adventure stars; spend in the **Shop**.
+- **Coins** 🪙 — earn from runs and missions; buy coin-priced skins such as **Macaron** (🪙 55 in the Shop once you own the gates).
+- **Bonbon skins** — classic plush, macaron, gummy, mochi, jelly bean, star cookie (shape + colour marks for colour-blind play).
+- **Board themes** — candy sky, night sprinkle, beach, winter frost, space jelly.
+- **Pop trails** — sparkle, hearts, bubbles, confetti.
+- **Stickers** — 30+ achievements with toasts.
+- **Daily missions** — three quick goals per day.
+- **Play streak** — gentle login streak with a weekly bump.
+- **Player XP** — level up for shop gates.
+
+Everything saves in `localStorage` (`bonbon-boing-v3`) with migration from older saves.
 
 ## Controls
 
-- **Drag** through same-colour bonbons and **release** to pop. Drag back along the path to undo the last step.
-- **Pause** and **Home** stay on screen during play. Pause freezes the round and offers Resume, Restart and Home.
-- **Esc** or the browser **Back** button opens pause, then the menu. They stay inside the game.
-- **Sound** and **music** buttons mute each bus. The choice is remembered.
+- **Pause** / **Home** on the HUD; **Back** / **Esc** opens pause then menu.
+- **Settings** (gear, top corner): **Sound** / **Music** toggles persist.
+- Title shortcuts: **Adventure**, **Shop**, **Stickers**, **Collection** (each opens a scrollable panel).
 
 ## Tech
 
-Vite 6 · TypeScript (strict) · Canvas2D · DOM HUD · Vitest · Playwright · PWA · GitHub Pages (`/bonbon-boing/`).
-
-Every bonbon is one size, `D`. Sprites are cached per colour and size. The frame loop does not use `ctx.filter` or blur.
+Vite 6 · TypeScript (strict) · Canvas2D · Vitest · Playwright · PWA · GitHub Pages (`/bonbon-boing/`).
 
 ```bash
 npm install
@@ -45,24 +57,28 @@ npm test
 npm run qa:layout
 ```
 
-`?qa` installs `window.__qa` (chains, pause, pump) and never opens an audio context. Layout shots use `&screen=title|play|chain|pop|pause|results&freeze=1`.
+QA hooks: `?qa` exposes `window.__qa` (no audio context). Layout captures: `&screen=title|play|…&freeze=1`.
 
 ## Screenshots
 
-| Title | Chain | Pop |
-|---|---|---|
-| ![](qa/shots/title_390x844.png) | ![](qa/shots/chain_390x844.png) | ![](qa/shots/pop_390x844.png) |
+| Title / Map | Adventure | Shop |
+|-------------|-----------|------|
+| ![](qa/shots/meta-title_390x844.png) | ![](qa/shots/meta-adventure-play-390x844.png) | ![](qa/shots/meta-shop_390x844.png) |
 
-## Inspirations
+| Stickers | Collection | No crop (mid-pop) |
+|----------|------------|-------------------|
+| ![](qa/shots/meta-achievements_390x844.png) | ![](qa/shots/meta-collection_390x844.png) | ![](qa/shots/clip-pop-mid_390x844.png) |
 
-Inspired by **Peggle** (the rising squeak ladder), **Puzzle Bobble** (colour pops), **Suika Game** (cute round characters), **Squishmallows** (plush look), **Kirby** (faces stay round), connect-and-pop puzzles, and **Gloop Pop** (gloss and juice).
-
-> Bonbon Boing! is an independent fan-made game. It is not affiliated with, endorsed by or sponsored by PopCap/EA, Taito, Aladdin X, Disney, SEGA, Sony, Nintendo/HAL Laboratory, Jazwares or Mediatonic. All names are trademarks of their owners.
-
-## Licence & assets
+## Credits & licence
 
 - Code: [MIT](LICENSE)
-- Audio shipped in the repo: CC0. See [CREDITS.md](CREDITS.md) and `assets-src/audio/SOURCES.md`. The round itself plays a procedural squeak ladder and a soft procedural lullaby, so the first tap is never waiting on a download.
+- Audio: CC0 — see [CREDITS.md](CREDITS.md) and `assets-src/audio/SOURCES.md`
 - Fonts: Fredoka & Nunito (SIL OFL 1.1)
+- Meta design patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, adventure map, missions).
+- Tutorial pointer glove is drawn in-engine; silhouette inspired by Kenney Cursor Pack (CC0) — see [CREDITS.md](CREDITS.md).
 
-**Suggested repo topics:** `puzzle-game` `html5-game` `browser-game` `typescript` `vite` `canvas` `pwa` `kawaii` `cute` `physics` `soft-body` `peggle-like` `bubble-shooter` `cc0-audio` `mobile-game`
+Bonbon Boing! is an independent fan-made game. It is not affiliated with, endorsed by or sponsored by PopCap/EA, Taito, Aladdin X, Disney, SEGA, Sony, Nintendo/HAL Laboratory, Jazwares or Mediatonic. All names are trademarks of their owners.
+
+**Suggested repo description:** Squish Chain puzzle — drag same-colour bonbons, bombs, rainbows, 60s rounds, Adventure map, skins & stickers.
+
+**Suggested topics:** `puzzle-game` `html5-game` `browser-game` `typescript` `vite` `canvas` `pwa` `kawaii` `cute` `mobile-game` `match-game` `casual-game` `adventure-mode` `achievements`

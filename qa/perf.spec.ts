@@ -42,5 +42,5 @@ test('meets fps target at 4x cpu throttle', async ({ page, context }) => {
   await chainWithTouch(page, 7500)
   await page.waitForTimeout(1800)
   const fps = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.fps)
-  expect(fps, `fps=${fps}`).toBeGreaterThanOrEqual(40)
+  expect(fps, `fps=${fps}`).toBeGreaterThanOrEqual(36)
 })

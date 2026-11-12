@@ -5,6 +5,7 @@
 See `assets-src/audio/SOURCES.md` for the full list. Highlights:
 
 - Kenney Impact Sounds, Interface Sounds, Music Jingles (CC0)
+- Achievement unlock sting: procedural chime inspired by Kenney Interface (CC0); shipped as Web Audio in `playUnlock()`.
 - Freesound pop/boing/squish clips (CC0, authors in SOURCES.md)
 - OpenGameArt: Cozy Puzzle loops and jingles (mintodog), Happy Vibes (Ruskerdax)
 
@@ -12,6 +13,12 @@ See `assets-src/audio/SOURCES.md` for the full list. Highlights:
 
 - Fredoka — `@fontsource-variable/fredoka`
 - Nunito — `@fontsource/nunito`
+
+## Visual
+
+- Tutorial pointer glove: Canvas2D, silhouette inspired by [Kenney Cursor Pack](https://kenney.nl/assets/cursor-pack) (CC0), recoloured to match bonbon outlines.
+- UI patterns inspired by [Gloop Pop](https://github.com/AieatAssam/gloop-pop) (shop, map, missions).
+- Kenney CC0 packs (Impact / Interface) — cited for audio; optional UI reference.
 
 ## Inspirations
 

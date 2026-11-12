@@ -1,14 +1,25 @@
-import { boardLayout, titleHeroScale, type Layout } from './layout'
+import {
+  ADVENTURE_LANDSCAPE_DOCK_W,
+  ADVENTURE_PORTRAIT_HUD_RESERVE,
+  boardLayout,
+  boardLayoutFixedGrid,
+  earsInsideMatAtRest,
+  titleHeapCenter,
+  titleHeroScale,
+  type Layout,
+} from './layout'
 import {
   at,
   byId,
   canAppend,
+  createAdventureGame,
   createGame,
   COMBO_WINDOW_MS,
   dailySeed,
   extendDrag,
   findPath,
   findPathEndingAt,
+  findPathTouchingKind,
   ROUND_MS,
   maxSameColorCluster,
   mayBeginChain,
@@ -28,20 +39,25 @@ import {
 } from './sim'
 import { invalidateBgCache, renderScene, spriteMisses, type DrawParticle, type Scene } from './draw'
 import { audioCreates, playLink, playPop, setAudioPaused, setAudioPrefs, unlockAudio } from './audio'
+import { createMetaLayer } from './meta-shell'
+import { ADVENTURE_LEVELS, type AdventureLevelDef } from './adventure/levels'
+import {
+  allGoalsMet,
+  emptyGoalState,
+  evaluateStars,
+  type AdventureGoalState,
+} from './adventure/goals'
+import { renderMetaDock } from './ui/metaDom'
+import { goalChip } from './adventure/goals'
+import { showTipCard } from './ui/tipCard'
+import { equip, purchase } from './meta/catalogue'
+import { PLUSH_ICONS } from './ui/plushIcons'
+import { getCosmetics } from './draw'
+import { queueToast, setToastBlocked } from './ui/toastQueue'
+import type { SaveV3 } from './meta/save'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
 type Pose = 'idle' | 'chain' | 'pop'
-
-type Save = {
-  v: 2
-  tut: boolean
-  muteSfx: boolean
-  muteMusic: boolean
-  bestTimed: number
-  bestCuddle: number
-  dailyBest: number
-  dailyDay: string
-}
 
 export type ChainCell = { id: number; x: number; y: number; c: number; r: number }
 
@@ -54,8 +70,9 @@ export type Qa = {
   score: number
   combo: number
   timeLeft: number
+  movesLeft: number
   paused: boolean
-  inputLocked: false
+  inputLocked: boolean
   chain: number[]
   D: number
   cols: number
@@ -120,9 +137,35 @@ export type Qa = {
   pump: (ms: number) => void
   draw: () => void
   setMute: (sfx: boolean, music: boolean) => void
+  openMeta: (which: 'map' | 'shop' | 'achievements' | 'collection', mapChapter?: number) => void
+  closeMeta: () => void
+  prepPromoSave: () => void
+  prepMapLock: () => void
+  prepAdventureLevel: (levelId: number) => void
+  boardPieces: () => { spawning: boolean; spawnT: number; x: number; y: number }[]
+  markTipsSeen: () => void
+  playRealRound: () => void
+  buySkin: (id: string) => void
+  equipItem: (id: string) => void
+  showBlockerTip: (tipId: string) => void
+  earsOk: () => boolean
+  startAdventure: (levelId: number) => void
+  capturePopBurst: () => void
+  settleChain: (min: number) => boolean
+  hasBomb: () => boolean
+  lastChainLen: number
+  setMovesLeft: (n: number) => void
+  bonusActive: () => boolean
+  lastMovesLeftAtGoal: number
+  forceBonusFinale: (moves: number) => void
+  finalePopsTotal: () => number
+  findGoalChain: (min?: number) => ChainCell[] | null
+  showTestToast: () => void
+  adventureMovesTable: (max: number) => { level: number; moves: number; chapter: number }[]
+  cellD: () => number
+  finishAdventureWin: () => void
 }
 
-const KEY = 'bonbon-boing-v2'
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
 const CONFETTI = ['#FF3D8E', '#FFD02A', '#2FDB8E', '#5088FF', '#FFFFFF', '#FF7A28']
 
@@ -139,6 +182,12 @@ declare global {
     __checkOverlaps: () => { overlaps: [string, string][]; offscreen: string[] }
     __checkPlayGeometry: () => { violations: string[] }
     __checkHudBoard: () => { violations: string[] }
+    __checkAdventureHudGoals: () => { violations: string[] }
+    __checkHudPlayfield: () => { violations: string[] }
+    __checkPlayfieldInViewport: () => { violations: string[] }
+    __checkLandscapeAdventureDock: () => { violations: string[]; cellD: number }
+    __checkPortraitGoalChips: () => { violations: string[]; cellD: number }
+    __piecePlayfieldRect: () => { x: number; y: number; w: number; h: number }
   }
 }
 
@@ -160,40 +209,10 @@ const ICONS = {
   muted:
     '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4A2440" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 10l5 5M21 10l-5 5" stroke="#FF4F93" stroke-width="2" stroke-linecap="round"/></svg>',
   star: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#FFB703" d="M12 3l2.4 5.6L20 9.2l-4.2 3.8L17 19l-5-3-5 3 1.2-6L4 9.2l5.6-.6z"/></svg>',
-}
-
-function loadSave(): Save {
-  const blank: Save = {
-    v: 2,
-    tut: false,
-    muteSfx: false,
-    muteMusic: false,
-    bestTimed: 0,
-    bestCuddle: 0,
-    dailyBest: 0,
-    dailyDay: '',
-  }
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return blank
-    const parsed = JSON.parse(raw) as Partial<Save>
-    return { ...blank, ...parsed, v: 2 }
-  } catch {
-    return blank
-  }
-}
-
-function storeSave(save: Save) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(save))
-  } catch {
-    /* private mode */
-  }
+  gear: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="#4A2440" stroke-width="2"/><path fill="none" stroke="#4A2440" stroke-width="2" stroke-linecap="round" d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4"/></svg>',
 }
 
 export function boot(): void {
-  const save = loadSave()
-  setAudioPrefs({ sfx: !save.muteSfx, music: !save.muteMusic })
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
   const root = document.getElementById('app')
   if (!root) return
@@ -204,19 +223,169 @@ export function boot(): void {
   if (!ctx || !root) return
   const gfx = ctx
   const appRoot = root
+
+  let adventureLevel: AdventureLevelDef | null = null
+  let adventureGoals: AdventureGoalState | null = null
+  let lastResultStars: number | null = null
+  let lastAdventureWon = false
+  let lastFinishedAdventureLevel: AdventureLevelDef | null = null
+  let lastRunRewards = { coins: 0, xp: 0 }
+  let lastRunRewardNote = ''
+  type BonusFinale = {
+    popsLeft: number
+    popsTotal: number
+    elapsed: number
+    nextPopAt: number
+  }
+  let bonusFinale: BonusFinale | null = null
+  let movesLeftAtGoal = 0
+  let resultsLocked = false
+  let hudStarsLive = { s2: true, s3: true }
+  const BONUS_SCORE_PER_MOVE = 500
+  const BONUS_POP_GAP_MS = 250
+  const BONUS_CAP_MS = 4000
+
+  function resetRunPhase() {
+    bonusFinale = null
+    movesLeftAtGoal = 0
+    resultsLocked = false
+    hudStarsLive = { s2: true, s3: true }
+    if (state) state.inputLocked = false
+  }
+
+  function finishBonusFinale() {
+    if (!bonusFinale) return
+    if (bonusFinale.popsLeft > 0) {
+      const n = bonusFinale.popsLeft
+      const lump = n * BONUS_SCORE_PER_MOVE
+      state.score += lump
+      if (adventureGoals) adventureGoals.score = state.score
+      floats.push({
+        x: layout.ox + (layout.cols * layout.D) / 2,
+        y: layout.oy + layout.padTop,
+        text: `+${n} × ${BONUS_SCORE_PER_MOVE}`,
+        age: 0,
+        big: true,
+      })
+      bonusFinale.popsLeft = 0
+    }
+    bonusFinale = null
+    state.inputLocked = false
+    state.movesLeft = 0
+    if (finaleHintEl) finaleHintEl.hidden = true
+    setToastBlocked(false)
+    showResults()
+  }
+
+  function doBonusFinalePop() {
+    const live = state.pieces.filter((p) => !p.dead && p.popT < 0 && p.kind === 'bonbon')
+  const pick = live.length ? live[Math.floor(state.rng() * live.length)]! : null
+    const useRow = state.rng() < 0.55
+    let pts = 0
+    const hits: Piece[] = []
+    if (pick && useRow) {
+      hits.push(...state.pieces.filter((p) => !p.dead && p.popT < 0 && p.r === pick.r).slice(0, 5))
+    } else if (pick) {
+      hits.push(...state.pieces.filter((p) => !p.dead && p.popT < 0 && p.c === pick.c).slice(0, 5))
+    } else if (pick) {
+      hits.push(pick)
+    }
+    for (const p of hits.length ? hits : live.slice(0, 1)) {
+      const c = center(p)
+      burst(c.x, c.y, p.color, hits.length > 2, hits.length > 3)
+      p.landT = 0
+    }
+    pts = BONUS_SCORE_PER_MOVE
+    state.score += pts
+    if (adventureGoals) adventureGoals.score = state.score
+    state.gained = pts
+    if (!save.muteSfx) playPop(pick?.color ?? 0, hits.length > 2)
+    floats.push({
+      x: layout.ox + (layout.cols * layout.D) * 0.5,
+      y: layout.oy + layout.padTop + layout.D * 2,
+      text: `+${pts}`,
+      age: 0,
+      big: true,
+    })
+  }
+
+  function playRoundOver(): boolean {
+    if (bonusFinale) return false
+    if (mode === 'adventure' && adventureLevel && adventureGoals && allGoalsMet(adventureGoals, adventureLevel.goals)) {
+      return false
+    }
+    return roundOver(state)
+  }
+
+  function syncAdventureGoalsFromTrack() {
+    if (!adventureGoals) return
+    adventureGoals.score = state.score
+    adventureGoals.movesUsed = state.track.movesUsed
+    adventureGoals.bombsPopped = state.track.bombsPopped
+    adventureGoals.iceBroken = state.track.iceBroken
+    adventureGoals.chocoCleared = state.track.chocoCleared
+    adventureGoals.clearedByColor = {}
+    state.track.clearedByColor.forEach((n, i) => {
+      if (n > 0) adventureGoals!.clearedByColor[i] = n
+    })
+  }
+
+  function startAdventureLevel(level: AdventureLevelDef) {
+    resetRunPhase()
+    perfLevel = 0
+    perfSlowStreak = 0
+    perfFastStreak = 0
+    perfFastNeed = 5
+    perfLastStep = null
+    adventureLevel = level
+    adventureGoals = emptyGoalState(level.moves)
+    mode = 'adventure'
+    pose = 'idle'
+    particles = []
+    waves = []
+    beams = []
+    floats = []
+    springs.clear()
+    ghostPath = []
+    state = createAdventureGame(level, level.cols, level.rows)
+    ghostOn = tutParam || (!meta.save.tut && !qaMode)
+    clockOn = false
+    clockRunMs = 0
+    clockTickAt = 0
+    ghostDemoDone = meta.save.tut || qaMode
+    ghostCycleStart = 0
+    lastSimPhase = 'idle'
+    showPlay()
+    applyBoardLayout()
+    const intro = adventureLevel.tutorialTip
+    if (intro && !save.seenTips.includes(intro)) {
+      showTipCard(intro, () => {
+        save.seenTips.push(intro)
+        meta.persist()
+        draw()
+      })
+    }
+  }
+
+  const meta = createMetaLayer(appRoot, startAdventureLevel)
+  const save = meta.save as SaveV3
+  setAudioPrefs({ sfx: !save.muteSfx, music: !save.muteMusic })
+  meta.applyCosmetics()
+
   const probe = document.createElement('div')
   probe.style.cssText = 'position:fixed;left:0;top:0;padding-top:env(safe-area-inset-top);visibility:hidden'
   document.body.append(probe)
 
   const title = el('div')
   title.id = 'title'
-  const logo = el('h1', 'logo title-logo ui')
+  const logo = el('h1', 'logo title-logo')
   logo.dataset.nozoom = '1'
   logo.textContent = 'Bonbon Boing!'
-  const titleBest = el('p', 'title-best ui')
+  const titleProfile = el('div', 'title-profile')
+  const titleBest = el('p', 'title-best')
   const titleCorner = el('div', 'title-corner')
   const dock = el('div', 'dock')
-  title.append(logo, titleBest, dock)
+  title.append(logo, titleProfile, titleBest, titleCorner, dock)
   const hud = el('div')
   hud.id = 'hud'
   const hudLeft = el('div', 'hud-side')
@@ -242,8 +411,13 @@ export function boot(): void {
   newBestEl.hidden = true
   const finalEl = el('div', 'ui final')
   const bestEl = el('div', 'ui best')
+  const rewardEl = el('div', 'results-reward ui')
+  rewardEl.hidden = true
+  const xpBar = el('div', 'xp-bar')
+  xpBar.innerHTML = '<div class="xp-fill"></div>'
+  const coinRoll = el('p', 'coin-roll ui')
   const resultRow = el('div', 'row')
-  results.append(stars, newBestEl, finalEl, bestEl, resultRow)
+  results.append(stars, newBestEl, finalEl, bestEl, rewardEl, xpBar, coinRoll, resultRow)
   root.append(title, hud, pauseMenu, results)
 
   const mk = (parent: HTMLElement, label: string, action: string, icon: string, tiny = false) => {
@@ -276,16 +450,43 @@ export function boot(): void {
     return b
   }
 
-  mkPill(dock, 'Play', 'timed', ICONS.play, 'primary')
-  mkPill(dock, 'Cuddle', 'cuddle', ICONS.heart, 'relax')
-  mkPill(dock, 'Daily', 'daily', ICONS.sun)
-  dock.append(titleCorner)
-  mk(titleCorner, 'Sound', 'sfx', ICONS.sound, true)
-  mk(titleCorner, 'Music', 'music', ICONS.note, true)
+  mkPill(dock, 'Score Rush', 'timed', PLUSH_ICONS.rush, 'primary')
+  mkPill(dock, 'Cuddle', 'cuddle', PLUSH_ICONS.cuddle, 'relax')
+  mkPill(dock, 'Daily', 'daily', PLUSH_ICONS.daily)
+  const metaRow = renderMetaDock(meta.save, (action) => onAction(action))
+  metaRow.classList.add('meta-row')
+  dock.append(metaRow)
+  const settingsPop = el('div', 'title-settings-pop')
+  settingsPop.hidden = true
+  mk(settingsPop, 'Sound', 'sfx', ICONS.sound, true)
+  mk(settingsPop, 'Music', 'music', ICONS.note, true)
+  titleCorner.append(settingsPop)
+  const settingsBtn = mk(titleCorner, 'Settings', 'settings', ICONS.gear, true)
+  settingsBtn.title = 'Sound & music'
+  settingsBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation()
+    settingsPop.hidden = !settingsPop.hidden
+  })
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
+  const hudTopRow = el('div', 'hud-top-row')
+  const hudRightTop = el('div', 'hud-right-top')
+  const movesPillEl = el('div', 'ui timer ring moves-pill')
+  const hudGoalRow = el('div', 'hud-goal-row')
+  hudGoalRow.hidden = true
+  const starBarEl = el('div', 'star-progress ui')
+  starBarEl.setAttribute('aria-label', 'Star targets by moves left')
+  const goalStripEl = el('div', 'goal-strip ui')
+  goalStripEl.hidden = true
+  hudGoalRow.append(starBarEl, goalStripEl)
+  const finaleHintEl = el('div', 'finale-skip-hint ui')
+  finaleHintEl.hidden = true
+  finaleHintEl.innerHTML = '<span class="finale-skip-ico" aria-hidden="true">👆</span><span>Tap to skip</span>'
   hudMid.append(scoreEl, comboEl, hudMini)
-  hud.append(hudLeft, hudMid, timeEl)
+  hudRightTop.append(timeEl, movesPillEl)
+  hudTopRow.append(hudLeft, hudMid, hudRightTop)
+  hud.append(hudTopRow, hudGoalRow)
+  root.append(finaleHintEl)
   mkPill(pauseMain, 'Resume', 'resume', ICONS.play, 'primary')
   mkPill(pauseMain, 'Restart', 'restart', ICONS.restart)
   mkPill(pauseMain, 'Home', 'home', ICONS.home)
@@ -302,7 +503,6 @@ export function boot(): void {
   let freeze = params.has('freeze')
   let ghostOn = false
   let frame = 0
-  let pieceClipFrames = 0
   let lastSimPhase: GameState['phase'] = 'idle'
   let highlightFrame = 0
   let popWallMs = 0
@@ -346,6 +546,82 @@ export function boot(): void {
 
   function insetTop(): number {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
+  }
+
+  function baseHudPx(): number {
+    const landscape = innerWidth > innerHeight
+    return Math.round(Math.min(landscape ? 72 : 84, Math.max(64, innerHeight * (landscape ? 0.07 : 0.09))))
+  }
+
+  function measureHudInset(): { extraTop: number; side: number } {
+    const sat = insetTop()
+    const hudEl = document.getElementById('hud')
+    if (screen !== 'play' || !hudEl || hudEl.hidden) {
+      return { extraTop: sat, side: 0 }
+    }
+    const landscape = innerWidth > innerHeight
+    if (mode === 'adventure') {
+      if (landscape) {
+        const sal = parseFloat(getComputedStyle(probe).paddingLeft) || 0
+        return { extraTop: sat, side: Math.ceil(ADVENTURE_LANDSCAPE_DOCK_W + sal + 12) }
+      }
+      return { extraTop: Math.max(sat, ADVENTURE_PORTRAIT_HUD_RESERVE - baseHudPx()), side: 0 }
+    }
+    const hr = hudEl.getBoundingClientRect()
+    const wantTop = Math.ceil(hr.bottom + 8)
+    return { extraTop: Math.max(sat, wantTop - baseHudPx()), side: 0 }
+  }
+
+  function piecePlayfieldRect(): { x: number; y: number; w: number; h: number } {
+    return {
+      x: layout.ox,
+      y: layout.oy + layout.padTop,
+      w: layout.cols * layout.D,
+      h: layout.rows * layout.D,
+    }
+  }
+
+  function publishBoardCssVars() {
+    const pf = piecePlayfieldRect()
+    const br = boardRect()
+    document.documentElement.style.setProperty('--playfield-x', `${pf.x}px`)
+    document.documentElement.style.setProperty('--playfield-y', `${pf.y}px`)
+    document.documentElement.style.setProperty('--playfield-w', `${pf.w}px`)
+    document.documentElement.style.setProperty('--playfield-h', `${pf.h}px`)
+    document.documentElement.style.setProperty('--board-x', `${br.x}px`)
+    document.documentElement.style.setProperty('--board-w', `${br.w}px`)
+  }
+
+  function applyBoardLayout() {
+    const { extraTop, side } = measureHudInset()
+    const next =
+      adventureLevel && mode === 'adventure'
+        ? boardLayoutFixedGrid(innerWidth, innerHeight, adventureLevel.cols, adventureLevel.rows, extraTop, side)
+        : boardLayout(innerWidth, innerHeight, extraTop, side)
+    const dpr = computeTargetDpr()
+    if (dpr !== canvasDpr) {
+      canvasDpr = dpr
+      invalidateBgCache()
+    }
+    canvas.width = Math.max(1, Math.round(innerWidth * dpr))
+    canvas.height = Math.max(1, Math.round(innerHeight * dpr))
+    canvas.style.width = `${innerWidth}px`
+    canvas.style.height = `${innerHeight}px`
+    gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    if (next.D !== layout.D) invalidateBgCache()
+    if (state && screen !== 'title' && !adventureLevel && (next.cols !== layout.cols || next.rows !== layout.rows)) {
+      const score = state.score
+      const timeLeft = state.timeLeft
+      const seed = state.seed
+      const nextMode = state.mode
+      state = createGame(seed, next.cols, next.rows, nextMode)
+      state.score = score
+      state.timeLeft = timeLeft
+      ghostPath = []
+    }
+    layout = next
+    publishBoardCssVars()
+    if (screen === 'play') draw()
   }
 
   const STAR2_SCORE = 20_000
@@ -398,38 +674,20 @@ export function boot(): void {
   }
 
   function resize() {
-    const next = boardLayout(innerWidth, innerHeight, insetTop())
-    const dpr = computeTargetDpr()
-    if (dpr !== canvasDpr) {
-      canvasDpr = dpr
-      invalidateBgCache()
-    }
-    canvas.width = Math.max(1, Math.round(innerWidth * dpr))
-    canvas.height = Math.max(1, Math.round(innerHeight * dpr))
-    canvas.style.width = `${innerWidth}px`
-    canvas.style.height = `${innerHeight}px`
-    gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    if (next.cols !== layout.cols || next.rows !== layout.rows || next.D !== layout.D) {
-      invalidateBgCache()
-    }
-    if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
-      const score = state.score
-      const timeLeft = state.timeLeft
-      const seed = state.seed
-      const nextMode = state.mode
-      state = createGame(seed, next.cols, next.rows, nextMode)
-      state.score = score
-      state.timeLeft = timeLeft
-      ghostPath = []
-    }
-    layout = next
+    applyBoardLayout()
   }
 
   function center(p: Piece): { x: number; y: number } {
     const s = springs.get(p.id) ?? { ox: 0, oy: 0, vx: 0, vy: 0 }
+    let yExtra = 0
+    if (p.spawnT >= 0 && p.spawnT < 1) {
+      const u = p.spawnT
+      const ease = 1 - (1 - u) ** 2.2
+      yExtra = -layout.D * 0.42 * (1 - ease)
+    }
     return {
       x: layout.ox + (p.c + 0.5) * layout.D + s.ox,
-      y: layout.oy + layout.padTop + (visualRow(p) + 0.5) * layout.D + s.oy,
+      y: layout.oy + layout.padTop + (visualRow(p) + 0.5) * layout.D + yExtra + s.oy,
     }
   }
 
@@ -439,7 +697,7 @@ export function boot(): void {
       x: layout.ox - D * 0.1,
       y: layout.oy,
       w: layout.cols * D + D * 0.2,
-      h: layout.padTop + layout.rows * D + D * 0.1,
+      h: layout.padTop + layout.rows * D + D * 0.18,
     }
   }
 
@@ -562,7 +820,7 @@ export function boot(): void {
     else {
       chosen = {
         x: tipPt.x,
-        y: tipPt.y - D * 1.25,
+        y: tipPt.y + D * 0.92,
         nonChain: 0,
         inChain: 0,
         dist: D * 1.25,
@@ -593,6 +851,7 @@ export function boot(): void {
   }
 
   function burst(x: number, y: number, color: number, big: boolean, bomb = false) {
+    const popId = getCosmetics().pop
     const lite = perfLevel > 0 || fpsBuf.some((f) => f < 44)
     const dotN = reduced || lite ? 7 : 10 + Math.floor(state.rng() * 5)
     const extra = bomb ? 8 : big ? 4 : 0
@@ -601,6 +860,10 @@ export function boot(): void {
       const sp = layout.D * (4 + state.rng() * 5)
       const rad = layout.D * (0.08 + state.rng() * 0.08)
       const conf = bomb && i % 3 === 0
+      const trailStar = popId === 'sparkle' || popId === 'stars'
+      const trailHeart = popId === 'hearts'
+      const trailBubble = popId === 'bubbles'
+      const trailConf = popId === 'confetti' || conf
       particles.push({
         x,
         y,
@@ -608,8 +871,14 @@ export function boot(): void {
         vy: Math.sin(a) * sp - layout.D * (0.4 + state.rng() * 0.6),
         life: 450 + state.rng() * 200,
         age: 0,
-        color: conf ? CONFETTI[Math.floor(state.rng() * CONFETTI.length)]! : COLORS[color] ?? COLORS[0],
-        kind: conf ? 'confetti' : 'dot',
+        color: trailConf
+          ? CONFETTI[Math.floor(state.rng() * CONFETTI.length)]!
+          : trailHeart
+            ? '#FF4F93'
+            : trailBubble
+              ? '#A8E8FF'
+              : COLORS[color] ?? COLORS[0],
+        kind: trailConf ? 'confetti' : trailStar ? 'star' : 'dot',
         rot: state.rng() * Math.PI,
         vr: 0,
         w: rad,
@@ -681,12 +950,18 @@ export function boot(): void {
   }
 
   function armRelease() {
+    const bombsBefore = state.track.bombsPopped
     const dragPts = state.drag
       .map((id) => byId(state, id))
       .filter((p): p is Piece => !!p)
       .map((p) => center(p))
     const t0 = performance.now()
     const ids = release(state)
+    if (state.track.bombsPopped > bombsBefore) {
+      meta.notifyFacts({ bomb: true, bombs: state.track.bombsPopped, chainLen: state.lastChainLen, score: state.score })
+    } else if (state.lastChainLen >= 3) {
+      meta.notifyFacts({ chainLen: state.lastChainLen, combo: state.combo, score: state.score, pops: state.track.clearedByColor.reduce((a, b) => a + b, 0) })
+    }
     popWallMs = performance.now() - t0
     if (!ids.length) return
     const spot = center(byId(state, ids[0]) ?? state.pieces[0])
@@ -705,12 +980,13 @@ export function boot(): void {
     notePops(ids)
     ghostOn = false
     save.tut = true
-    storeSave(save)
+    meta.persist()
     syncHud()
   }
 
   function show(next: Screen) {
     screen = next
+    setToastBlocked(next === 'results')
     title.hidden = next !== 'title'
     hud.hidden = next !== 'play'
     pauseMenu.hidden = next !== 'pause'
@@ -719,17 +995,63 @@ export function boot(): void {
     if (next === 'results') {
       finalEl.textContent = String(state.score)
       const prior = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-      const isNew = state.score > prior
+      const isNew = mode !== 'adventure' && state.score > prior
       rememberBest()
       const best = mode === 'cuddle' ? save.bestCuddle : mode === 'daily' ? save.dailyBest : save.bestTimed
-      const n = state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1
+      const n =
+        mode === 'adventure'
+          ? (lastResultStars ?? 0)
+          : (lastResultStars ?? (state.score >= STAR3_SCORE ? 3 : state.score >= STAR2_SCORE ? 2 : 1))
+      if (mode === 'adventure') {
+        newBestEl.hidden = lastAdventureWon
+        newBestEl.textContent = lastAdventureWon ? '' : 'Out of moves!'
+        bestEl.hidden = true
+        rewardEl.textContent = lastAdventureWon ? 'Level clear!' : 'Keep squishing — try again!'
+        resultRow.innerHTML = ''
+        if (lastAdventureWon) {
+          mkPill(resultRow, 'Next level', 'adventure-next', ICONS.play, 'primary')
+          mkPill(resultRow, 'Map', 'adventure-map', PLUSH_ICONS.map)
+          mkPill(resultRow, 'Replay', 'adventure-retry', ICONS.restart)
+        } else {
+          mkPill(resultRow, 'Retry', 'adventure-retry', ICONS.restart, 'primary')
+          mkPill(resultRow, 'Map', 'adventure-map', PLUSH_ICONS.map)
+        }
+      } else {
+        resultRow.innerHTML = ''
+        mkPill(resultRow, 'Play again', 'restart', ICONS.play, 'primary')
+        mkPill(resultRow, 'Home', 'home', ICONS.home)
+      }
+      rewardEl.hidden = false
+      if (mode !== 'adventure') rewardEl.textContent = lastRunRewardNote || 'Nice squish!'
+      const fill = results.querySelector('.xp-fill') as HTMLElement | null
+      if (fill) {
+        const need = Math.max(1, save.profile.xp + lastRunRewards.xp)
+        const pct = Math.min(100, (save.profile.xp / need) * 100)
+        fill.style.width = '0%'
+        requestAnimationFrame(() => {
+          fill.style.width = `${pct}%`
+        })
+      }
+      coinRoll.textContent = ''
+      if (lastRunRewards.coins > 0) {
+        let n = 0
+        const target = lastRunRewards.coins
+        const step = () => {
+          n = Math.min(target, n + Math.max(1, Math.ceil(target / 12)))
+          coinRoll.textContent = `+${n} coins`
+          if (n < target) requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }
       stars.innerHTML = [0, 1, 2]
         .map(
           (i) =>
             `<span class="star${i < n ? ' on' : ''}" style="transition-delay:${i * 180}ms" aria-hidden="true">${ICONS.star.replace('width="18"', 'width="44"').replace('height="18"', 'height="44"')}</span>`,
         )
         .join('')
-      if (isNew) {
+      if (mode === 'adventure') {
+        bestEl.hidden = true
+      } else if (isNew) {
         bestEl.hidden = true
         newBestEl.hidden = false
         newBestEl.textContent = 'New best!'
@@ -746,7 +1068,8 @@ export function boot(): void {
 
   function syncTitleBest() {
     const best = Math.max(save.bestTimed, save.bestCuddle, save.dailyBest)
-    titleBest.textContent = best > 0 ? `Best ${best}` : 'Best —'
+    titleBest.textContent = best > 0 ? `Best rush ${best}` : 'Best rush —'
+    titleProfile.innerHTML = `<span class="title-stat">${PLUSH_ICONS.coin} <b>${save.profile.coins}</b></span><span class="title-stat">Lv <b>${save.profile.level}</b></span>`
   }
 
   function syncHud() {
@@ -763,20 +1086,75 @@ export function boot(): void {
     if (mode === 'cuddle') {
       timeEl.classList.remove('pulse')
       timeEl.innerHTML = `<span aria-hidden="true">${ICONS.heart}</span>`
+    } else if (mode === 'adventure') {
+      const showAdvHud = screen === 'play'
+      timeEl.hidden = true
+      movesPillEl.hidden = !showAdvHud
+      hudGoalRow.hidden = !showAdvHud
+      hud.classList.toggle('hud--adventure', showAdvHud)
+      timeEl.classList.remove('pulse')
+      const limit = adventureLevel?.moves ?? Math.max(1, state.movesLeft)
+      const moves = bonusFinale ? bonusFinale.popsLeft : Math.max(0, state.movesLeft)
+      const fillPct = Math.max(0, Math.min(100, (moves / limit) * 100))
+      const t2 = Math.ceil(limit * 0.25)
+      const t3 = Math.ceil(limit * 0.45)
+      const pct2 = (t2 / limit) * 100
+      const pct3 = (t3 / limit) * 100
+      const on2 = moves >= t2
+      const on3 = moves >= t3
+      const pop2 = hudStarsLive.s2 && !on2
+      const pop3 = hudStarsLive.s3 && !on3
+      hudStarsLive = { s2: on2, s3: on3 }
+      const bonus = bonusFinale ? ' bonus-active' : ''
+      movesPillEl.className = `ui timer ring moves-pill${bonus}`
+      movesPillEl.setAttribute('aria-label', `Moves left ${moves} of ${limit}`)
+      movesPillEl.innerHTML = `<span class="moves-num">${moves}</span><span class="moves-lbl">moves</span>`
+      starBarEl.innerHTML = `<div class="star-fill" style="width:${fillPct}%"></div>
+        <span class="star-marker star-goal on" style="left:6%" title="Beat the level">★</span>
+        <span class="star-marker star-s2 ${on2 ? 'on' : 'off'}${pop2 ? ' pop' : ''}" style="left:${pct2}%">★</span>
+        <span class="star-marker star-s3 ${on3 ? 'on' : 'off'}${pop3 ? ' pop' : ''}" style="left:${pct3}%">★</span>`
+      if (finaleHintEl) finaleHintEl.hidden = !bonusFinale
+      if (adventureLevel && adventureGoals) {
+        goalStripEl.hidden = false
+        goalStripEl.innerHTML = adventureLevel.goals
+          .map((g) => `<span class="goal-chip">${goalChip(g, adventureGoals!)}</span>`)
+          .join('')
+      } else {
+        goalStripEl.hidden = true
+        goalStripEl.innerHTML = ''
+      }
+      hudMini.hidden = true
+      hudMini.innerHTML = ''
     } else {
+      goalStripEl.hidden = true
+      goalStripEl.innerHTML = ''
+      hudGoalRow.hidden = true
+      hud.classList.remove('hud--adventure')
+      movesPillEl.hidden = true
+      timeEl.hidden = false
+      if (finaleHintEl) finaleHintEl.hidden = true
+      hudMini.hidden = true
+      hudMini.className = 'hud-mini ui'
+      hudMini.innerHTML = ''
       const pct = Math.max(0, Math.min(1, state.timeLeft / 60_000))
       const dash = Math.max(0.02, pct) * 88
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
       timeEl.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" fill="none" stroke="#ffe0f0" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#ff4f93" stroke-width="4" stroke-dasharray="${dash} 88" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><span>${secs}</span>`
     }
+    if (screen === 'play') publishBoardCssVars()
   }
 
   function fresh(nextMode: Mode, seed: string) {
+    resetRunPhase()
     perfLevel = 0
     perfSlowStreak = 0
     perfFastStreak = 0
     perfFastNeed = 5
     perfLastStep = null
+    if (nextMode !== 'adventure') {
+      adventureLevel = null
+      adventureGoals = null
+    }
     mode = nextMode
     pose = 'idle'
     particles = []
@@ -785,14 +1163,20 @@ export function boot(): void {
     floats = []
     springs.clear()
     ghostPath = []
-    state = createGame(seed, layout.cols, layout.rows, nextMode)
+    if (adventureLevel) {
+      applyBoardLayout()
+      state = createAdventureGame(adventureLevel, adventureLevel.cols, adventureLevel.rows)
+      adventureGoals = emptyGoalState(adventureLevel.moves)
+    } else {
+      state = createGame(seed, layout.cols, layout.rows, nextMode)
+    }
+    if (nextMode === 'timed' || nextMode === 'daily') meta.touchStreak()
     ghostOn = tutParam || (!save.tut && !qaMode)
     clockOn = false
     clockRunMs = 0
     clockTickAt = 0
     ghostDemoDone = save.tut || qaMode
     ghostCycleStart = 0
-    pieceClipFrames = 0
     lastSimPhase = 'idle'
   }
 
@@ -810,7 +1194,7 @@ export function boot(): void {
   }
 
   function syncWallClock(now: number) {
-    if (!clockOn || mode === 'cuddle') return
+    if (!clockOn || mode === 'cuddle' || mode === 'adventure') return
   const running = screen === 'play' && document.visibilityState === 'visible'
     if (running) {
       if (!clockTickAt) clockTickAt = now
@@ -825,6 +1209,8 @@ export function boot(): void {
   }
 
   function rememberBest() {
+    if (mode === 'adventure') return
+    if (state.track.movesUsed <= 0 && clockRunMs < 2000 && state.timeLeft > ROUND_MS - 2500) return
     if (mode === 'daily') {
       if (save.dailyDay !== state.seed) {
         save.dailyDay = state.seed
@@ -833,11 +1219,56 @@ export function boot(): void {
       save.dailyBest = Math.max(save.dailyBest, state.score)
     } else if (mode === 'cuddle') save.bestCuddle = Math.max(save.bestCuddle, state.score)
     else save.bestTimed = Math.max(save.bestTimed, state.score)
-    storeSave(save)
+    meta.persist()
   }
 
   function showResults(score?: number) {
+    if (bonusFinale) return
+    if (resultsLocked) return
     if (score !== undefined) state.score = score
+    const coinsBefore = save.profile.coins
+    const xpBefore = save.profile.xp
+  const pops = state.track.clearedByColor.reduce((a, b) => a + b, 0)
+    if (mode === 'adventure' && adventureLevel && adventureGoals) {
+      const bonusClear = movesLeftAtGoal > 0
+      if (adventureGoals.movesUsed <= 0 && !allGoalsMet(adventureGoals, adventureLevel.goals) && !bonusClear) return
+      syncAdventureGoalsFromTrack()
+      if (bonusClear && !allGoalsMet(adventureGoals, adventureLevel.goals)) {
+        adventureGoals.movesUsed = Math.max(1, adventureGoals.movesUsed)
+        for (const g of adventureLevel.goals) {
+          if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+          else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+          else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+          else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+          else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+        }
+      }
+      const ev = evaluateStars(adventureGoals, adventureLevel, movesLeftAtGoal)
+      lastAdventureWon = ev.goalMet
+      lastResultStars = lastAdventureWon ? ev.stars : 0
+      lastFinishedAdventureLevel = adventureLevel
+      resultsLocked = true
+      meta.onAdventureEnd(adventureLevel, adventureGoals, lastAdventureWon, movesLeftAtGoal)
+    } else {
+      resultsLocked = true
+      lastResultStars = null
+      meta.onRunEnd({
+        mode,
+        score: state.score,
+        chainLen: state.lastChainLen,
+        combo: state.combo,
+        bombs: state.track.bombsPopped,
+        rainbows: state.track.starbursts,
+        pops,
+      })
+    }
+    lastRunRewards = {
+      coins: save.profile.coins - coinsBefore,
+      xp: save.profile.xp - xpBefore,
+    }
+    lastRunRewardNote = lastRunRewards.xp > 0 ? `+${lastRunRewards.xp} XP` : 'Sweet round!'
+    adventureLevel = null
+    adventureGoals = null
     show('results')
   }
 
@@ -846,14 +1277,14 @@ export function boot(): void {
     if (action === 'sfx') {
       save.muteSfx = !save.muteSfx
       setAudioPrefs({ sfx: !save.muteSfx })
-      storeSave(save)
+      meta.persist()
       paintMutes()
       return
     }
     if (action === 'music') {
       save.muteMusic = !save.muteMusic
       setAudioPrefs({ music: !save.muteMusic })
-      storeSave(save)
+      meta.persist()
       paintMutes()
       return
     }
@@ -863,8 +1294,30 @@ export function boot(): void {
       clockTickAt = performance.now()
       showPlay()
     } else if (action === 'home') {
-      if (screen === 'play') openPause()
-      else show('title')
+      if (screen === 'play' && mode === 'adventure') {
+        meta.close()
+        meta.open('map')
+        show('title')
+      } else if (screen === 'play') openPause()
+      else {
+        meta.close()
+        show('title')
+      }
+    } else if (action === 'adventure-map') {
+      meta.close()
+      meta.open('map')
+      show('title')
+    } else if (action === 'adventure-next' && lastFinishedAdventureLevel) {
+      const next = ADVENTURE_LEVELS.find((l) => l.id === lastFinishedAdventureLevel!.id + 1)
+      if (next) startAdventureLevel(next)
+      else {
+        meta.open('map')
+        show('title')
+      }
+    } else if (action === 'adventure-retry' && lastFinishedAdventureLevel) {
+      startAdventureLevel(lastFinishedAdventureLevel)
+    } else if (action === 'map' || action === 'shop' || action === 'achievements' || action === 'collection') {
+      meta.open(action)
     }
     else if (action === 'restart') {
       const seed = qaMode ? state.seed : mode === 'daily' ? dailySeed() : `${mode}-${Date.now()}`
@@ -941,10 +1394,14 @@ export function boot(): void {
       onTitleTap(x, y)
       return
     }
+    if (bonusFinale) {
+      finishBonusFinale()
+      return
+    }
     if (screen !== 'play') return
     if (!mayBeginChain(state)) {
       state.drag = []
-      if (roundOver(state)) showResults()
+      if (playRoundOver()) showResults()
       draw()
       return
     }
@@ -956,7 +1413,7 @@ export function boot(): void {
       clockTickAt = performance.now()
       ghostOn = false
     }
-    if (roundOver(state)) {
+    if (playRoundOver()) {
       showResults()
       return
     }
@@ -990,7 +1447,7 @@ export function boot(): void {
       state.drag = []
       if (!save.tut) ghostOn = tutParam || !qaMode
     }
-    if (state.phase === 'idle' && roundOver(state)) showResults()
+    if (state.phase === 'idle' && playRoundOver()) showResults()
     draw()
     highlightFrame = frame
   }
@@ -1078,11 +1535,47 @@ export function boot(): void {
     updateParticles(dt)
     const popped = step(state, dt)
     if (lastSimPhase === 'clearing' && state.phase === 'falling') {
-      if (state.lastChainLen >= 6 || state.hitstopTotal > 0) pieceClipFrames = 3
     }
     lastSimPhase = state.phase
     if (popped.length) notePops(popped)
-    if (roundOver(state)) showResults()
+    if (bonusFinale) {
+      bonusFinale.elapsed += dt
+      if (bonusFinale.elapsed >= bonusFinale.nextPopAt && bonusFinale.popsLeft > 0) {
+        doBonusFinalePop()
+        bonusFinale.popsLeft -= 1
+        state.movesLeft = bonusFinale.popsLeft
+        bonusFinale.nextPopAt += BONUS_POP_GAP_MS
+      }
+      if (bonusFinale.popsLeft <= 0 || bonusFinale.elapsed >= BONUS_CAP_MS) {
+        finishBonusFinale()
+        return
+      }
+      syncHud()
+      return
+    }
+    if (mode === 'adventure' && adventureLevel && adventureGoals && state.phase === 'idle' && state.settled && !state.drag.length) {
+      syncAdventureGoalsFromTrack()
+      if (allGoalsMet(adventureGoals, adventureLevel.goals)) {
+        const left = state.movesLeft
+        movesLeftAtGoal = left
+        if (left > 0) {
+          bonusFinale = {
+            popsLeft: left,
+            popsTotal: left,
+            elapsed: 0,
+            nextPopAt: BONUS_POP_GAP_MS,
+          }
+          if (finaleHintEl) finaleHintEl.hidden = false
+          setToastBlocked(true)
+          state.inputLocked = true
+          syncHud()
+          return
+        }
+        showResults()
+        return
+      }
+    }
+    if (playRoundOver()) showResults()
     syncHud()
   }
 
@@ -1104,10 +1597,9 @@ export function boot(): void {
     if (idx >= ghostPath.length - 1 && u > 0.88) ghostDemoDone = true
     const c = center(ghostPath[idx])
     const alpha = u < 0.08 ? u / 0.08 : u > 0.88 ? (1 - u) / 0.12 : 1
-    const towardX = c.x < innerWidth / 2 ? layout.D * 0.28 : -layout.D * 0.28
     return {
-      x: Math.min(innerWidth - 8, Math.max(8, c.x + towardX)),
-      y: Math.min(innerHeight - 8, Math.max(8, c.y + layout.D * 0.22)),
+      x: c.x,
+      y: c.y,
       down: u < 0.84,
       alpha,
       prefix: idx,
@@ -1164,6 +1656,10 @@ export function boot(): void {
           const wob = Math.sin(u * Math.PI * 3) * (1 - u) * 0.06
           sx = 1.15 - 0.15 * u + wob
           sy = 0.85 + 0.15 * u - wob
+        } else if (p.spawnT >= 0 && p.spawnT < 1 && !p.dead) {
+          const u = p.spawnT
+          const pop = u < 0.45 ? (u / 0.45) * 1.15 : 1.15 - ((u - 0.45) / 0.55) * 0.15
+          sx = sy = pop
         } else if (p.fallT >= 0 && p.fallT < 1 && !p.dead) {
           const ft = p.fallT
           const land = ft > 0.85 ? Math.sin(((ft - 0.85) / 0.15) * Math.PI) * 0.08 : 0
@@ -1209,7 +1705,6 @@ export function boot(): void {
         }))
       }
     }
-    const landscape = innerWidth > innerHeight
     const hero = titleHeroScale(innerWidth, innerHeight, D)
     const dragPath = state.drag.map((id) => byId(state, id)).filter((p): p is Piece => !!p)
     const ropeColor = dragPath.length
@@ -1227,11 +1722,12 @@ export function boot(): void {
           ? rope[rope.length - 1]
           : null
     let titleHint: Scene['titleHint'] = null
-    const heapCenterX = landscape ? innerWidth * 0.38 : innerWidth * 0.5
-    const heapCenterY = landscape ? innerHeight * 0.55 : innerHeight * 0.48
+    const heapPt = titleHeapCenter(innerWidth, innerHeight)
+    const heapCenterX = heapPt.x
+    const heapCenterY = heapPt.y
     const hintColor = 1
     const hintSlots = new Set([0, 1, 2])
-    if (screen === 'title') {
+    if (screen === 'title' && !save.tut && !qaMode) {
       const u = (now % 2800) / 2800
       const travel = Math.min(1, Math.max(0, (u - 0.12) / 0.58))
       const idx = Math.min(2, Math.floor(travel * 3))
@@ -1254,8 +1750,8 @@ export function boot(): void {
         rope: ropePts,
         ropeColor: hintColor,
         hand: {
-          x: tip.x + D * 0.2,
-          y: tip.y + D * 0.28,
+          x: tip.x,
+          y: tip.y,
           down: travel < 0.86,
           alpha: u < 0.08 ? u / 0.08 : u > 0.9 ? (1 - u) / 0.1 : 0.88,
         },
@@ -1300,9 +1796,9 @@ export function boot(): void {
         ? null
         : {
             x: layout.ox - D * 0.1,
-            y: Math.max(layout.hud, layout.oy - D * 0.08),
+            y: layout.oy - D * 0.06,
             w: layout.cols * D + D * 0.2,
-            h: layout.padTop + layout.rows * D + D * 0.12,
+            h: layout.padTop + layout.rows * D + D * 0.18,
           }
     return {
       w: innerWidth,
@@ -1338,7 +1834,7 @@ export function boot(): void {
       dim: screen === 'pause' ? 1 : screen === 'results' ? 0.72 : 0,
       heap,
       mat,
-      pieceClip: screen === 'play' && pieceClipFrames > 0 && mat ? mat : null,
+      pieceClip: null,
       peeks,
       liteRibbon: perfLevel > 0,
     }
@@ -1348,7 +1844,6 @@ export function boot(): void {
     const now = performance.now()
     const blink = !freeze && !reduced && now % 3200 < 140
     renderScene(gfx, scene(now), blink)
-    if (pieceClipFrames > 0) pieceClipFrames -= 1
     frame += 1
   }
 
@@ -1562,6 +2057,144 @@ export function boot(): void {
     }))
   }
 
+  function rectOverlap(a: DOMRect, b: { x: number; y: number; w: number; h: number }, slack = 2): boolean {
+    const ix = Math.min(a.right, b.x + b.w) - Math.max(a.left, b.x)
+    const iy = Math.min(a.bottom, b.y + b.h) - Math.max(a.top, b.y)
+    return ix > slack && iy > slack
+  }
+
+  function circleRectOverlap(cx: number, cy: number, rad: number, r: DOMRect, slack = 1): boolean {
+    const nearX = Math.max(r.left, Math.min(cx, r.right))
+    const nearY = Math.max(r.top, Math.min(cy, r.bottom))
+    return Math.hypot(cx - nearX, cy - nearY) < rad + slack
+  }
+
+  window.__piecePlayfieldRect = () => piecePlayfieldRect()
+
+  window.__checkAdventureHudGoals = () => window.__checkHudPlayfield()
+
+  window.__checkHudPlayfield = () => {
+    const violations: string[] = []
+    if (screen !== 'play') return { violations }
+    const pf = piecePlayfieldRect()
+    const hudSel =
+      '#hud button, #hud .score, #hud .combo-badge, #hud .moves-pill, #hud .star-progress, #hud .goal-chip, #hud .timer.ring'
+    const hudEls = [...document.querySelectorAll<HTMLElement>(hudSel)].filter((el) => {
+      if (el.closest('[hidden]')) return false
+      const s = getComputedStyle(el)
+      return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    })
+    for (const el of hudEls) {
+      const r = el.getBoundingClientRect()
+      if (rectOverlap(r, pf, 1)) {
+        violations.push(`hud on playfield: ${el.getAttribute('aria-label') || el.className}`)
+      }
+    }
+    for (let i = 0; i < hudEls.length; i++) {
+      for (let j = i + 1; j < hudEls.length; j++) {
+        const a = hudEls[i]!.getBoundingClientRect()
+        const b = hudEls[j]!.getBoundingClientRect()
+        const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+        const iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+        if (ix > 2 && iy > 2) {
+          violations.push(`hud overlap: ${hudEls[i]!.className} × ${hudEls[j]!.className}`)
+        }
+      }
+    }
+    const rad = layout.D * 0.46
+    for (const p of state.pieces) {
+      if (p.dead && p.popT < 0) continue
+      if (p.fallT >= 0 && p.fallT < 1) continue
+      const c = center(p)
+      for (const el of hudEls) {
+        if (circleRectOverlap(c.x, c.y, rad, el.getBoundingClientRect(), 2)) {
+          violations.push(`hud on piece ${p.id} (${el.className})`)
+        }
+      }
+    }
+    const toast = document.querySelector('body > .meta-toast.ui')
+    if (toast && getComputedStyle(toast).display !== 'none') {
+      const tr = toast.getBoundingClientRect()
+      if (rectOverlap(tr, pf, 1)) violations.push('toast on playfield')
+      for (const p of state.pieces) {
+        if (p.dead && p.popT < 0) continue
+        const c = center(p)
+        if (circleRectOverlap(c.x, c.y, rad, tr, 2)) violations.push(`toast on piece ${p.id}`)
+      }
+    }
+    return { violations }
+  }
+
+  window.__checkLandscapeAdventureDock = () => {
+    const violations: string[] = []
+    const hud = document.getElementById('hud')
+    if (screen !== 'play' || mode !== 'adventure' || !hud || hud.hidden) {
+      return { violations, cellD: layout.D }
+    }
+    const hudR = hud.getBoundingClientRect()
+    const sel =
+      '#hud button, #hud .score, #hud .moves-pill, #hud .star-progress, #hud .goal-chip, #hud .star-marker'
+    for (const el of hud.querySelectorAll<HTMLElement>(sel)) {
+      if (el.closest('[hidden]')) continue
+      const s = getComputedStyle(el)
+      if (s.display === 'none' || s.visibility === 'hidden') continue
+      const r = el.getBoundingClientRect()
+      if (r.width < 1 && r.height < 1) continue
+      if (r.right > hudR.right + 3 || r.left < hudR.left - 3) {
+        violations.push(`dock clip horizontal: ${el.className}`)
+      }
+      if (r.bottom > hudR.bottom + 3 || r.top < hudR.top - 3) {
+        violations.push(`dock clip vertical: ${el.className}`)
+      }
+      if (r.right > innerWidth + 1 || r.bottom > innerHeight + 1 || r.left < -1 || r.top < -1) {
+        violations.push(`dock off viewport: ${el.className}`)
+      }
+      if (el.scrollWidth > el.clientWidth + 2) {
+        violations.push(`dock overflow: ${el.className} scroll=${el.scrollWidth}>${el.clientWidth}`)
+      }
+    }
+    return { violations, cellD: layout.D }
+  }
+
+  window.__checkPortraitGoalChips = () => {
+    const violations: string[] = []
+    const hud = document.getElementById('hud')
+    if (screen !== 'play' || mode !== 'adventure' || !hud || hud.hidden) {
+      return { violations, cellD: layout.D }
+    }
+    if (innerWidth <= innerHeight) {
+      const sat = insetTop()
+      const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0
+      const hudR = hud.getBoundingClientRect()
+      for (const chip of hud.querySelectorAll<HTMLElement>('.goal-chip')) {
+        const r = chip.getBoundingClientRect()
+        if (r.width < 1) continue
+        if (r.right > innerWidth - 2) violations.push(`chip past viewport right ${r.right}`)
+        if (r.left < 2) violations.push(`chip past viewport left`)
+        if (r.right > hudR.right + 2) violations.push(`chip past hud right`)
+        if (chip.scrollWidth > chip.clientWidth + 2) violations.push(`chip overflow ${chip.scrollWidth}`)
+      }
+      if (hudR.bottom > innerHeight - sab + 2) violations.push(`hud below safe area ${hudR.bottom}`)
+      if (hudR.top < sat - 2) violations.push(`hud above safe area`)
+    }
+    return { violations, cellD: layout.D }
+  }
+
+  window.__checkPlayfieldInViewport = () => {
+    const violations: string[] = []
+    if (screen !== 'play') return { violations }
+    const pf = piecePlayfieldRect()
+    const sat = insetTop()
+    const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0
+    const sal = 0
+    const sar = 0
+    if (pf.y < sat - 4) violations.push(`playfield top ${pf.y} < safe ${sat}`)
+    if (pf.x < sal - 4) violations.push(`playfield left ${pf.x} < safe ${sal}`)
+    if (pf.y + pf.h > innerHeight - sab + 4) violations.push(`playfield bottom off (${pf.y + pf.h} > ${innerHeight - sab})`)
+    if (pf.x + pf.w > innerWidth - sar + 4) violations.push(`playfield right off (${pf.x + pf.w} > ${innerWidth - sar})`)
+    return { violations }
+  }
+
   window.__checkOverlaps = () => {
     const els = visibleUi()
     const overlaps: [string, string][] = []
@@ -1583,7 +2216,7 @@ export function boot(): void {
   window.__checkHudBoard = () => {
     const violations: string[] = []
     if (screen !== 'play') return { violations }
-    const br = boardRect()
+    const br = piecePlayfieldRect()
     const box = (r: DOMRect) => {
       const ix = Math.min(r.right, br.x + br.w) - Math.max(r.left, br.x)
       const iy = Math.min(r.bottom, br.y + br.h) - Math.max(r.top, br.y)
@@ -1636,9 +2269,11 @@ export function boot(): void {
     get seed() { return state.seed },
     get score() { return state.score },
     get combo() { return state.combo },
+    get lastChainLen() { return state.lastChainLen },
     get timeLeft() { return state.timeLeft },
+    get movesLeft() { return state.movesLeft },
     get paused() { return screen === 'pause' },
-    inputLocked: false,
+    get inputLocked() { return state.inputLocked },
     get chain() { return state.drag.slice() },
     get D() { return layout.D },
     get cols() { return state.cols },
@@ -1655,6 +2290,8 @@ export function boot(): void {
             color: p.color,
             kind: p.kind,
             popping: p.popT >= 0,
+            spawning: p.spawnT >= 0 && p.spawnT < 1,
+            spawnT: p.spawnT,
             falling: p.fallT >= 0 && p.fallT < 1,
             x: c.x,
             y: c.y,
@@ -1795,6 +2432,38 @@ export function boot(): void {
       if (!path) return null
       return path.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
     },
+    findGoalChain(min = 2) {
+      const levelGoals = adventureLevel?.goals ?? []
+      const needIce =
+        adventureGoals &&
+        levelGoals.some((g) => g.type === 'break_ice' && adventureGoals!.iceBroken < g.count)
+      if (needIce) {
+        for (let n = 8; n >= min; n--) {
+          const cand = findPathTouchingKind(state, n, 'ice')
+          if (cand) return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const needChoco =
+        adventureGoals &&
+        levelGoals.some((g) => g.type === 'clear_choco' && adventureGoals!.chocoCleared < g.count)
+      if (needChoco) {
+        for (let n = 8; n >= min; n--) {
+          const cand = findPathTouchingKind(state, n, 'choco')
+          if (cand) return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const goalColor = levelGoals.find((g) => g.type === 'clear_color')?.color
+      for (let n = 8; n >= min; n--) {
+        const cand = findPath(state, n)
+        if (!cand) continue
+        if (goalColor == null || cand[0]!.color === goalColor) {
+          return cand.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+        }
+      }
+      const fallback = findPath(state, min)
+      if (!fallback) return null
+      return fallback.map((p) => ({ id: p.id, ...center(p), c: p.c, r: p.r }))
+    },
     center(id) {
       const p = byId(state, id)
       return p ? center(p) : null
@@ -1843,8 +2512,198 @@ export function boot(): void {
       save.muteSfx = sfx
       save.muteMusic = music
       setAudioPrefs({ sfx: !sfx, music: !music })
-      storeSave(save)
+      meta.persist()
       paintMutes()
+    },
+    openMeta(which, mapChapter?: number) {
+      const ch = mapChapter as 1 | 2 | 3 | 4 | undefined
+      meta.open(which, ch ? { mapChapter: ch } : undefined)
+    },
+    closeMeta() {
+      meta.close()
+    },
+    prepPromoSave() {
+      save.profile.stars = 80
+      save.profile.coins = 120
+      save.profile.level = 12
+      for (const id of ['macaron', 'gummy', 'mochi', 'night', 'beach']) {
+        if (id === 'macaron' || id === 'gummy' || id === 'mochi') {
+          if (!save.owned.skins.includes(id)) save.owned.skins.push(id)
+        } else if (!save.owned.themes.includes(id)) save.owned.themes.push(id)
+      }
+      save.achievements.first_bomb = 1
+      meta.persist()
+    },
+    startAdventure(levelId) {
+      const level = ADVENTURE_LEVELS.find((l) => l.id === levelId) ?? ADVENTURE_LEVELS[0]!
+      startAdventureLevel(level)
+      draw()
+    },
+    capturePopBurst() {
+      const path = findPath(state, 6)
+      if (!path) return
+      state.drag = path.map((p) => p.id)
+      release(state)
+      for (let t = 0; t < 6; t++) {
+        step(state, 18)
+        draw()
+      }
+    },
+    prepMapLock() {
+      save.profile.stars = 6
+      save.adventure.chapterStars = { '1': 6 }
+      save.adventure.frontier = 18
+      meta.persist()
+    },
+    prepAdventureLevel(levelId: number) {
+      save.adventure.frontier = Math.max(1, levelId)
+      save.adventure.chapterStars = { '1': 30, '2': 30, '3': 30, '4': 30 }
+      for (const t of ['ice', 'choco', 'jelly', 'sleepy', 'starburst']) {
+        if (!save.seenTips.includes(t)) save.seenTips.push(t)
+      }
+      meta.persist()
+    },
+    boardPieces() {
+      return state.pieces
+        .filter((p) => !p.dead)
+        .map((p) => {
+          const c = center(p)
+          return {
+            spawning: p.spawnT >= 0 && p.spawnT < 1,
+            spawnT: p.spawnT,
+            x: c.x,
+            y: c.y,
+          }
+        })
+    },
+    markTipsSeen() {
+      for (const t of ['ice', 'choco', 'jelly', 'sleepy', 'starburst']) {
+        if (!save.seenTips.includes(t)) save.seenTips.push(t)
+      }
+      meta.persist()
+    },
+    playRealRound() {
+      fresh('timed', seedParam ?? 'qa-real-round')
+      showPlay()
+      clockOn = true
+      clockTickAt = performance.now()
+      clockRunMs = 0
+      let guard = 0
+      while (state.timeLeft > 500 && guard++ < 900) {
+        if (state.phase === 'idle') {
+          if (!settleChain(guard % 3 === 0 ? 5 : 4)) {
+            clockRunMs += 180
+            state.timeLeft = Math.max(0, ROUND_MS - clockRunMs)
+          }
+        } else {
+          step(state, 28)
+        }
+        syncWallClock(performance.now())
+      }
+      clockRunMs = ROUND_MS
+      state.timeLeft = 0
+      showResults()
+    },
+    buySkin(id: string) {
+      save.profile.coins = Math.max(save.profile.coins, 300)
+      purchase(save, id)
+      meta.persist()
+    },
+    equipItem(id: string) {
+      if (equip(save, id)) {
+        meta.applyCosmetics()
+        meta.persist()
+      }
+    },
+    showBlockerTip(tipId: string) {
+      showTipCard(tipId, () => {})
+      freeze = true
+    },
+    earsOk() {
+      return earsInsideMatAtRest(layout, 1) && earsInsideMatAtRest(layout, 0.82)
+    },
+    settleChain(min: number) {
+      return settleChain(min)
+    },
+    hasBomb() {
+      return state.pieces.some((p) => !p.dead && p.kind === 'bomb')
+    },
+    setMovesLeft(n: number) {
+      if (!qaMode) return
+      state.movesLeft = Math.max(0, n)
+      syncHud()
+      draw()
+    },
+    bonusActive() {
+      return bonusFinale !== null
+    },
+    get lastMovesLeftAtGoal() {
+      return movesLeftAtGoal
+    },
+    finalePopsTotal() {
+      return bonusFinale?.popsTotal ?? 0
+    },
+    showTestToast() {
+      if (!qaMode) return
+      queueToast('Combo ×5!', '🎂')
+    },
+    adventureMovesTable(max: number) {
+      return ADVENTURE_LEVELS.filter((l) => l.id <= max).map((l) => ({
+        level: l.id,
+        moves: l.moves,
+        cols: l.cols,
+        rows: l.rows,
+        chapter: l.chapter,
+        goals: l.goals.map((g) => {
+          if (g.type === 'clear_color') return `c${g.color}:${g.count}`
+          if (g.type === 'break_ice') return `ice:${g.count}`
+          if (g.type === 'clear_choco') return `ch:${g.count}`
+          if (g.type === 'pop_bombs') return `bomb:${g.count}`
+          return g.type
+        }),
+      }))
+    },
+    cellD() {
+      return layout.D
+    },
+    finishAdventureWin() {
+      if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return
+      for (const g of adventureLevel.goals) {
+        if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+        else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+        else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+        else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+        else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+      }
+      syncAdventureGoalsFromTrack()
+      movesLeftAtGoal = Math.max(1, state.movesLeft)
+      showResults()
+    },
+    forceBonusFinale(moves: number) {
+      if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return
+      const n = Math.max(1, moves)
+      movesLeftAtGoal = n
+      state.movesLeft = n
+      syncAdventureGoalsFromTrack()
+      adventureGoals.movesUsed = Math.max(1, adventureGoals.movesUsed)
+      for (const g of adventureLevel.goals) {
+        if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+        else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+        else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+        else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+        else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+      }
+      bonusFinale = {
+        popsLeft: n,
+        popsTotal: n,
+        elapsed: 0,
+        nextPopAt: BONUS_POP_GAP_MS,
+      }
+      state.inputLocked = true
+      if (finaleHintEl) finaleHintEl.hidden = false
+      setToastBlocked(true)
+      syncHud()
+      draw()
     },
   }
 

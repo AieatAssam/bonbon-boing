@@ -199,12 +199,23 @@ test.describe('pop juice', () => {
 
   test('bomb-strip contact sheet', async ({ page }) => {
     test.setTimeout(120_000)
-    await page.goto('?qa&screen=play&seed=feel', { timeout: 30_000 })
-    await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
-    const five = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.findChain(5))
-    expect(five?.length ?? 0).toBeGreaterThanOrEqual(5)
-    await dragPath(page, five!)
-    await releasePath(page, five!)
+    let armed = false
+    for (const seed of ['feel', 'pretty', 'spawn-a', 'qa-bomb']) {
+      await page.goto(`?qa&screen=play&seed=${seed}`, { timeout: 60_000 })
+      await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true)
+      const five = await page.evaluate(() => {
+        const q = (window as unknown as { __qa: Qa & { settleChain: (m: number) => boolean; hasBomb: () => boolean } }).__qa
+        for (let i = 0; i < 24; i++) if (q.settleChain(5) && q.hasBomb()) return q.findChain(3)
+        return q.findChain(5)
+      })
+      if ((five?.length ?? 0) >= 5) {
+        await dragPath(page, five!)
+        await releasePath(page, five!)
+        armed = true
+        break
+      }
+    }
+    expect(armed).toBe(true)
     await page.evaluate(() => {
       const q = (window as unknown as { __qa: Qa }).__qa
       for (let t = 0; t < 1400; t += 40) q.pump(40)

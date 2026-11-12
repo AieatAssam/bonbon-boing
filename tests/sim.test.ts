@@ -90,8 +90,8 @@ describe('pacing', () => {
     expect(first.length).toBe(1)
     expect(s.popAt[0]).toBe(0)
     expect(s.hitstopTotal).toBe(HITSTOP_MS)
-    expect(s.hitstopTotal).toBeGreaterThanOrEqual(65)
-    expect(s.hitstopTotal).toBeLessThanOrEqual(75)
+    expect(s.hitstopTotal).toBeGreaterThanOrEqual(40)
+    expect(s.hitstopTotal).toBeLessThanOrEqual(46)
     expect(s.inputLocked).toBe(false)
     const held = byId(s, path![1].id)!
     const r0 = held.r

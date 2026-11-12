@@ -1,0 +1,2212 @@
+{
+  "version": 6,
+  "levels": [
+    {
+      "id": 1,
+      "chapter": 1,
+      "title": "Sugar Meadow 1",
+      "seed": "adv-1-1-1",
+      "moves": 28,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 2
+      },
+      "starScore": [
+        4320,
+        4579,
+        5270
+      ],
+      "tutorialTip": "ice"
+    },
+    {
+      "id": 2,
+      "chapter": 1,
+      "title": "Sugar Meadow 2",
+      "seed": "adv-1-2-2",
+      "moves": 28,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 2
+      },
+      "starScore": [
+        4620,
+        4897,
+        5636
+      ]
+    },
+    {
+      "id": 3,
+      "chapter": 1,
+      "title": "Sugar Meadow 3",
+      "seed": "adv-1-3-3",
+      "moves": 28,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 4
+        },
+        {
+          "type": "break_ice",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 2
+      },
+      "starScore": [
+        4920,
+        5215,
+        6002
+      ]
+    },
+    {
+      "id": 4,
+      "chapter": 1,
+      "title": "Sugar Meadow 4",
+      "seed": "adv-1-4-4",
+      "moves": 22,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 9
+        },
+        {
+          "type": "break_ice",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 3
+      },
+      "starScore": [
+        5220,
+        5533,
+        6368
+      ]
+    },
+    {
+      "id": 5,
+      "chapter": 1,
+      "title": "Sugar Meadow 5",
+      "seed": "adv-1-5-5",
+      "moves": 22,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 9
+        },
+        {
+          "type": "break_ice",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 3,
+        "jelly": 1
+      },
+      "starScore": [
+        5520,
+        5851,
+        6734
+      ],
+      "tutorialTip": "jelly"
+    },
+    {
+      "id": 6,
+      "chapter": 1,
+      "title": "Sugar Meadow 6",
+      "seed": "adv-1-6-6",
+      "moves": 22,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 10
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 3,
+        "jelly": 1
+      },
+      "starScore": [
+        5820,
+        6169,
+        7100
+      ]
+    },
+    {
+      "id": 7,
+      "chapter": 1,
+      "title": "Sugar Meadow 7",
+      "seed": "adv-1-7-7",
+      "moves": 22,
+      "colorCount": 3,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 10
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 3,
+        "jelly": 1
+      },
+      "starScore": [
+        6120,
+        6487,
+        7466
+      ]
+    },
+    {
+      "id": 8,
+      "chapter": 1,
+      "title": "Sugar Meadow 8",
+      "seed": "adv-1-8-8",
+      "moves": 19,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 11
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 4,
+        "jelly": 1
+      },
+      "starScore": [
+        6420,
+        6805,
+        7832
+      ]
+    },
+    {
+      "id": 9,
+      "chapter": 1,
+      "title": "Sugar Meadow 9",
+      "seed": "adv-1-9-9",
+      "moves": 19,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 16
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 4,
+        "jelly": 1
+      },
+      "starScore": [
+        6720,
+        8870,
+        11558
+      ]
+    },
+    {
+      "id": 10,
+      "chapter": 1,
+      "title": "Sugar Meadow 10",
+      "seed": "adv-1-10-10",
+      "moves": 19,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 4,
+        "jelly": 2,
+        "sleepy": 0
+      },
+      "starScore": [
+        7020,
+        9266,
+        12074
+      ]
+    },
+    {
+      "id": 11,
+      "chapter": 1,
+      "title": "Sugar Meadow 11",
+      "seed": "adv-1-11-11",
+      "moves": 19,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 4,
+        "jelly": 2,
+        "sleepy": 0
+      },
+      "starScore": [
+        7320,
+        9662,
+        12590
+      ]
+    },
+    {
+      "id": 12,
+      "chapter": 1,
+      "title": "Sugar Meadow 12",
+      "seed": "adv-1-12-12",
+      "moves": 18,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 18
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 5,
+        "jelly": 2,
+        "sleepy": 1
+      },
+      "starScore": [
+        7620,
+        10058,
+        13106
+      ],
+      "tutorialTip": "sleepy"
+    },
+    {
+      "id": 13,
+      "chapter": 1,
+      "title": "Sugar Meadow 13",
+      "seed": "adv-1-13-13",
+      "moves": 18,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 19
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 5,
+        "jelly": 2,
+        "sleepy": 0
+      },
+      "starScore": [
+        7920,
+        10454,
+        13622
+      ]
+    },
+    {
+      "id": 14,
+      "chapter": 1,
+      "title": "Sugar Meadow 14",
+      "seed": "adv-1-14-14",
+      "moves": 18,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 20
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 5,
+        "jelly": 2,
+        "sleepy": 0
+      },
+      "starScore": [
+        8220,
+        10850,
+        14138
+      ]
+    },
+    {
+      "id": 15,
+      "chapter": 1,
+      "title": "Sugar Meadow 15",
+      "seed": "adv-1-15-15",
+      "moves": 18,
+      "colorCount": 4,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 21
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 5
+        },
+        {
+          "type": "score_moves",
+          "score": 8520,
+          "moves": 18
+        }
+      ],
+      "blockers": {
+        "ice": 5,
+        "jelly": 2,
+        "sleepy": 0
+      },
+      "starScore": [
+        8520,
+        11246,
+        14654
+      ]
+    },
+    {
+      "id": 16,
+      "chapter": 2,
+      "title": "Fizz Factory 1",
+      "seed": "adv-2-1-16",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 11
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 6,
+        "jelly": 3,
+        "sleepy": 0
+      },
+      "starScore": [
+        8380,
+        12402,
+        17179
+      ]
+    },
+    {
+      "id": 17,
+      "chapter": 2,
+      "title": "Fizz Factory 2",
+      "seed": "adv-2-2-17",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 12
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 6,
+        "jelly": 3,
+        "sleepy": 0
+      },
+      "starScore": [
+        8680,
+        12846,
+        17794
+      ]
+    },
+    {
+      "id": 18,
+      "chapter": 2,
+      "title": "Fizz Factory 3",
+      "seed": "adv-2-3-18",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 13
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 6,
+        "jelly": 3,
+        "sleepy": 1,
+        "choco": 1
+      },
+      "starScore": [
+        8980,
+        13290,
+        18409
+      ],
+      "tutorialTip": "choco"
+    },
+    {
+      "id": 19,
+      "chapter": 2,
+      "title": "Fizz Factory 4",
+      "seed": "adv-2-4-19",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 14
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 6,
+        "jelly": 3,
+        "sleepy": 0,
+        "choco": 1
+      },
+      "starScore": [
+        9280,
+        13734,
+        19024
+      ]
+    },
+    {
+      "id": 20,
+      "chapter": 2,
+      "title": "Fizz Factory 5",
+      "seed": "adv-2-5-20",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 15
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 6
+        },
+        {
+          "type": "clear_choco",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 7,
+        "jelly": 3,
+        "sleepy": 0,
+        "choco": 1
+      },
+      "starScore": [
+        9580,
+        14178,
+        19639
+      ]
+    },
+    {
+      "id": 21,
+      "chapter": 2,
+      "title": "Fizz Factory 6",
+      "seed": "adv-2-6-21",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 16
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 6
+        },
+        {
+          "type": "clear_choco",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 7,
+        "jelly": 3,
+        "sleepy": 0,
+        "choco": 1
+      },
+      "starScore": [
+        9880,
+        14622,
+        20254
+      ]
+    },
+    {
+      "id": 22,
+      "chapter": 2,
+      "title": "Fizz Factory 7",
+      "seed": "adv-2-7-22",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 6
+        },
+        {
+          "type": "clear_choco",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 7,
+        "jelly": 4,
+        "sleepy": 0,
+        "choco": 2
+      },
+      "starScore": [
+        10180,
+        15066,
+        20869
+      ]
+    },
+    {
+      "id": 23,
+      "chapter": 2,
+      "title": "Fizz Factory 8",
+      "seed": "adv-2-8-23",
+      "moves": 16,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 6
+        },
+        {
+          "type": "clear_choco",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 7,
+        "jelly": 4,
+        "sleepy": 0,
+        "choco": 2
+      },
+      "starScore": [
+        10480,
+        15510,
+        21483
+      ]
+    },
+    {
+      "id": 24,
+      "chapter": 2,
+      "title": "Fizz Factory 9",
+      "seed": "adv-2-9-24",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 18
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 6
+        },
+        {
+          "type": "clear_choco",
+          "count": 2
+        }
+      ],
+      "blockers": {
+        "ice": 8,
+        "jelly": 4,
+        "sleepy": 0,
+        "choco": 2
+      },
+      "starScore": [
+        10780,
+        15954,
+        22098
+      ]
+    },
+    {
+      "id": 25,
+      "chapter": 2,
+      "title": "Fizz Factory 10",
+      "seed": "adv-2-10-25",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 19
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 7
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 8,
+        "jelly": 4,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 2
+      },
+      "starScore": [
+        11080,
+        16398,
+        22713
+      ],
+      "tutorialTip": "starburst"
+    },
+    {
+      "id": 26,
+      "chapter": 2,
+      "title": "Fizz Factory 11",
+      "seed": "adv-2-11-26",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 20
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 7
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 8,
+        "jelly": 4,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 2
+      },
+      "starScore": [
+        11380,
+        16842,
+        23328
+      ]
+    },
+    {
+      "id": 27,
+      "chapter": 2,
+      "title": "Fizz Factory 12",
+      "seed": "adv-2-12-27",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 21
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 7
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 8,
+        "jelly": 4,
+        "sleepy": 1,
+        "starburst": 0,
+        "choco": 3
+      },
+      "starScore": [
+        11680,
+        17286,
+        23943
+      ]
+    },
+    {
+      "id": 28,
+      "chapter": 2,
+      "title": "Fizz Factory 13",
+      "seed": "adv-2-13-28",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 22
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 7
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 9,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 3
+      },
+      "starScore": [
+        11980,
+        17730,
+        24558
+      ]
+    },
+    {
+      "id": 29,
+      "chapter": 2,
+      "title": "Fizz Factory 14",
+      "seed": "adv-2-14-29",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 23
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 7
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        }
+      ],
+      "blockers": {
+        "ice": 9,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 3
+      },
+      "starScore": [
+        12280,
+        18174,
+        25173
+      ]
+    },
+    {
+      "id": 30,
+      "chapter": 2,
+      "title": "Fizz Factory 15",
+      "seed": "adv-2-15-30",
+      "moves": 15,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 24
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 8
+        },
+        {
+          "type": "clear_choco",
+          "count": 3
+        },
+        {
+          "type": "score_moves",
+          "score": 12580,
+          "moves": 15
+        }
+      ],
+      "blockers": {
+        "ice": 9,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 3
+      },
+      "starScore": [
+        12580,
+        18618,
+        25788
+      ]
+    },
+    {
+      "id": 31,
+      "chapter": 3,
+      "title": "Frost Fields 1",
+      "seed": "adv-3-1-31",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 14
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 8
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 9,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 3
+      },
+      "starScore": [
+        12440,
+        17664,
+        23387
+      ]
+    },
+    {
+      "id": 32,
+      "chapter": 3,
+      "title": "Frost Fields 2",
+      "seed": "adv-3-2-32",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 15
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 8
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 10,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 4
+      },
+      "starScore": [
+        12740,
+        18090,
+        23951
+      ]
+    },
+    {
+      "id": 33,
+      "chapter": 3,
+      "title": "Frost Fields 3",
+      "seed": "adv-3-3-33",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 16
+        },
+        {
+          "type": "pop_bombs",
+          "count": 1
+        },
+        {
+          "type": "break_ice",
+          "count": 8
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 10,
+        "jelly": 5,
+        "sleepy": 0,
+        "starburst": 1,
+        "choco": 4
+      },
+      "starScore": [
+        13040,
+        18516,
+        24515
+      ]
+    },
+    {
+      "id": 34,
+      "chapter": 3,
+      "title": "Frost Fields 4",
+      "seed": "adv-3-4-34",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 8
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 10,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 4
+      },
+      "starScore": [
+        13340,
+        18942,
+        25079
+      ]
+    },
+    {
+      "id": 35,
+      "chapter": 3,
+      "title": "Frost Fields 5",
+      "seed": "adv-3-5-35",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 9
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 10,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 4
+      },
+      "starScore": [
+        13640,
+        19368,
+        25643
+      ]
+    },
+    {
+      "id": 36,
+      "chapter": 3,
+      "title": "Frost Fields 6",
+      "seed": "adv-3-6-36",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 18
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 9
+        },
+        {
+          "type": "clear_choco",
+          "count": 4
+        }
+      ],
+      "blockers": {
+        "ice": 11,
+        "jelly": 6,
+        "sleepy": 1,
+        "starburst": 0,
+        "choco": 4
+      },
+      "starScore": [
+        13940,
+        19794,
+        26207
+      ]
+    },
+    {
+      "id": 37,
+      "chapter": 3,
+      "title": "Frost Fields 7",
+      "seed": "adv-3-7-37",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 19
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 9
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 11,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 5
+      },
+      "starScore": [
+        14240,
+        20220,
+        26771
+      ]
+    },
+    {
+      "id": 38,
+      "chapter": 3,
+      "title": "Frost Fields 8",
+      "seed": "adv-3-8-38",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 20
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 9
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 11,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 5
+      },
+      "starScore": [
+        14540,
+        20646,
+        27335
+      ]
+    },
+    {
+      "id": 39,
+      "chapter": 3,
+      "title": "Frost Fields 9",
+      "seed": "adv-3-9-39",
+      "moves": 13,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 21
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 9
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 11,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 5
+      },
+      "starScore": [
+        14840,
+        21072,
+        27899
+      ]
+    },
+    {
+      "id": 40,
+      "chapter": 3,
+      "title": "Frost Fields 10",
+      "seed": "adv-3-10-40",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 22
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 12,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 5
+      },
+      "starScore": [
+        15140,
+        21498,
+        28463
+      ]
+    },
+    {
+      "id": 41,
+      "chapter": 3,
+      "title": "Frost Fields 11",
+      "seed": "adv-3-11-41",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 23
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 12,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 5
+      },
+      "starScore": [
+        15440,
+        21924,
+        29027
+      ]
+    },
+    {
+      "id": 42,
+      "chapter": 3,
+      "title": "Frost Fields 12",
+      "seed": "adv-3-12-42",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 24
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 5
+        }
+      ],
+      "blockers": {
+        "ice": 12,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 6
+      },
+      "starScore": [
+        15740,
+        22350,
+        29591
+      ]
+    },
+    {
+      "id": 43,
+      "chapter": 3,
+      "title": "Frost Fields 13",
+      "seed": "adv-3-13-43",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 25
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        }
+      ],
+      "blockers": {
+        "ice": 12,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 6
+      },
+      "starScore": [
+        16040,
+        22776,
+        30155
+      ]
+    },
+    {
+      "id": 44,
+      "chapter": 3,
+      "title": "Frost Fields 14",
+      "seed": "adv-3-14-44",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 26
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        }
+      ],
+      "blockers": {
+        "ice": 13,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 1,
+        "choco": 6
+      },
+      "starScore": [
+        16340,
+        23202,
+        30719
+      ]
+    },
+    {
+      "id": 45,
+      "chapter": 3,
+      "title": "Frost Fields 15",
+      "seed": "adv-3-15-45",
+      "moves": 12,
+      "colorCount": 5,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 26
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        },
+        {
+          "type": "score_moves",
+          "score": 16640,
+          "moves": 12
+        }
+      ],
+      "blockers": {
+        "ice": 13,
+        "jelly": 6,
+        "sleepy": 1,
+        "starburst": 0,
+        "choco": 6
+      },
+      "starScore": [
+        16640,
+        23628,
+        31283
+      ]
+    },
+    {
+      "id": 46,
+      "chapter": 4,
+      "title": "Choco Cavern 1",
+      "seed": "adv-4-1-46",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        }
+      ],
+      "blockers": {
+        "ice": 13,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 6
+      },
+      "starScore": [
+        16500,
+        23430,
+        31020
+      ]
+    },
+    {
+      "id": 47,
+      "chapter": 4,
+      "title": "Choco Cavern 2",
+      "seed": "adv-4-2-47",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 5,
+          "count": 17
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        }
+      ],
+      "blockers": {
+        "ice": 13,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 7
+      },
+      "starScore": [
+        16800,
+        23856,
+        31584
+      ]
+    },
+    {
+      "id": 48,
+      "chapter": 4,
+      "title": "Choco Cavern 3",
+      "seed": "adv-4-3-48",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 18
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 6
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 7
+      },
+      "starScore": [
+        17100,
+        24282,
+        32147
+      ]
+    },
+    {
+      "id": 49,
+      "chapter": 4,
+      "title": "Choco Cavern 4",
+      "seed": "adv-4-4-49",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 19
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 7
+      },
+      "starScore": [
+        17400,
+        24708,
+        32711
+      ]
+    },
+    {
+      "id": 50,
+      "chapter": 4,
+      "title": "Choco Cavern 5",
+      "seed": "adv-4-5-50",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 20
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 7
+      },
+      "starScore": [
+        17700,
+        25134,
+        33276
+      ]
+    },
+    {
+      "id": 51,
+      "chapter": 4,
+      "title": "Choco Cavern 6",
+      "seed": "adv-4-6-51",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 21
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 7
+      },
+      "starScore": [
+        18000,
+        25560,
+        33840
+      ]
+    },
+    {
+      "id": 52,
+      "chapter": 4,
+      "title": "Choco Cavern 7",
+      "seed": "adv-4-7-52",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 22
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 8
+      },
+      "starScore": [
+        18300,
+        25986,
+        34404
+      ]
+    },
+    {
+      "id": 53,
+      "chapter": 4,
+      "title": "Choco Cavern 8",
+      "seed": "adv-4-8-53",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 5,
+          "count": 23
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 8
+      },
+      "starScore": [
+        18600,
+        26412,
+        34968
+      ]
+    },
+    {
+      "id": 54,
+      "chapter": 4,
+      "title": "Choco Cavern 9",
+      "seed": "adv-4-9-54",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 24
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 7
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 1,
+        "starburst": 0,
+        "choco": 8
+      },
+      "starScore": [
+        18900,
+        26838,
+        35532
+      ]
+    },
+    {
+      "id": 55,
+      "chapter": 4,
+      "title": "Choco Cavern 10",
+      "seed": "adv-4-10-55",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 1,
+          "count": 25
+        },
+        {
+          "type": "pop_bombs",
+          "count": 2
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 1,
+        "choco": 8
+      },
+      "starScore": [
+        19200,
+        27264,
+        36096
+      ]
+    },
+    {
+      "id": 56,
+      "chapter": 4,
+      "title": "Choco Cavern 11",
+      "seed": "adv-4-11-56",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 2,
+          "count": 26
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 8
+      },
+      "starScore": [
+        19500,
+        27690,
+        36660
+      ]
+    },
+    {
+      "id": 57,
+      "chapter": 4,
+      "title": "Choco Cavern 12",
+      "seed": "adv-4-12-57",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 3,
+          "count": 26
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 9
+      },
+      "starScore": [
+        19800,
+        28116,
+        37224
+      ]
+    },
+    {
+      "id": 58,
+      "chapter": 4,
+      "title": "Choco Cavern 13",
+      "seed": "adv-4-13-58",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 4,
+          "count": 27
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 9
+      },
+      "starScore": [
+        20100,
+        28542,
+        37788
+      ]
+    },
+    {
+      "id": 59,
+      "chapter": 4,
+      "title": "Choco Cavern 14",
+      "seed": "adv-4-14-59",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 5,
+          "count": 28
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 9
+      },
+      "starScore": [
+        20400,
+        28968,
+        38352
+      ]
+    },
+    {
+      "id": 60,
+      "chapter": 4,
+      "title": "Choco Cavern 15",
+      "seed": "adv-4-15-60",
+      "moves": 12,
+      "colorCount": 6,
+      "goals": [
+        {
+          "type": "clear_color",
+          "color": 0,
+          "count": 29
+        },
+        {
+          "type": "pop_bombs",
+          "count": 3
+        },
+        {
+          "type": "break_ice",
+          "count": 10
+        },
+        {
+          "type": "clear_choco",
+          "count": 8
+        },
+        {
+          "type": "score_moves",
+          "score": 20700,
+          "moves": 12
+        }
+      ],
+      "blockers": {
+        "ice": 14,
+        "jelly": 6,
+        "sleepy": 0,
+        "starburst": 0,
+        "choco": 9
+      },
+      "starScore": [
+        20700,
+        29394,
+        38916
+      ]
+    }
+  ]
+}
