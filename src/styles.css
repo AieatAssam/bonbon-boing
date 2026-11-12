@@ -492,6 +492,22 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   padding: 0 2px;
 }
 
+#hud:not(.hud--adventure) {
+  display: block;
+}
+
+#hud:not(.hud--adventure) .hud-top-row {
+  display: grid;
+  grid-template-columns: auto minmax(72px, 1fr) minmax(52px, 150px);
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+}
+
+#hud:not(.hud--adventure) .hud-goal-row {
+  display: none !important;
+}
+
 #hud.hud--adventure {
   display: flex;
   flex-direction: column;
@@ -571,7 +587,10 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
 .score.pop { transform: scale(1.14); transform-origin: center center; }
 
 @media (max-width: 400px) {
-  #hud:not(.hud--adventure) { gap: 4px; grid-template-columns: auto minmax(56px, 1fr) minmax(48px, 88px); }
+  #hud:not(.hud--adventure) .hud-top-row {
+    gap: 4px;
+    grid-template-columns: auto minmax(56px, 1fr) minmax(48px, 88px);
+  }
   .score { font-size: 18px; padding: 6px 10px; min-width: 72px; }
   .score.pop { transform: scale(1.04); }
 }

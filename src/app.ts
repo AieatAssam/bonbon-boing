@@ -541,14 +541,14 @@ export function boot(): void {
   function measureHudInset(): { extraTop: number; side: number } {
     const sat = insetTop()
     const hudEl = document.getElementById('hud')
-    if (screen !== 'play' || !hudEl || hudEl.hidden || mode !== 'adventure') {
+    if (screen !== 'play' || !hudEl || hudEl.hidden) {
       return { extraTop: sat, side: 0 }
     }
     const landscape = innerWidth > innerHeight
     const hr = hudEl.getBoundingClientRect()
     const wantTop = Math.ceil(hr.bottom + 8)
     const extraTop = Math.max(sat, wantTop - baseHudPx())
-    const side = landscape ? Math.ceil(hr.width + 12) : 0
+    const side = landscape && mode === 'adventure' ? Math.ceil(hr.width + 12) : 0
     return { extraTop, side }
   }
 
@@ -609,7 +609,8 @@ export function boot(): void {
     }
     layout = next
     publishBoardCssVars()
-    if (layoutPass < 4 && mode === 'adventure' && screen === 'play') {
+    if (screen === 'play') draw()
+    if (layoutPass < 4 && screen === 'play') {
       requestAnimationFrame(() => applyBoardLayout())
     }
   }
@@ -1132,7 +1133,7 @@ export function boot(): void {
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
       timeEl.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" fill="none" stroke="#ffe0f0" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#ff4f93" stroke-width="4" stroke-dasharray="${dash} 88" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><span>${secs}</span>`
     }
-    if (mode === 'adventure' && screen === 'play') {
+    if (screen === 'play') {
       requestAnimationFrame(() => {
         layoutPass = 0
         applyBoardLayout()
@@ -2144,7 +2145,7 @@ export function boot(): void {
   window.__checkHudBoard = () => {
     const violations: string[] = []
     if (screen !== 'play') return { violations }
-    const br = boardRect()
+    const br = piecePlayfieldRect()
     const box = (r: DOMRect) => {
       const ix = Math.min(r.right, br.x + br.w) - Math.max(r.left, br.x)
       const iy = Math.min(r.bottom, br.y + br.h) - Math.max(r.top, br.y)

@@ -111,7 +111,7 @@ for (const [w, h] of sizes) {
     test.setTimeout(240_000)
     await ready(page, w, h)
     await openLevel(page, 4)
-    const hud = page.locator('.adventure-hud')
+    const hud = page.locator('#hud.hud--adventure')
     await expect(hud).toBeVisible()
     await page.screenshot({ path: `/opt/cursor/artifacts/round6-star-full_${tag}.png` })
     const limit = await page.evaluate(() => {
