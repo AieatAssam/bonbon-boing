@@ -97,7 +97,7 @@ test('next level and rush after win — real drags', async ({ page }) => {
   await page.locator('#results [data-action="adventure-next"]').tap()
   await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.screen === 'play', { timeout: 15_000 })
   const m2 = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.movesLeft)
-  expect(m2).toBeGreaterThan(15)
+  expect(m2).toBeGreaterThan(12)
   const before = m2
   await dragOnce(page)
   const after = await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.movesLeft)

@@ -530,7 +530,13 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   transition: transform 120ms ease;
 }
 
-.score.pop { transform: scale(1.14); }
+.score.pop { transform: scale(1.14); transform-origin: center center; }
+
+@media (max-width: 400px) {
+  #hud { gap: 4px; grid-template-columns: auto minmax(56px, 1fr) minmax(48px, 88px); }
+  .score { font-size: 18px; padding: 6px 10px; min-width: 72px; }
+  .score.pop { transform: scale(1.04); }
+}
 
 .combo-badge {
   font-size: 13px;
