@@ -291,6 +291,13 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   align-items: stretch;
   gap: 4px;
   width: 150px;
+  max-width: min(150px, 40vw);
+}
+
+.adventure-hud .goal-strip {
+  max-width: 100%;
+  justify-content: flex-end;
+  gap: 3px;
 }
 
 .moves-pill {
@@ -700,14 +707,17 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
     min-height: 46px;
   }
   body > .meta-toast.ui {
-    bottom: auto;
-    top: calc(10px + var(--sat));
-    left: 50%;
-    transform: translateX(-50%);
-    max-height: min(56px, 18vh);
+    top: auto;
+    bottom: calc(12px + var(--sab));
+    left: calc(12px + var(--sal));
+    right: auto;
+    transform: none;
+    max-height: min(48px, 14vh);
+    max-width: min(240px, 42vw);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: left;
   }
   #results.card {
     top: calc(10px + max(12px, env(safe-area-inset-top, 0px)));
@@ -886,6 +896,23 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (orientation: landscape) {
+  body > .meta-toast.ui {
+    animation: meta-toast-in-land 0.35s ease;
+  }
+}
+
+@keyframes meta-toast-in-land {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

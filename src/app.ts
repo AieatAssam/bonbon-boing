@@ -44,7 +44,7 @@ import { showTipCard } from './ui/tipCard'
 import { equip, purchase } from './meta/catalogue'
 import { PLUSH_ICONS } from './ui/plushIcons'
 import { getCosmetics } from './draw'
-import { setToastBlocked } from './ui/toastQueue'
+import { queueToast, setToastBlocked } from './ui/toastQueue'
 import type { SaveV3 } from './meta/save'
 
 type Screen = 'title' | 'play' | 'pause' | 'results'
@@ -151,6 +151,8 @@ export type Qa = {
   forceBonusFinale: (moves: number) => void
   finalePopsTotal: () => number
   findGoalChain: (min?: number) => ChainCell[] | null
+  showTestToast: () => void
+  adventureMovesTable: (max: number) => { level: number; moves: number; chapter: number }[]
 }
 
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
@@ -169,6 +171,7 @@ declare global {
     __checkOverlaps: () => { overlaps: [string, string][]; offscreen: string[] }
     __checkPlayGeometry: () => { violations: string[] }
     __checkHudBoard: () => { violations: string[] }
+    __checkAdventureHudGoals: () => { violations: string[] }
   }
 }
 
@@ -455,7 +458,9 @@ export function boot(): void {
   adventureHud.hidden = true
   const starBarEl = el('div', 'star-progress ui')
   starBarEl.setAttribute('aria-label', 'Star targets by moves left')
-  adventureHud.append(movesPillEl, starBarEl)
+  const goalStripEl = el('div', 'goal-strip ui')
+  goalStripEl.hidden = true
+  adventureHud.append(movesPillEl, starBarEl, goalStripEl)
   const finaleHintEl = el('div', 'finale-skip-hint ui')
   finaleHintEl.hidden = true
   finaleHintEl.innerHTML = '<span class="finale-skip-ico" aria-hidden="true">👆</span><span>Tap to skip</span>'
@@ -1043,13 +1048,19 @@ export function boot(): void {
         <span class="star-marker star-s3 ${on3 ? 'on' : 'off'}${pop3 ? ' pop' : ''}" style="left:${pct3}%">★</span>`
       if (finaleHintEl) finaleHintEl.hidden = !bonusFinale
       if (adventureLevel && adventureGoals) {
-        hudMini.hidden = false
-        hudMini.className = 'hud-mini ui goal-strip'
-        hudMini.innerHTML = adventureLevel.goals
+        goalStripEl.hidden = false
+        goalStripEl.innerHTML = adventureLevel.goals
           .map((g) => `<span class="goal-chip">${goalChip(g, adventureGoals!)}</span>`)
           .join('')
+      } else {
+        goalStripEl.hidden = true
+        goalStripEl.innerHTML = ''
       }
+      hudMini.hidden = true
+      hudMini.innerHTML = ''
     } else {
+      goalStripEl.hidden = true
+      goalStripEl.innerHTML = ''
       timeEl.hidden = false
       adventureHud.hidden = true
       if (finaleHintEl) finaleHintEl.hidden = true
@@ -1975,6 +1986,29 @@ export function boot(): void {
     }))
   }
 
+  window.__checkAdventureHudGoals = () => {
+    const violations: string[] = []
+    if (mode !== 'adventure' || screen !== 'play' || adventureHud.hidden) return { violations }
+    const bar = document.querySelector('.star-progress')
+    const movesPill = document.querySelector('.adventure-hud .moves-pill')
+    if (!bar) return { violations }
+    const br = bar.getBoundingClientRect()
+    const mr = movesPill?.getBoundingClientRect()
+    const chips = adventureHud.querySelectorAll<HTMLElement>('.goal-chip')
+    for (const chip of chips) {
+      const cr = chip.getBoundingClientRect()
+      const ix = Math.min(br.right, cr.right) - Math.max(br.left, cr.left)
+      const iy = Math.min(br.bottom, cr.bottom) - Math.max(br.top, cr.top)
+      if (ix > 2 && iy > 2) violations.push(`goal chip on star bar: ${chip.textContent?.trim() ?? ''}`)
+      if (mr) {
+        const ix2 = Math.min(mr.right, cr.right) - Math.max(mr.left, cr.left)
+        const iy2 = Math.min(mr.bottom, cr.bottom) - Math.max(mr.top, cr.top)
+        if (ix2 > 2 && iy2 > 2) violations.push(`goal chip on moves pill: ${chip.textContent?.trim() ?? ''}`)
+      }
+    }
+    return { violations }
+  }
+
   window.__checkOverlaps = () => {
     const els = visibleUi()
     const overlaps: [string, string][] = []
@@ -2422,6 +2456,17 @@ export function boot(): void {
     },
     finalePopsTotal() {
       return bonusFinale?.popsTotal ?? 0
+    },
+    showTestToast() {
+      if (!qaMode) return
+      queueToast('Combo ×5!', '🎂')
+    },
+    adventureMovesTable(max: number) {
+      return ADVENTURE_LEVELS.filter((l) => l.id <= max).map((l) => ({
+        level: l.id,
+        moves: l.moves,
+        chapter: l.chapter,
+      }))
     },
     forceBonusFinale(moves: number) {
       if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return

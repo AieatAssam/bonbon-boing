@@ -1,7 +1,7 @@
 import type { AdventureLevelDef } from './adventure/levels'
 
 export const ROUND_MS = 60_000
-export const HITSTOP_MS = 48
+export const HITSTOP_MS = 42
 export const POP_MS = 140
 export const POP_GROW_MS = 40
 export const POP_SQUASH_MS = 40

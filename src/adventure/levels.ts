@@ -50,38 +50,37 @@ function buildBlockers(id: number, chapter: number): BlockerHints {
   return blockers
 }
 
+/** Touch-tuned move budgets; everything else in L13–L24 uses {@link moveBudgetFromGoals}. */
+const MOVE_OVERRIDES: Partial<Record<number, number>> = {
+  1: 13,
+  2: 14,
+  3: 13,
+  4: 16,
+  5: 8,
+  6: 19,
+  7: 15,
+  8: 22,
+  12: 11,
+  16: 42,
+}
+
+export function moveBudgetFromGoals(goals: AdventureGoal[]): number {
+  let est = 0
+  for (const g of goals) {
+    if (g.type === 'clear_color') est += g.count / 3
+    else if (g.type === 'break_ice') est += g.count * 2
+    else if (g.type === 'pop_bombs') est += g.count * 2
+    else if (g.type === 'clear_choco') est += g.count * 2
+  }
+  return Math.max(8, Math.ceil(est * 1.6))
+}
+
 export function buildLevel(id: number): AdventureLevelDef {
   const chapter = (Math.ceil(id / 15) as 1 | 2 | 3 | 4)
   const indexInChapter = ((id - 1) % 15) + 1
   const tier = indexInChapter + (chapter - 1) * 3
   const colorCount =
     id <= 3 ? 3 : chapter === 1 && id < 8 ? 3 : chapter === 1 ? 4 : chapter === 2 ? 5 : Math.min(6, 4 + Math.floor(chapter / 2))
-  const moves =
-    id === 1
-      ? 13
-      : id === 2
-        ? 14
-        : id === 3
-          ? 15
-          : id === 4
-            ? 16
-            : id === 5
-              ? 17
-              : id === 6
-                ? 19
-                : id === 7
-                  ? 22
-                  : id === 8
-                    ? 26
-                    : id === 12
-                      ? 26
-                      : id === 16
-                        ? 26
-                      : chapter === 1
-                        ? 22
-                        : chapter === 2
-                          ? Math.max(16, 20 - Math.floor(id / 8))
-                          : Math.max(14, 18 - Math.floor(id / 10))
   const baseScore = 3500 + id * 220 + chapter * 520 + tier * 80
 
   const blockers = buildBlockers(id, chapter)
@@ -122,8 +121,16 @@ export function buildLevel(id: number): AdventureLevelDef {
   if (iceN > 0) goals.push({ type: 'break_ice', count: iceN })
   const chocoN = blockers.choco ?? 0
   if (chocoN > 0) goals.push({ type: 'clear_choco', count: chocoN })
+
+  let moves: number
+  if (MOVE_OVERRIDES[id] != null) moves = MOVE_OVERRIDES[id]!
+  else if (id >= 13 && id <= 24) moves = moveBudgetFromGoals(goals)
+  else if (chapter === 1 && id > 8) moves = 22
+  else if (chapter === 2) moves = moveBudgetFromGoals(goals)
+  else moves = Math.max(14, 18 - Math.floor(id / 10))
+
   if (indexInChapter === 15) {
-    goals.push({ type: 'score_moves', score: baseScore, moves: moves })
+    goals.push({ type: 'score_moves', score: baseScore, moves })
   }
 
   const starMul: [number, number, number] =

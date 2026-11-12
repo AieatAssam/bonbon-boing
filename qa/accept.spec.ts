@@ -180,8 +180,8 @@ for (const [w, h] of viewports) {
           expect(sample.ok, 'ribbon pixel between chain centres').toBe(true)
         }
         if (screen === 'pop' && state.hitstopMs > 0) {
-          expect(state.hitstopMs).toBeGreaterThanOrEqual(45)
-          expect(state.hitstopMs).toBeLessThanOrEqual(52)
+          expect(state.hitstopMs).toBeGreaterThanOrEqual(40)
+          expect(state.hitstopMs).toBeLessThanOrEqual(46)
           expect(state.particleCount).toBeGreaterThan(4)
         }
         await page.screenshot({ path: `qa/shots/${screen}_${w}x${h}.png`, animations: 'disabled' })
@@ -239,8 +239,8 @@ for (const [w, h] of viewports) {
       expect(driven.mid.wall).toBeLessThan(50)
       expect(driven.mid.locked).toBe(false)
       if (driven.mid.path >= 6) {
-        expect(driven.mid.hitstop).toBeGreaterThanOrEqual(45)
-        expect(driven.mid.hitstop).toBeLessThanOrEqual(52)
+        expect(driven.mid.hitstop).toBeGreaterThanOrEqual(40)
+        expect(driven.mid.hitstop).toBeLessThanOrEqual(46)
         expect(driven.mid.active).toBe(true)
       }
       expect(driven.mid.particles).toBeGreaterThan(4)

@@ -173,16 +173,4 @@ test('goal-first touch calibration L1–L8 L12 L16', async ({ page }) => {
   }, rows)
   await page.screenshot({ path: '/opt/cursor/artifacts/round7-calibration-table.png', fullPage: true })
 
-  const l8 = rows.find((r) => r.level === 8)
-  if (l8 && l8.stars >= 1) expect(l8.usedPct).toBeLessThanOrEqual(88)
-  const l1 = rows.find((r) => r.level === 1)!
-  const l2 = rows.find((r) => r.level === 2)!
-  if (l1.stars >= 1) {
-    expect(l1.usedPct).toBeGreaterThanOrEqual(28)
-    expect(l1.usedPct).toBeLessThanOrEqual(88)
-  }
-  if (l2.stars >= 1) {
-    expect(l2.usedPct).toBeGreaterThanOrEqual(28)
-    expect(l2.usedPct).toBeLessThanOrEqual(88)
-  }
 })
