@@ -46,11 +46,12 @@ export function earsInsideMatAtRest(L: Layout, squashSy = 1): boolean {
   return b.earTipY >= b.matTopY + 1 && b.row0CenterY <= b.matBottomY
 }
 
-export function boardLayout(w: number, h: number, insetTop = 0): Layout {
+export function boardLayout(w: number, h: number, insetTop = 0, insetSide = 0): Layout {
   const landscape = w > h
   const hud = Math.round(Math.min(landscape ? 72 : 84, Math.max(64, h * (landscape ? 0.07 : 0.09)))) + insetTop
   const pad = landscape ? 10 : 8
-  const availW = Math.max(120, w - pad * 2)
+  const side = Math.max(0, insetSide)
+  const availW = Math.max(120, w - pad * 2 - side)
   const availH = Math.max(120, h - hud - pad * 2)
 
   let cols: number
@@ -78,7 +79,7 @@ export function boardLayout(w: number, h: number, insetTop = 0): Layout {
     while (rows * D + padTop > availH + 1 && rows > 5) rows -= 1
     const gridW = cols * D
     const gridH = rows * D + padTop
-    ox = Math.round((w - gridW) / 2)
+    ox = Math.round(pad + side + Math.max(0, (w - pad * 2 - side - gridW) / 2))
     oy = Math.round(hud + Math.max(0, (h - hud - gridH - pad) / 2))
   } else {
     D = Math.min(60, Math.max(52, Math.floor(availW / 7)))

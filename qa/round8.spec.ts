@@ -66,7 +66,7 @@ test('moves table L1–L24 (touch-tuned + formula)', async ({ page }) => {
     document.body.append(el)
   }, rows)
   await page.screenshot({ path: '/opt/cursor/artifacts/round8-moves-l1-24.png', fullPage: true })
-  expect(rows.find((r) => r.level === 16)?.moves).toBe(42)
+  expect(rows.find((r) => r.level === 16)?.moves).toBe(46)
   expect(rows.find((r) => r.level === 12)?.moves).toBe(11)
 })
 
@@ -74,10 +74,10 @@ for (const [w, h, tag] of hudViewports) {
   test(`adventure HUD ice level ${tag}`, async ({ page }) => {
     await ready(page, w, h)
     await openIceLevel(page, w >= h ? 8 : 1)
-    await expect(page.locator('.adventure-hud .star-progress')).toBeVisible()
-    await expect(page.locator('.adventure-hud .goal-chip').first()).toBeVisible()
+    await expect(page.locator('#hud .star-progress')).toBeVisible()
+    await expect(page.locator('#hud .goal-chip').first()).toBeVisible()
     const check = await page.evaluate(() =>
-      (window as unknown as { __checkAdventureHudGoals: () => { violations: string[] } }).__checkAdventureHudGoals(),
+      (window as unknown as { __checkHudPlayfield: () => { violations: string[] } }).__checkHudPlayfield(),
     )
     expect(check.violations, JSON.stringify(check)).toEqual([])
     await page.screenshot({ path: `/opt/cursor/artifacts/round8-adventure-hud_${tag}.png` })
@@ -90,7 +90,7 @@ test('adventure HUD goal vs star bar — 6 viewports', async ({ page }) => {
     const lvl = w >= h ? 8 : 4
     await openIceLevel(page, lvl)
     const check = await page.evaluate(() =>
-      (window as unknown as { __checkAdventureHudGoals: () => { violations: string[] } }).__checkAdventureHudGoals(),
+      (window as unknown as { __checkHudPlayfield: () => { violations: string[] } }).__checkHudPlayfield(),
     )
     expect(check.violations, `${w}x${h} ${JSON.stringify(check)}`).toEqual([])
   }
@@ -103,19 +103,8 @@ test('landscape score rush toast avoids score', async ({ page }) => {
   await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.showTestToast())
   await page.waitForSelector('.meta-toast', { state: 'visible' })
   await page.screenshot({ path: '/opt/cursor/artifacts/round8-rush-toast-landscape.png' })
-  const covers = await page.evaluate(() => {
-    const score = document.querySelector('.score')?.getBoundingClientRect()
-    const toast = document.querySelector('body > .meta-toast.ui')?.getBoundingClientRect()
-    const moves = document.querySelector('.timer.ring')?.getBoundingClientRect()
-    if (!score || !toast) return true
-    const overlap = (a: DOMRect, b: DOMRect) => {
-      const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left)
-      const iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
-      return ix > 2 && iy > 2
-    }
-    if (overlap(score, toast)) return true
-    if (moves && overlap(moves, toast)) return true
-    return false
-  })
-  expect(covers).toBe(false)
+  const check = await page.evaluate(() =>
+    (window as unknown as { __checkHudPlayfield: () => { violations: string[] } }).__checkHudPlayfield(),
+  )
+  expect(check.violations.filter((v) => v.includes('toast'))).toEqual([])
 })

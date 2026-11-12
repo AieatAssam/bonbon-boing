@@ -172,6 +172,8 @@ declare global {
     __checkPlayGeometry: () => { violations: string[] }
     __checkHudBoard: () => { violations: string[] }
     __checkAdventureHudGoals: () => { violations: string[] }
+    __checkHudPlayfield: () => { violations: string[] }
+    __piecePlayfieldRect: () => { x: number; y: number; w: number; h: number }
   }
 }
 
@@ -452,21 +454,23 @@ export function boot(): void {
   })
   mk(hudLeft, 'Pause', 'pause', ICONS.pause)
   mk(hudLeft, 'Home', 'home', ICONS.home)
-  const hudTimerCol = el('div', 'hud-timer-col')
+  const hudTopRow = el('div', 'hud-top-row')
+  const hudRightTop = el('div', 'hud-right-top')
   const movesPillEl = el('div', 'ui timer ring moves-pill')
-  const adventureHud = el('div', 'adventure-hud')
-  adventureHud.hidden = true
+  const hudGoalRow = el('div', 'hud-goal-row')
+  hudGoalRow.hidden = true
   const starBarEl = el('div', 'star-progress ui')
   starBarEl.setAttribute('aria-label', 'Star targets by moves left')
   const goalStripEl = el('div', 'goal-strip ui')
   goalStripEl.hidden = true
-  adventureHud.append(movesPillEl, starBarEl, goalStripEl)
+  hudGoalRow.append(starBarEl, goalStripEl)
   const finaleHintEl = el('div', 'finale-skip-hint ui')
   finaleHintEl.hidden = true
   finaleHintEl.innerHTML = '<span class="finale-skip-ico" aria-hidden="true">👆</span><span>Tap to skip</span>'
   hudMid.append(scoreEl, comboEl, hudMini)
-  hudTimerCol.append(timeEl, adventureHud)
-  hud.append(hudLeft, hudMid, hudTimerCol)
+  hudRightTop.append(timeEl, movesPillEl)
+  hudTopRow.append(hudLeft, hudMid, hudRightTop)
+  hud.append(hudTopRow, hudGoalRow)
   root.append(finaleHintEl)
   mkPill(pauseMain, 'Resume', 'resume', ICONS.play, 'primary')
   mkPill(pauseMain, 'Restart', 'restart', ICONS.restart)
@@ -529,6 +533,87 @@ export function boot(): void {
     return parseFloat(getComputedStyle(probe).paddingTop) || 0
   }
 
+  function baseHudPx(): number {
+    const landscape = innerWidth > innerHeight
+    return Math.round(Math.min(landscape ? 72 : 84, Math.max(64, innerHeight * (landscape ? 0.07 : 0.09))))
+  }
+
+  function measureHudInset(): { extraTop: number; side: number } {
+    const sat = insetTop()
+    const hudEl = document.getElementById('hud')
+    if (screen !== 'play' || !hudEl || hudEl.hidden || mode !== 'adventure') {
+      return { extraTop: sat, side: 0 }
+    }
+    const landscape = innerWidth > innerHeight
+    const hr = hudEl.getBoundingClientRect()
+    const wantTop = Math.ceil(hr.bottom + 8)
+    const extraTop = Math.max(sat, wantTop - baseHudPx())
+    const side = landscape ? Math.ceil(hr.width + 12) : 0
+    return { extraTop, side }
+  }
+
+  function piecePlayfieldRect(): { x: number; y: number; w: number; h: number } {
+    return {
+      x: layout.ox,
+      y: layout.oy + layout.padTop,
+      w: layout.cols * layout.D,
+      h: layout.rows * layout.D,
+    }
+  }
+
+  function publishBoardCssVars() {
+    const pf = piecePlayfieldRect()
+    const br = boardRect()
+    document.documentElement.style.setProperty('--playfield-x', `${pf.x}px`)
+    document.documentElement.style.setProperty('--playfield-y', `${pf.y}px`)
+    document.documentElement.style.setProperty('--playfield-w', `${pf.w}px`)
+    document.documentElement.style.setProperty('--playfield-h', `${pf.h}px`)
+    document.documentElement.style.setProperty('--board-x', `${br.x}px`)
+    document.documentElement.style.setProperty('--board-w', `${br.w}px`)
+  }
+
+  let layoutPass = 0
+
+  function applyBoardLayout() {
+    const { extraTop, side } = measureHudInset()
+    const next = boardLayout(innerWidth, innerHeight, extraTop, side)
+    layoutPass += 1
+    const dpr = computeTargetDpr()
+    if (dpr !== canvasDpr) {
+      canvasDpr = dpr
+      invalidateBgCache()
+    }
+    canvas.width = Math.max(1, Math.round(innerWidth * dpr))
+    canvas.height = Math.max(1, Math.round(innerHeight * dpr))
+    canvas.style.width = `${innerWidth}px`
+    canvas.style.height = `${innerHeight}px`
+    gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    if (next.cols !== layout.cols || next.rows !== layout.rows || next.D !== layout.D) {
+      invalidateBgCache()
+    }
+    if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
+      if (adventureLevel) {
+        state = createAdventureGame(adventureLevel, next.cols, next.rows)
+        adventureGoals = emptyGoalState(adventureLevel.moves)
+        syncAdventureGoalsFromTrack()
+      } else {
+        const score = state.score
+        const timeLeft = state.timeLeft
+        const seed = state.seed
+        const nextMode = state.mode
+        state = createGame(seed, next.cols, next.rows, nextMode)
+        state.score = score
+        state.timeLeft = timeLeft
+      }
+      ghostPath = []
+    }
+    layout = next
+    publishBoardCssVars()
+    if (layoutPass < 4 && mode === 'adventure' && screen === 'play') {
+      requestAnimationFrame(() => applyBoardLayout())
+    }
+  }
+
   const STAR2_SCORE = 20_000
   const STAR3_SCORE = 35_000
 
@@ -579,37 +664,8 @@ export function boot(): void {
   }
 
   function resize() {
-    const next = boardLayout(innerWidth, innerHeight, insetTop())
-    const dpr = computeTargetDpr()
-    if (dpr !== canvasDpr) {
-      canvasDpr = dpr
-      invalidateBgCache()
-    }
-    canvas.width = Math.max(1, Math.round(innerWidth * dpr))
-    canvas.height = Math.max(1, Math.round(innerHeight * dpr))
-    canvas.style.width = `${innerWidth}px`
-    canvas.style.height = `${innerHeight}px`
-    gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    if (next.cols !== layout.cols || next.rows !== layout.rows || next.D !== layout.D) {
-      invalidateBgCache()
-    }
-    if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
-      if (adventureLevel) {
-        state = createAdventureGame(adventureLevel, next.cols, next.rows)
-        adventureGoals = emptyGoalState(adventureLevel.moves)
-        syncAdventureGoalsFromTrack()
-      } else {
-        const score = state.score
-        const timeLeft = state.timeLeft
-        const seed = state.seed
-        const nextMode = state.mode
-        state = createGame(seed, next.cols, next.rows, nextMode)
-        state.score = score
-        state.timeLeft = timeLeft
-      }
-      ghostPath = []
-    }
-    layout = next
+    layoutPass = 0
+    applyBoardLayout()
   }
 
   function center(p: Piece): { x: number; y: number } {
@@ -1023,8 +1079,10 @@ export function boot(): void {
       timeEl.innerHTML = `<span aria-hidden="true">${ICONS.heart}</span>`
     } else if (mode === 'adventure') {
       const showAdvHud = screen === 'play'
-      timeEl.hidden = showAdvHud
-      adventureHud.hidden = !showAdvHud
+      timeEl.hidden = true
+      movesPillEl.hidden = !showAdvHud
+      hudGoalRow.hidden = !showAdvHud
+      hud.classList.toggle('hud--adventure', showAdvHud)
       timeEl.classList.remove('pulse')
       const limit = adventureLevel?.moves ?? Math.max(1, state.movesLeft)
       const moves = bonusFinale ? bonusFinale.popsLeft : Math.max(0, state.movesLeft)
@@ -1061,8 +1119,10 @@ export function boot(): void {
     } else {
       goalStripEl.hidden = true
       goalStripEl.innerHTML = ''
+      hudGoalRow.hidden = true
+      hud.classList.remove('hud--adventure')
+      movesPillEl.hidden = true
       timeEl.hidden = false
-      adventureHud.hidden = true
       if (finaleHintEl) finaleHintEl.hidden = true
       hudMini.hidden = true
       hudMini.className = 'hud-mini ui'
@@ -1071,6 +1131,15 @@ export function boot(): void {
       const dash = Math.max(0.02, pct) * 88
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
       timeEl.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" fill="none" stroke="#ffe0f0" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#ff4f93" stroke-width="4" stroke-dasharray="${dash} 88" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><span>${secs}</span>`
+    }
+    if (mode === 'adventure' && screen === 'play') {
+      requestAnimationFrame(() => {
+        layoutPass = 0
+        applyBoardLayout()
+        draw()
+      })
+    } else {
+      publishBoardCssVars()
     }
   }
 
@@ -1986,24 +2055,69 @@ export function boot(): void {
     }))
   }
 
-  window.__checkAdventureHudGoals = () => {
+  function rectOverlap(a: DOMRect, b: { x: number; y: number; w: number; h: number }, slack = 2): boolean {
+    const ix = Math.min(a.right, b.x + b.w) - Math.max(a.left, b.x)
+    const iy = Math.min(a.bottom, b.y + b.h) - Math.max(a.top, b.y)
+    return ix > slack && iy > slack
+  }
+
+  function circleRectOverlap(cx: number, cy: number, rad: number, r: DOMRect, slack = 1): boolean {
+    const nearX = Math.max(r.left, Math.min(cx, r.right))
+    const nearY = Math.max(r.top, Math.min(cy, r.bottom))
+    return Math.hypot(cx - nearX, cy - nearY) < rad + slack
+  }
+
+  window.__piecePlayfieldRect = () => piecePlayfieldRect()
+
+  window.__checkAdventureHudGoals = () => window.__checkHudPlayfield()
+
+  window.__checkHudPlayfield = () => {
     const violations: string[] = []
-    if (mode !== 'adventure' || screen !== 'play' || adventureHud.hidden) return { violations }
-    const bar = document.querySelector('.star-progress')
-    const movesPill = document.querySelector('.adventure-hud .moves-pill')
-    if (!bar) return { violations }
-    const br = bar.getBoundingClientRect()
-    const mr = movesPill?.getBoundingClientRect()
-    const chips = adventureHud.querySelectorAll<HTMLElement>('.goal-chip')
-    for (const chip of chips) {
-      const cr = chip.getBoundingClientRect()
-      const ix = Math.min(br.right, cr.right) - Math.max(br.left, cr.left)
-      const iy = Math.min(br.bottom, cr.bottom) - Math.max(br.top, cr.top)
-      if (ix > 2 && iy > 2) violations.push(`goal chip on star bar: ${chip.textContent?.trim() ?? ''}`)
-      if (mr) {
-        const ix2 = Math.min(mr.right, cr.right) - Math.max(mr.left, cr.left)
-        const iy2 = Math.min(mr.bottom, cr.bottom) - Math.max(mr.top, cr.top)
-        if (ix2 > 2 && iy2 > 2) violations.push(`goal chip on moves pill: ${chip.textContent?.trim() ?? ''}`)
+    if (screen !== 'play') return { violations }
+    const pf = piecePlayfieldRect()
+    const hudSel =
+      '#hud button, #hud .score, #hud .combo-badge, #hud .moves-pill, #hud .star-progress, #hud .goal-chip, #hud .timer.ring'
+    const hudEls = [...document.querySelectorAll<HTMLElement>(hudSel)].filter((el) => {
+      if (el.closest('[hidden]')) return false
+      const s = getComputedStyle(el)
+      return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    })
+    for (const el of hudEls) {
+      const r = el.getBoundingClientRect()
+      if (rectOverlap(r, pf, 1)) {
+        violations.push(`hud on playfield: ${el.getAttribute('aria-label') || el.className}`)
+      }
+    }
+    for (let i = 0; i < hudEls.length; i++) {
+      for (let j = i + 1; j < hudEls.length; j++) {
+        const a = hudEls[i]!.getBoundingClientRect()
+        const b = hudEls[j]!.getBoundingClientRect()
+        const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+        const iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+        if (ix > 2 && iy > 2) {
+          violations.push(`hud overlap: ${hudEls[i]!.className} × ${hudEls[j]!.className}`)
+        }
+      }
+    }
+    const rad = layout.D * 0.46
+    for (const p of state.pieces) {
+      if (p.dead && p.popT < 0) continue
+      if (p.fallT >= 0 && p.fallT < 1) continue
+      const c = center(p)
+      for (const el of hudEls) {
+        if (circleRectOverlap(c.x, c.y, rad, el.getBoundingClientRect(), 2)) {
+          violations.push(`hud on piece ${p.id} (${el.className})`)
+        }
+      }
+    }
+    const toast = document.querySelector('body > .meta-toast.ui')
+    if (toast && getComputedStyle(toast).display !== 'none') {
+      const tr = toast.getBoundingClientRect()
+      if (rectOverlap(tr, pf, 1)) violations.push('toast on playfield')
+      for (const p of state.pieces) {
+        if (p.dead && p.popT < 0) continue
+        const c = center(p)
+        if (circleRectOverlap(c.x, c.y, rad, tr, 2)) violations.push(`toast on piece ${p.id}`)
       }
     }
     return { violations }
@@ -2466,6 +2580,13 @@ export function boot(): void {
         level: l.id,
         moves: l.moves,
         chapter: l.chapter,
+        goals: l.goals.map((g) => {
+          if (g.type === 'clear_color') return `c${g.color}:${g.count}`
+          if (g.type === 'break_ice') return `ice:${g.count}`
+          if (g.type === 'clear_choco') return `ch:${g.count}`
+          if (g.type === 'pop_bombs') return `bomb:${g.count}`
+          return g.type
+        }),
       }))
     },
     forceBonusFinale(moves: number) {

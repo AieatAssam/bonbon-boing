@@ -285,20 +285,6 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   min-width: 52px;
 }
 
-.adventure-hud {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  width: 150px;
-  max-width: min(150px, 40vw);
-}
-
-.adventure-hud .goal-strip {
-  max-width: 100%;
-  justify-content: flex-end;
-  gap: 3px;
-}
 
 .moves-pill {
   width: 100%;
@@ -506,6 +492,51 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   padding: 0 2px;
 }
 
+#hud.hud--adventure {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: min(calc(100vw - 16px), 480px);
+  grid-template-columns: unset;
+}
+
+#hud.hud--adventure .hud-top-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+#hud.hud--adventure .hud-right-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+#hud.hud--adventure .hud-right-top .timer.ring:not(.moves-pill) {
+  display: none;
+}
+
+#hud.hud--adventure .hud-goal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  pointer-events: none;
+}
+
+#hud.hud--adventure .moves-pill {
+  width: auto;
+  min-width: 52px;
+  max-width: 76px;
+  flex: 0 0 auto;
+}
+
 .hud-side { display: flex; gap: 6px; pointer-events: auto; }
 
 .hud-mid {
@@ -540,7 +571,7 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
 .score.pop { transform: scale(1.14); transform-origin: center center; }
 
 @media (max-width: 400px) {
-  #hud { gap: 4px; grid-template-columns: auto minmax(56px, 1fr) minmax(48px, 88px); }
+  #hud:not(.hud--adventure) { gap: 4px; grid-template-columns: auto minmax(56px, 1fr) minmax(48px, 88px); }
   .score { font-size: 18px; padding: 6px 10px; min-width: 72px; }
   .score.pop { transform: scale(1.04); }
 }
@@ -706,14 +737,48 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
     flex-direction: row;
     min-height: 46px;
   }
+  #hud.hud--adventure {
+    left: calc(8px + var(--sal));
+    right: auto;
+    top: calc(8px + var(--sat));
+    transform: none;
+    width: 112px;
+    max-width: 28vw;
+  }
+  #hud.hud--adventure .hud-top-row {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+  }
+  #hud.hud--adventure .hud-mid {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  #hud.hud--adventure .hud-right-top {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  #hud.hud--adventure .hud-goal-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #hud.hud--adventure .star-progress {
+    width: 100%;
+  }
+  #hud.hud--adventure .goal-strip {
+    justify-content: flex-start;
+    max-width: 100%;
+  }
   body > .meta-toast.ui {
     top: auto;
     bottom: calc(12px + var(--sab));
-    left: calc(12px + var(--sal));
+    left: calc(var(--playfield-x, 0px) + var(--playfield-w, 0px) + 10px);
     right: auto;
     transform: none;
     max-height: min(48px, 14vh);
-    max-width: min(240px, 42vw);
+    max-width: min(
+      180px,
+      calc(100vw - var(--playfield-x, 0px) - var(--playfield-w, 0px) - 20px)
+    );
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

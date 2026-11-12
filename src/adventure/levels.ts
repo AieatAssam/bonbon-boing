@@ -42,11 +42,13 @@ function buildBlockers(id: number, chapter: number): BlockerHints {
   else if (id === 2) blockers.ice = 2
   else if (id <= 7) blockers.ice = Math.min(12, 3 + Math.floor(id / 2))
   else if (id === 12) blockers.ice = 4
+  else if (id === 24) blockers.ice = 6
   else blockers.ice = Math.min(14, 2 + Math.floor(id / 4))
   if (id >= 5) blockers.jelly = Math.min(6, 1 + Math.floor((id - 4) / 6))
   if (id >= 10) blockers.sleepy = id % 9 === 0 || id === 12 ? 1 : 0
   if (id >= 25) blockers.starburst = id % 11 === 0 ? 1 : 0
-  if (chapter >= 3 || id >= 18) blockers.choco = Math.min(10, 1 + Math.floor((id - 17) / 5))
+  if (id === 24) blockers.choco = 1
+  else if (chapter >= 3 || id >= 18) blockers.choco = Math.min(10, 1 + Math.floor((id - 17) / 5))
   return blockers
 }
 
@@ -61,18 +63,23 @@ const MOVE_OVERRIDES: Partial<Record<number, number>> = {
   7: 15,
   8: 22,
   12: 11,
-  16: 42,
+  14: 22,
+  16: 46,
+  20: 24,
+  24: 52,
 }
 
+/** Chapter 2 pacing: colour clears are cheap; ice/choco dominate move cost. */
 export function moveBudgetFromGoals(goals: AdventureGoal[]): number {
   let est = 0
   for (const g of goals) {
-    if (g.type === 'clear_color') est += g.count / 3
-    else if (g.type === 'break_ice') est += g.count * 2
-    else if (g.type === 'pop_bombs') est += g.count * 2
-    else if (g.type === 'clear_choco') est += g.count * 2
+    if (g.type === 'clear_color') est += g.count / 3.4
+    else if (g.type === 'break_ice') est += g.count * 3.1
+    else if (g.type === 'pop_bombs') est += g.count * 2.15
+    else if (g.type === 'clear_choco') est += g.count * 4.2
   }
-  return Math.max(8, Math.ceil(est * 1.6))
+  const mult = 1.08 + Math.min(0.35, est * 0.011)
+  return Math.max(8, Math.ceil(est * mult))
 }
 
 export function buildLevel(id: number): AdventureLevelDef {
@@ -107,7 +114,9 @@ export function buildLevel(id: number): AdventureLevelDef {
                     : id === 12
                       ? 12
                       : id === 16
-                        ? 16
+                      ? 16
+                      : id === 24
+                        ? 14
                         : id <= 12
                           ? 10 + Math.floor(tier * 0.65)
                           : 8 + Math.floor(tier * 0.9)
@@ -116,7 +125,8 @@ export function buildLevel(id: number): AdventureLevelDef {
     color,
     count: clearCount,
   })
-  if (id >= 14) goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 12) })
+  if (id === 24) goals.push({ type: 'pop_bombs', count: 2 })
+  else if (id >= 14) goals.push({ type: 'pop_bombs', count: 1 + Math.floor(tier / 12) })
   const iceN = blockers.ice ?? 0
   if (iceN > 0) goals.push({ type: 'break_ice', count: iceN })
   const chocoN = blockers.choco ?? 0
