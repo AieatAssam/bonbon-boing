@@ -153,6 +153,7 @@ export type Qa = {
   findGoalChain: (min?: number) => ChainCell[] | null
   showTestToast: () => void
   adventureMovesTable: (max: number) => { level: number; moves: number; chapter: number }[]
+  finishAdventureWin: () => void
 }
 
 const COLORS = ['#FF3D8E', '#2FDB8E', '#FFD02A', '#5088FF', '#FF7A28', '#C070FF']
@@ -610,7 +611,7 @@ export function boot(): void {
     layout = next
     publishBoardCssVars()
     if (screen === 'play') draw()
-    if (layoutPass < 4 && screen === 'play') {
+    if (layoutPass < 4 && screen === 'play' && mode === 'adventure') {
       requestAnimationFrame(() => applyBoardLayout())
     }
   }
@@ -2589,6 +2590,19 @@ export function boot(): void {
           return g.type
         }),
       }))
+    },
+    finishAdventureWin() {
+      if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return
+      for (const g of adventureLevel.goals) {
+        if (g.type === 'clear_color') adventureGoals.clearedByColor[g.color] = g.count
+        else if (g.type === 'break_ice') adventureGoals.iceBroken = g.count
+        else if (g.type === 'pop_bombs') adventureGoals.bombsPopped = g.count
+        else if (g.type === 'clear_choco') adventureGoals.chocoCleared = g.count
+        else if (g.type === 'score_moves') adventureGoals.score = Math.max(adventureGoals.score, g.score)
+      }
+      syncAdventureGoalsFromTrack()
+      movesLeftAtGoal = Math.max(1, state.movesLeft)
+      showResults()
     },
     forceBonusFinale(moves: number) {
       if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return

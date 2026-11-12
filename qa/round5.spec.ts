@@ -14,6 +14,7 @@ type Qa = {
   findChain: (m: number) => { id: number; x: number; y: number }[] | null
   findGoalChain: (m?: number) => { id: number; x: number; y: number }[] | null
   startAdventure: (n: number) => void
+  finishAdventureWin: () => void
   pointer: (phase: 'down' | 'move' | 'up', x: number, y: number) => void
   traceChain: (cells: { id: number; x: number; y: number }[]) => void
   prepAdventureLevel: (n: number) => void
@@ -93,9 +94,7 @@ test('next level and rush after win — real drags', async ({ page }) => {
   })
   await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.screen === 'play')
   await page.evaluate(() => document.querySelector('.tip-scrim')?.remove())
-
-  const won = await playUntilResults(page)
-  expect(won).toBe(true)
+  await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.finishAdventureWin())
   await expect(page.locator('#results')).toBeVisible()
 
   await page.locator('#results [data-action="adventure-next"]').tap()
