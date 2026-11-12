@@ -50,6 +50,12 @@ function baseHudPx(h: number, landscape: boolean): number {
   return Math.round(Math.min(landscape ? 72 : 84, Math.max(64, h * (landscape ? 0.07 : 0.09))))
 }
 
+/** Left dock width reserved in landscape adventure (must match CSS). */
+export const ADVENTURE_LANDSCAPE_DOCK_W = 140
+
+/** Vertical margin above/below board in landscape adventure. */
+export const ADVENTURE_LANDSCAPE_VPAD = 8
+
 /** Fit a fixed cols×rows adventure grid; only D and position change with viewport. */
 export function boardLayoutFixedGrid(
   w: number,
@@ -60,21 +66,45 @@ export function boardLayoutFixedGrid(
   insetSide = 0,
 ): Layout {
   const landscape = w > h
-  const hud = baseHudPx(h, landscape) + insetTop
   const pad = landscape ? 10 : 8
   const side = Math.max(0, insetSide)
+  const gridH = (d: number) => rows * d + boardPadTop(d)
+  const gridW = (d: number) => cols * d
+
+  /** Landscape adventure: board uses full viewport height; HUD is only horizontal inset. */
+  if (landscape && side > 0) {
+    const top = Math.max(insetTop, ADVENTURE_LANDSCAPE_VPAD)
+    const bottom = ADVENTURE_LANDSCAPE_VPAD
+    const availH = Math.max(80, h - top - bottom)
+    const availW = Math.max(80, w - side - pad * 2)
+    const minD = w < 960 ? 34 : 40
+    const maxD = 96
+    let D = Math.floor(Math.min(availW / cols, (availH - boardPadTop(40)) / rows))
+    D = Math.min(maxD, Math.max(minD, D))
+    let padTop = boardPadTop(D)
+    while (gridH(D) > availH + 1 && D > minD) {
+      D -= 1
+      padTop = boardPadTop(D)
+    }
+    while (gridW(D) > availW + 1 && D > minD) D -= 1
+    padTop = boardPadTop(D)
+    const gW = gridW(D)
+    const gH = gridH(D)
+    const ox = Math.round(side + pad + Math.max(0, (w - side - pad * 2 - gW) / 2))
+    const oy = Math.round(top + Math.max(0, (availH - gH) / 2))
+    return { cols, rows, D, padTop, ox, oy, hud: top }
+  }
+
+  const hud = baseHudPx(h, landscape) + insetTop
   const availW = Math.max(80, w - pad * 2 - side)
   const availH = Math.max(80, h - hud - pad * 2)
 
-  const minD = landscape ? 28 : 36
+  const minD = landscape ? 28 : 44
   const maxD = landscape ? 96 : 60
   let padTop = boardPadTop(52)
   let D = Math.floor(Math.min(availW / cols, (availH - padTop) / rows))
   D = Math.min(maxD, Math.max(minD, D))
   padTop = boardPadTop(D)
-
-  const gridH = (d: number) => rows * d + boardPadTop(d)
-  const gridW = (d: number) => cols * d
 
   while (gridH(D) > availH + 1 && D > minD) {
     D -= 1

@@ -1,5 +1,5 @@
 import {
-  ADVENTURE_LANDSCAPE_TOP_RESERVE,
+  ADVENTURE_LANDSCAPE_DOCK_W,
   ADVENTURE_PORTRAIT_HUD_RESERVE,
   boardLayout,
   boardLayoutFixedGrid,
@@ -162,6 +162,7 @@ export type Qa = {
   findGoalChain: (min?: number) => ChainCell[] | null
   showTestToast: () => void
   adventureMovesTable: (max: number) => { level: number; moves: number; chapter: number }[]
+  cellD: () => number
   finishAdventureWin: () => void
 }
 
@@ -184,6 +185,7 @@ declare global {
     __checkAdventureHudGoals: () => { violations: string[] }
     __checkHudPlayfield: () => { violations: string[] }
     __checkPlayfieldInViewport: () => { violations: string[] }
+    __checkLandscapeAdventureDock: () => { violations: string[]; cellD: number }
     __piecePlayfieldRect: () => { x: number; y: number; w: number; h: number }
   }
 }
@@ -559,11 +561,8 @@ export function boot(): void {
     const landscape = innerWidth > innerHeight
     if (mode === 'adventure') {
       if (landscape) {
-        const topRow = hudEl.querySelector('.hud-top-row')
-        const topH = topRow?.getBoundingClientRect().height ?? ADVENTURE_LANDSCAPE_TOP_RESERVE
-        const extraTop = Math.max(sat, Math.ceil(topH + 8) - baseHudPx())
-        const side = Math.ceil(hudEl.getBoundingClientRect().width + 12)
-        return { extraTop, side }
+        const sal = parseFloat(getComputedStyle(probe).paddingLeft) || 0
+        return { extraTop: sat, side: Math.ceil(ADVENTURE_LANDSCAPE_DOCK_W + sal + 12) }
       }
       return { extraTop: Math.max(sat, ADVENTURE_PORTRAIT_HUD_RESERVE - baseHudPx()), side: 0 }
     }
@@ -2125,6 +2124,37 @@ export function boot(): void {
     return { violations }
   }
 
+  window.__checkLandscapeAdventureDock = () => {
+    const violations: string[] = []
+    const hud = document.getElementById('hud')
+    if (screen !== 'play' || mode !== 'adventure' || !hud || hud.hidden) {
+      return { violations, cellD: layout.D }
+    }
+    const hudR = hud.getBoundingClientRect()
+    const sel =
+      '#hud button, #hud .score, #hud .moves-pill, #hud .star-progress, #hud .goal-chip, #hud .star-marker'
+    for (const el of hud.querySelectorAll<HTMLElement>(sel)) {
+      if (el.closest('[hidden]')) continue
+      const s = getComputedStyle(el)
+      if (s.display === 'none' || s.visibility === 'hidden') continue
+      const r = el.getBoundingClientRect()
+      if (r.width < 1 && r.height < 1) continue
+      if (r.right > hudR.right + 3 || r.left < hudR.left - 3) {
+        violations.push(`dock clip horizontal: ${el.className}`)
+      }
+      if (r.bottom > hudR.bottom + 3 || r.top < hudR.top - 3) {
+        violations.push(`dock clip vertical: ${el.className}`)
+      }
+      if (r.right > innerWidth + 1 || r.bottom > innerHeight + 1 || r.left < -1 || r.top < -1) {
+        violations.push(`dock off viewport: ${el.className}`)
+      }
+      if (el.scrollWidth > el.clientWidth + 2) {
+        violations.push(`dock overflow: ${el.className} scroll=${el.scrollWidth}>${el.clientWidth}`)
+      }
+    }
+    return { violations, cellD: layout.D }
+  }
+
   window.__checkPlayfieldInViewport = () => {
     const violations: string[] = []
     if (screen !== 'play') return { violations }
@@ -2607,6 +2637,9 @@ export function boot(): void {
           return g.type
         }),
       }))
+    },
+    cellD() {
+      return layout.D
     },
     finishAdventureWin() {
       if (!qaMode || mode !== 'adventure' || !adventureLevel || !adventureGoals) return

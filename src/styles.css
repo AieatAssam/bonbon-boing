@@ -789,58 +789,104 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
     left: calc(8px + var(--sal));
     right: auto;
     top: calc(8px + var(--sat));
+    bottom: calc(8px + var(--sab));
     transform: none;
-    width: 112px;
-    max-width: 28vw;
-    max-height: min(220px, calc(100vh - 16px - var(--sat) - var(--sab)));
+    width: 140px;
+    min-width: 128px;
+    max-width: min(148px, 26vw);
+    max-height: none;
     min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    gap: 4px;
+    overflow: visible;
+    gap: 5px;
+    padding: 0 2px 4px;
+    box-sizing: border-box;
   }
   #hud.hud--adventure .hud-top-row {
-    grid-template-columns: auto auto;
-    justify-content: space-between;
-  }
-  #hud.hud--adventure .hud-mid {
-    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
     width: 100%;
   }
-  #hud.hud--adventure .hud-right-top {
-    grid-column: 1 / -1;
-    justify-content: center;
-  }
-  #hud.hud--adventure .hud-goal-row {
+  #hud.hud--adventure .hud-side {
+    display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: center;
-    max-height: 72px;
-    min-height: 0;
-    overflow: hidden;
-    gap: 4px;
+    justify-content: space-between;
+    width: 100%;
   }
-  #hud.hud--adventure .goal-strip {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-height: 36px;
+  #hud.hud--adventure .hud-side button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  #hud.hud--adventure .hud-mid {
+    width: 100%;
+  }
+  #hud.hud--adventure .score {
+    font-size: 14px;
+    padding: 5px 8px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   #hud.hud--adventure .hud-right-top {
-    flex-direction: column;
-    gap: 4px;
-    align-items: stretch;
+    width: 100%;
+    justify-content: stretch;
   }
   #hud.hud--adventure .moves-pill {
+    width: 100%;
     max-width: 100%;
+    min-height: 36px;
+    padding: 3px 6px;
+  }
+  #hud.hud--adventure .moves-num {
+    font-size: 15px;
+  }
+  #hud.hud--adventure .hud-goal-row {
+    flex-direction: column;
+    align-items: stretch;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    gap: 4px;
+    width: 100%;
   }
   #hud.hud--adventure .star-progress {
     width: 100%;
+    height: 16px;
+    flex: 0 0 16px;
+    overflow: hidden;
   }
   #hud.hud--adventure .goal-strip {
-    justify-content: flex-start;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    width: 100%;
     max-width: 100%;
+    overflow: visible;
+  }
+  #hud.hud--adventure .goal-chip {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 4px;
+    gap: 2px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #hud.hud--adventure .goal-bonbon-ico {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+  }
+  #hud.hud--adventure .goal-ico {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
   }
   body > .meta-toast.ui {
     top: auto;
