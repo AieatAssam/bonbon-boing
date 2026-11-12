@@ -120,8 +120,8 @@ test('moves and goals L1–L24 table', async ({ page }) => {
     document.body.append(el)
   }, rows)
   await page.screenshot({ path: '/opt/cursor/artifacts/round9-moves-goals-l1-24.png', fullPage: true })
-  expect(rows.find((r) => r.level === 14)?.moves).toBe(22)
-  expect(rows.find((r) => r.level === 16)?.moves).toBe(46)
+  expect(rows.find((r) => r.level === 14)?.moves).toBe(28)
+  expect(rows.find((r) => r.level === 16)?.moves).toBe(52)
   expect(rows.find((r) => r.level === 20)?.moves).toBe(24)
   expect(rows.find((r) => r.level === 24)?.moves).toBe(52)
   const l24 = rows.find((r) => r.level === 24)!

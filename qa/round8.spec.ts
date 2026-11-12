@@ -66,7 +66,7 @@ test('moves table L1–L24 (touch-tuned + formula)', async ({ page }) => {
     document.body.append(el)
   }, rows)
   await page.screenshot({ path: '/opt/cursor/artifacts/round8-moves-l1-24.png', fullPage: true })
-  expect(rows.find((r) => r.level === 16)?.moves).toBe(46)
+  expect(rows.find((r) => r.level === 16)?.moves).toBe(52)
   expect(rows.find((r) => r.level === 12)?.moves).toBe(11)
 })
 

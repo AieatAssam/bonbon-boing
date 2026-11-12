@@ -23,11 +23,21 @@ export type AdventureLevelDef = {
   title: string
   seed: string
   moves: number
+  cols: number
+  rows: number
   colorCount: number
   goals: AdventureGoal[]
   blockers: BlockerHints
   starScore: [number, number, number]
   tutorialTip?: string
+}
+
+/** Fixed play grid per chapter — identical on every viewport/orientation. */
+export function gridForLevel(id: number): { cols: number; rows: number } {
+  if (id <= 15) return { cols: 7, rows: 9 }
+  if (id <= 30) return { cols: 8, rows: 10 }
+  if (id <= 45) return { cols: 8, rows: 11 }
+  return { cols: 9, rows: 11 }
 }
 
 const CHAPTER_NAMES = ['Sugar Meadow', 'Fizz Factory', 'Frost Fields', 'Choco Cavern'] as const
@@ -63,9 +73,16 @@ const MOVE_OVERRIDES: Partial<Record<number, number>> = {
   7: 15,
   8: 22,
   12: 11,
-  14: 22,
-  16: 46,
+  13: 20,
+  14: 28,
+  16: 52,
+  17: 34,
+  18: 36,
+  19: 37,
   20: 24,
+  21: 40,
+  22: 44,
+  23: 46,
   24: 52,
 }
 
@@ -164,12 +181,16 @@ export function buildLevel(id: number): AdventureLevelDef {
   else if (id === 18) tutorialTip = 'choco'
   else if (id === 25) tutorialTip = 'starburst'
 
+  const { cols, rows } = gridForLevel(id)
+
   return {
     id,
     chapter,
     title: levelTitle(chapter, indexInChapter),
     seed: `adv-${chapter}-${indexInChapter}-${id}`,
     moves,
+    cols,
+    rows,
     colorCount,
     goals,
     blockers,

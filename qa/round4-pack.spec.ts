@@ -161,18 +161,8 @@ test('results landscape 844x390', async ({ page }) => {
   await page.locator('button.map-path-node .map-node-num', { hasText: '1' }).click()
   await page.evaluate(() => document.querySelector('.tip-scrim')?.remove())
   await page.evaluate(() => {
-    const q = (window as unknown as { __qa: Qa }).__qa
-    for (let i = 0; i < 150; i++) {
-      if (q.inputLocked) q.pointer('down', innerWidth * 0.5, innerHeight * 0.5)
-      const path = q.findChain(5) ?? q.findChain(4) ?? q.findChain(3) ?? q.findChain(2)
-      if (path?.length) {
-        q.pointer('down', path[0]!.x, path[0]!.y)
-        q.traceChain(path as { id: number; x: number; y: number }[])
-        q.pointer('up', path[path.length - 1]!.x, path[path.length - 1]!.y)
-      }
-      for (let t = 0; t < 900; t += 30) q.pump(30)
-      if (q.screen === 'results') break
-    }
+    const q = (window as unknown as { __qa: Qa & { finishAdventureWin: () => void } }).__qa
+    q.finishAdventureWin()
     q.draw()
   })
   await expect(page.locator('#results')).toBeVisible()

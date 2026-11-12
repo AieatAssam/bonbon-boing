@@ -1,4 +1,13 @@
-import { boardLayout, earsInsideMatAtRest, titleHeapCenter, titleHeroScale, type Layout } from './layout'
+import {
+  ADVENTURE_LANDSCAPE_TOP_RESERVE,
+  ADVENTURE_PORTRAIT_HUD_RESERVE,
+  boardLayout,
+  boardLayoutFixedGrid,
+  earsInsideMatAtRest,
+  titleHeapCenter,
+  titleHeroScale,
+  type Layout,
+} from './layout'
 import {
   at,
   byId,
@@ -174,6 +183,7 @@ declare global {
     __checkHudBoard: () => { violations: string[] }
     __checkAdventureHudGoals: () => { violations: string[] }
     __checkHudPlayfield: () => { violations: string[] }
+    __checkPlayfieldInViewport: () => { violations: string[] }
     __piecePlayfieldRect: () => { x: number; y: number; w: number; h: number }
   }
 }
@@ -334,7 +344,7 @@ export function boot(): void {
     floats = []
     springs.clear()
     ghostPath = []
-    state = createAdventureGame(level, layout.cols, layout.rows)
+    state = createAdventureGame(level, level.cols, level.rows)
     ghostOn = tutParam || (!meta.save.tut && !qaMode)
     clockOn = false
     clockRunMs = 0
@@ -343,6 +353,7 @@ export function boot(): void {
     ghostCycleStart = 0
     lastSimPhase = 'idle'
     showPlay()
+    applyBoardLayout()
     const intro = adventureLevel.tutorialTip
     if (intro && !save.seenTips.includes(intro)) {
       showTipCard(intro, () => {
@@ -546,11 +557,19 @@ export function boot(): void {
       return { extraTop: sat, side: 0 }
     }
     const landscape = innerWidth > innerHeight
+    if (mode === 'adventure') {
+      if (landscape) {
+        const topRow = hudEl.querySelector('.hud-top-row')
+        const topH = topRow?.getBoundingClientRect().height ?? ADVENTURE_LANDSCAPE_TOP_RESERVE
+        const extraTop = Math.max(sat, Math.ceil(topH + 8) - baseHudPx())
+        const side = Math.ceil(hudEl.getBoundingClientRect().width + 12)
+        return { extraTop, side }
+      }
+      return { extraTop: Math.max(sat, ADVENTURE_PORTRAIT_HUD_RESERVE - baseHudPx()), side: 0 }
+    }
     const hr = hudEl.getBoundingClientRect()
     const wantTop = Math.ceil(hr.bottom + 8)
-    const extraTop = Math.max(sat, wantTop - baseHudPx())
-    const side = landscape && mode === 'adventure' ? Math.ceil(hr.width + 12) : 0
-    return { extraTop, side }
+    return { extraTop: Math.max(sat, wantTop - baseHudPx()), side: 0 }
   }
 
   function piecePlayfieldRect(): { x: number; y: number; w: number; h: number } {
@@ -573,12 +592,12 @@ export function boot(): void {
     document.documentElement.style.setProperty('--board-w', `${br.w}px`)
   }
 
-  let layoutPass = 0
-
   function applyBoardLayout() {
     const { extraTop, side } = measureHudInset()
-    const next = boardLayout(innerWidth, innerHeight, extraTop, side)
-    layoutPass += 1
+    const next =
+      adventureLevel && mode === 'adventure'
+        ? boardLayoutFixedGrid(innerWidth, innerHeight, adventureLevel.cols, adventureLevel.rows, extraTop, side)
+        : boardLayout(innerWidth, innerHeight, extraTop, side)
     const dpr = computeTargetDpr()
     if (dpr !== canvasDpr) {
       canvasDpr = dpr
@@ -589,31 +608,20 @@ export function boot(): void {
     canvas.style.width = `${innerWidth}px`
     canvas.style.height = `${innerHeight}px`
     gfx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    if (next.cols !== layout.cols || next.rows !== layout.rows || next.D !== layout.D) {
-      invalidateBgCache()
-    }
-    if (state && screen !== 'title' && (next.cols !== layout.cols || next.rows !== layout.rows)) {
-      if (adventureLevel) {
-        state = createAdventureGame(adventureLevel, next.cols, next.rows)
-        adventureGoals = emptyGoalState(adventureLevel.moves)
-        syncAdventureGoalsFromTrack()
-      } else {
-        const score = state.score
-        const timeLeft = state.timeLeft
-        const seed = state.seed
-        const nextMode = state.mode
-        state = createGame(seed, next.cols, next.rows, nextMode)
-        state.score = score
-        state.timeLeft = timeLeft
-      }
+    if (next.D !== layout.D) invalidateBgCache()
+    if (state && screen !== 'title' && !adventureLevel && (next.cols !== layout.cols || next.rows !== layout.rows)) {
+      const score = state.score
+      const timeLeft = state.timeLeft
+      const seed = state.seed
+      const nextMode = state.mode
+      state = createGame(seed, next.cols, next.rows, nextMode)
+      state.score = score
+      state.timeLeft = timeLeft
       ghostPath = []
     }
     layout = next
     publishBoardCssVars()
     if (screen === 'play') draw()
-    if (layoutPass < 4 && screen === 'play' && mode === 'adventure') {
-      requestAnimationFrame(() => applyBoardLayout())
-    }
   }
 
   const STAR2_SCORE = 20_000
@@ -666,7 +674,6 @@ export function boot(): void {
   }
 
   function resize() {
-    layoutPass = 0
     applyBoardLayout()
   }
 
@@ -1134,15 +1141,7 @@ export function boot(): void {
       timeEl.classList.toggle('pulse', secs <= 10 && screen === 'play')
       timeEl.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="22" fill="none" stroke="#ffe0f0" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#ff4f93" stroke-width="4" stroke-dasharray="${dash} 88" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><span>${secs}</span>`
     }
-    if (screen === 'play') {
-      requestAnimationFrame(() => {
-        layoutPass = 0
-        applyBoardLayout()
-        draw()
-      })
-    } else {
-      publishBoardCssVars()
-    }
+    if (screen === 'play') publishBoardCssVars()
   }
 
   function fresh(nextMode: Mode, seed: string) {
@@ -1165,7 +1164,8 @@ export function boot(): void {
     springs.clear()
     ghostPath = []
     if (adventureLevel) {
-      state = createAdventureGame(adventureLevel, layout.cols, layout.rows)
+      applyBoardLayout()
+      state = createAdventureGame(adventureLevel, adventureLevel.cols, adventureLevel.rows)
       adventureGoals = emptyGoalState(adventureLevel.moves)
     } else {
       state = createGame(seed, layout.cols, layout.rows, nextMode)
@@ -2125,6 +2125,21 @@ export function boot(): void {
     return { violations }
   }
 
+  window.__checkPlayfieldInViewport = () => {
+    const violations: string[] = []
+    if (screen !== 'play') return { violations }
+    const pf = piecePlayfieldRect()
+    const sat = insetTop()
+    const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0
+    const sal = 0
+    const sar = 0
+    if (pf.y < sat - 4) violations.push(`playfield top ${pf.y} < safe ${sat}`)
+    if (pf.x < sal - 4) violations.push(`playfield left ${pf.x} < safe ${sal}`)
+    if (pf.y + pf.h > innerHeight - sab + 4) violations.push(`playfield bottom off (${pf.y + pf.h} > ${innerHeight - sab})`)
+    if (pf.x + pf.w > innerWidth - sar + 4) violations.push(`playfield right off (${pf.x + pf.w} > ${innerWidth - sar})`)
+    return { violations }
+  }
+
   window.__checkOverlaps = () => {
     const els = visibleUi()
     const overlaps: [string, string][] = []
@@ -2581,6 +2596,8 @@ export function boot(): void {
       return ADVENTURE_LEVELS.filter((l) => l.id <= max).map((l) => ({
         level: l.id,
         moves: l.moves,
+        cols: l.cols,
+        rows: l.rows,
         chapter: l.chapter,
         goals: l.goals.map((g) => {
           if (g.type === 'clear_color') return `c${g.color}:${g.count}`

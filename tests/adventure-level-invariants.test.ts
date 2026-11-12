@@ -6,7 +6,7 @@ describe('adventure level invariants (60 levels)', () => {
   it('blocker goals match placed blockers; colour goals are plausible', () => {
     const violations: string[] = []
     for (const level of ADVENTURE_LEVELS) {
-      const state = createAdventureGame(level, 7, 9)
+      const state = createAdventureGame(level, level.cols, level.rows)
       const placed = countBlockersAtStart(state)
 
       for (const g of level.goals) {

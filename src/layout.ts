@@ -46,9 +46,95 @@ export function earsInsideMatAtRest(L: Layout, squashSy = 1): boolean {
   return b.earTipY >= b.matTopY + 1 && b.row0CenterY <= b.matBottomY
 }
 
+function baseHudPx(h: number, landscape: boolean): number {
+  return Math.round(Math.min(landscape ? 72 : 84, Math.max(64, h * (landscape ? 0.07 : 0.09))))
+}
+
+/** Fit a fixed cols×rows adventure grid; only D and position change with viewport. */
+export function boardLayoutFixedGrid(
+  w: number,
+  h: number,
+  cols: number,
+  rows: number,
+  insetTop = 0,
+  insetSide = 0,
+): Layout {
+  const landscape = w > h
+  const hud = baseHudPx(h, landscape) + insetTop
+  const pad = landscape ? 10 : 8
+  const side = Math.max(0, insetSide)
+  const availW = Math.max(80, w - pad * 2 - side)
+  const availH = Math.max(80, h - hud - pad * 2)
+
+  const minD = landscape ? 28 : 36
+  const maxD = landscape ? 96 : 60
+  let padTop = boardPadTop(52)
+  let D = Math.floor(Math.min(availW / cols, (availH - padTop) / rows))
+  D = Math.min(maxD, Math.max(minD, D))
+  padTop = boardPadTop(D)
+
+  const gridH = (d: number) => rows * d + boardPadTop(d)
+  const gridW = (d: number) => cols * d
+
+  while (gridH(D) > availH + 1 && D > minD) {
+    D -= 1
+    padTop = boardPadTop(D)
+  }
+  while (gridW(D) > availW + 1 && D > minD) D -= 1
+  padTop = boardPadTop(D)
+  while (gridH(D) > availH + 1 && D > minD) {
+    D -= 1
+    padTop = boardPadTop(D)
+  }
+  if (gridH(D) > availH + 1 || gridW(D) > availW + 1) {
+    D = Math.max(
+      minD,
+      Math.floor(Math.min(availW / cols, (availH - boardPadTop(minD)) / rows)),
+    )
+    padTop = boardPadTop(D)
+    while (gridH(D) > availH + 1 && D > 24) {
+      D -= 1
+      padTop = boardPadTop(D)
+    }
+  }
+
+  const bottomMargin = landscape ? 8 : 4
+  let gW = gridW(D)
+  let gH = gridH(D)
+  while (gH > h - hud - pad * 2 + 1 && D > 23) {
+    D -= 1
+    padTop = boardPadTop(D)
+    gW = gridW(D)
+    gH = gridH(D)
+  }
+  while ((gH > h - pad - bottomMargin || hud + pad + gH > h - pad - bottomMargin) && D > 23) {
+    D -= 1
+    padTop = boardPadTop(D)
+    gW = gridW(D)
+    gH = gridH(D)
+  }
+  let ox = Math.round(pad + side + Math.max(0, (w - pad * 2 - side - gW) / 2))
+  let oy = landscape
+    ? Math.round(hud + pad + Math.max(0, (h - hud - gH - pad * 2) / 2))
+    : Math.round(hud + pad)
+  const bottomLimit = h - pad - bottomMargin
+  if (oy + gH > bottomLimit) oy = Math.round(bottomLimit - gH)
+  if (oy + gH > bottomLimit && D > 23) {
+    D -= 1
+    padTop = boardPadTop(D)
+    gW = gridW(D)
+    gH = gridH(D)
+    ox = Math.round(pad + side + Math.max(0, (w - pad * 2 - side - gW) / 2))
+    oy = Math.round(hud + pad + Math.max(0, (h - hud - gH - pad * 2) / 2))
+    if (oy + gH > bottomLimit) oy = Math.round(bottomLimit - gH)
+  }
+
+  return { cols, rows, D, padTop, ox, oy, hud }
+}
+
 export function boardLayout(w: number, h: number, insetTop = 0, insetSide = 0): Layout {
   const landscape = w > h
-  const hud = Math.round(Math.min(landscape ? 72 : 84, Math.max(64, h * (landscape ? 0.07 : 0.09)))) + insetTop
+  const hud = baseHudPx(h, landscape) + insetTop
   const pad = landscape ? 10 : 8
   const side = Math.max(0, insetSide)
   const availW = Math.max(120, w - pad * 2 - side)
@@ -73,7 +159,7 @@ export function boardLayout(w: number, h: number, insetTop = 0, insetSide = 0): 
     D = Math.min(96, Math.max(52, D))
     padTop = boardPadTop(D)
     while (rows * D + padTop > availH + 1 && rows > 5) rows -= 1
-  D = Math.floor(Math.min(availW / cols, (availH - padTop) / Math.max(1, rows)))
+    D = Math.floor(Math.min(availW / cols, (availH - padTop) / Math.max(1, rows)))
     D = Math.min(96, Math.max(52, D))
     padTop = boardPadTop(D)
     while (rows * D + padTop > availH + 1 && rows > 5) rows -= 1
@@ -142,3 +228,9 @@ export function titleHeapCenter(w: number, h: number): { x: number; y: number } 
     y: landscape ? h * 0.52 : h * 0.33,
   }
 }
+
+/** Reserved vertical chrome for adventure HUD (portrait: 8px top + 112px two-row stack + ear clearance). */
+export const ADVENTURE_PORTRAIT_HUD_RESERVE = 148
+
+/** Top bar height when adventure uses landscape left dock. */
+export const ADVENTURE_LANDSCAPE_TOP_RESERVE = 64
