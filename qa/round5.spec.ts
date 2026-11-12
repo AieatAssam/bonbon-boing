@@ -216,11 +216,16 @@ test('goal chip zoom and results layouts', async ({ page }) => {
     await page.locator('button.map-path-node .map-node-num', { hasText: '4' }).click()
     await page.waitForFunction(() => (window as unknown as { __qa: Qa }).__qa.screen === 'play')
     await page.evaluate(() => document.querySelector('.tip-scrim')?.remove())
-    const chip = page.locator('.goal-chip').first()
+    const chip = page.locator('#hud .goal-chip').first()
     await expect(chip).toBeVisible()
+    await page.waitForFunction(() => {
+      const c = document.querySelector('#hud .goal-chip') as HTMLElement | null
+      return c && c.getBoundingClientRect().width > 0
+    })
     const icon = chip.locator('img.goal-bonbon-ico, .goal-ico svg').first()
     await icon.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {})
     await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
+    await expect(chip).toBeVisible()
     const chipBox = await chip.boundingBox()
     expect(chipBox).toBeTruthy()
     expect(chipBox!.width).toBeGreaterThanOrEqual(16)

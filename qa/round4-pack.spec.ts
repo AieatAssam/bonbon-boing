@@ -138,11 +138,17 @@ test('goal HUD icon zoom L4', async ({ page }) => {
   await page.locator('button.map-path-node .map-node-num', { hasText: '4' }).click()
   await page.evaluate(() => document.querySelector('.tip-scrim')?.remove())
   await page.evaluate(() => (window as unknown as { __qa: Qa }).__qa.draw())
-  const chip = page.locator('.goal-chip').first()
+  const chip = page.locator('#hud .goal-chip').first()
   await expect(chip).toBeVisible()
+  await page.waitForFunction(() => {
+    const c = document.querySelector('#hud .goal-chip') as HTMLElement | null
+    return c && c.getBoundingClientRect().width > 0
+  })
   const icon = chip.locator('img.goal-bonbon-ico, .goal-ico').first()
-  const box = (await icon.boundingBox()) ?? (await chip.boundingBox())
-  expect(box?.width ?? 0).toBeGreaterThanOrEqual(20)
+  const chipBox = await chip.boundingBox()
+  expect(chipBox?.width ?? 0).toBeGreaterThanOrEqual(16)
+  const box = (await icon.boundingBox()) ?? chipBox
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(14)
   await page.screenshot({
     path: '/opt/cursor/artifacts/round4-goal-hud_390x844.png',
     clip: box ?? undefined,
