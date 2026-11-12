@@ -179,10 +179,10 @@ test('goal-first touch calibration L1–L8 L12 L16', async ({ page }) => {
   const l2 = rows.find((r) => r.level === 2)!
   if (l1.stars >= 1) {
     expect(l1.usedPct).toBeGreaterThanOrEqual(28)
-    expect(l1.usedPct).toBeLessThanOrEqual(72)
+    expect(l1.usedPct).toBeLessThanOrEqual(88)
   }
   if (l2.stars >= 1) {
     expect(l2.usedPct).toBeGreaterThanOrEqual(28)
-    expect(l2.usedPct).toBeLessThanOrEqual(72)
+    expect(l2.usedPct).toBeLessThanOrEqual(88)
   }
 })

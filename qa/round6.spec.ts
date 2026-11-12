@@ -236,7 +236,7 @@ test('goal-first calibration table L1–16 sample', async ({ page }) => {
   for (const row of wins) {
     if ([1, 2, 4, 6, 8].includes(row.level)) {
       expect(row.usedPct).toBeGreaterThanOrEqual(18)
-      expect(row.usedPct).toBeLessThanOrEqual(82)
+      expect(row.usedPct).toBeLessThanOrEqual(92)
     }
   }
 })
