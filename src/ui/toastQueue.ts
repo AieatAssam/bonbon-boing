@@ -30,11 +30,10 @@ function hideToastEl() {
   if (toastEl) toastEl.style.display = 'none'
 }
 
-function showOne(item: ToastItem, extra: number) {
+function showOne(item: ToastItem, _extra: number) {
   if (blocked) return
   const toast = ensureToastEl()
-  const extraLine = extra > 0 ? ` (+${extra} more)` : ''
-  toast.textContent = `${item.emoji} ${item.message}${extraLine}`
+  toast.textContent = `${item.emoji} ${item.message}`
   toast.style.display = 'block'
 }
 

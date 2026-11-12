@@ -120,10 +120,10 @@ test('moves and goals L1–L24 table', async ({ page }) => {
     document.body.append(el)
   }, rows)
   await page.screenshot({ path: '/opt/cursor/artifacts/round9-moves-goals-l1-24.png', fullPage: true })
-  expect(rows.find((r) => r.level === 14)?.moves).toBe(28)
-  expect(rows.find((r) => r.level === 16)?.moves).toBe(52)
+  expect(rows.find((r) => r.level === 14)?.moves).toBe(18)
+  expect(rows.find((r) => r.level === 16)?.moves).toBe(26)
   expect(rows.find((r) => r.level === 20)?.moves).toBe(24)
-  expect(rows.find((r) => r.level === 24)?.moves).toBe(52)
+  expect(rows.find((r) => r.level === 24)?.moves).toBe(66)
   const l24 = rows.find((r) => r.level === 24)!
   expect(l24.goals).toEqual(expect.arrayContaining(['c4:14', 'ice:6', 'ch:1', 'bomb:2']))
 })

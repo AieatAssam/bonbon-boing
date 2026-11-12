@@ -260,7 +260,8 @@ export function titleHeapCenter(w: number, h: number): { x: number; y: number } 
 }
 
 /** Reserved vertical chrome for adventure HUD (portrait: 8px top + 112px two-row stack + ear clearance). */
-export const ADVENTURE_PORTRAIT_HUD_RESERVE = 148
+/** Top row + star + 2×2 goal chips (4 goals), fixed for the whole level. */
+export const ADVENTURE_PORTRAIT_HUD_RESERVE = 158
 
 /** Top bar height when adventure uses landscape left dock. */
 export const ADVENTURE_LANDSCAPE_TOP_RESERVE = 64

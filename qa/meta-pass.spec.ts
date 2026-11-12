@@ -104,11 +104,11 @@ test('adventure blockers 390x844', async ({ page }) => {
   await page.evaluate(() => {
     const q = (window as unknown as { __qa: Qa & { prepAdventureLevel: (n: number) => void; markTipsSeen: () => void } }).__qa
     q.prepPromoSave()
-    q.prepAdventureLevel(4)
+    q.prepAdventureLevel(24)
     q.markTipsSeen()
   })
   await page.locator('#title .meta-row button').filter({ hasText: 'Adventure' }).click()
-  await page.locator('button.map-path-node .map-node-num', { hasText: '4' }).click()
+  await page.locator('button.map-path-node .map-node-num', { hasText: '24' }).click()
   await page.waitForFunction(() => (window as unknown as { __qa: { screen: string } }).__qa.screen === 'play')
   await page.evaluate(() => {
     document.querySelector('.tip-scrim')?.remove()

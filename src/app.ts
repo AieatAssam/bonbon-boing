@@ -186,6 +186,7 @@ declare global {
     __checkHudPlayfield: () => { violations: string[] }
     __checkPlayfieldInViewport: () => { violations: string[] }
     __checkLandscapeAdventureDock: () => { violations: string[]; cellD: number }
+    __checkPortraitGoalChips: () => { violations: string[]; cellD: number }
     __piecePlayfieldRect: () => { x: number; y: number; w: number; h: number }
   }
 }
@@ -2151,6 +2152,30 @@ export function boot(): void {
       if (el.scrollWidth > el.clientWidth + 2) {
         violations.push(`dock overflow: ${el.className} scroll=${el.scrollWidth}>${el.clientWidth}`)
       }
+    }
+    return { violations, cellD: layout.D }
+  }
+
+  window.__checkPortraitGoalChips = () => {
+    const violations: string[] = []
+    const hud = document.getElementById('hud')
+    if (screen !== 'play' || mode !== 'adventure' || !hud || hud.hidden) {
+      return { violations, cellD: layout.D }
+    }
+    if (innerWidth <= innerHeight) {
+      const sat = insetTop()
+      const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0
+      const hudR = hud.getBoundingClientRect()
+      for (const chip of hud.querySelectorAll<HTMLElement>('.goal-chip')) {
+        const r = chip.getBoundingClientRect()
+        if (r.width < 1) continue
+        if (r.right > innerWidth - 2) violations.push(`chip past viewport right ${r.right}`)
+        if (r.left < 2) violations.push(`chip past viewport left`)
+        if (r.right > hudR.right + 2) violations.push(`chip past hud right`)
+        if (chip.scrollWidth > chip.clientWidth + 2) violations.push(`chip overflow ${chip.scrollWidth}`)
+      }
+      if (hudR.bottom > innerHeight - sab + 2) violations.push(`hud below safe area ${hudR.bottom}`)
+      if (hudR.top < sat - 2) violations.push(`hud above safe area`)
     }
     return { violations, cellD: layout.D }
   }

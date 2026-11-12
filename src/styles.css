@@ -514,18 +514,11 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   align-items: stretch;
   gap: 6px;
   width: min(calc(100vw - 16px), 480px);
-  min-height: 112px;
-  max-height: 112px;
+  min-height: 158px;
+  max-height: 158px;
   overflow: hidden;
   grid-template-columns: unset;
-}
-
-#hud.hud--adventure .hud-goal-row {
-  flex-wrap: nowrap;
-  min-height: 40px;
-  max-height: 40px;
-  overflow: hidden;
-  align-items: center;
+  box-sizing: border-box;
 }
 
 #hud.hud--adventure .hud-top-row {
@@ -547,32 +540,60 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   display: none;
 }
 
-#hud.hud--adventure .hud-goal-row {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  pointer-events: none;
-}
+@media (orientation: portrait) {
+  #hud.hud--adventure .hud-goal-row {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 4px;
+    width: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    pointer-events: none;
+  }
 
-#hud.hud--adventure .goal-strip {
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  overflow-x: auto;
-  max-width: none;
-  scrollbar-width: none;
-}
+  #hud.hud--adventure .star-progress {
+    width: 100%;
+    flex: 0 0 18px;
+    height: 18px;
+    overflow: hidden;
+  }
 
-#hud.hud--adventure .goal-strip::-webkit-scrollbar {
-  display: none;
-}
+  #hud.hud--adventure .goal-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
 
-#hud.hud--adventure .star-progress {
-  flex: 0 0 150px;
-  overflow: hidden;
+  #hud.hud--adventure .goal-chip {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 5px;
+    gap: 3px;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  #hud.hud--adventure .goal-bonbon-ico {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+  }
+
+  #hud.hud--adventure .goal-ico {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+  }
 }
 
 #hud.hud--adventure .moves-pill {
@@ -987,6 +1008,34 @@ button.ui:active { transform: translateY(2px); box-shadow: 0 1px 0 #f3b6d4; }
   padding: 16px 14px calc(76px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 8px 0 #f3b6d4;
   pointer-events: auto;
+}
+
+.meta-panel.meta-panel--scroll,
+.meta-panel:has(.meta-panel-body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 12px;
+}
+
+.meta-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.meta-panel-footer {
+  flex: 0 0 auto;
+  padding: 10px 0 max(4px, env(safe-area-inset-bottom, 0px));
+  border-top: 2px solid #ffe8f2;
+  margin-top: 8px;
+}
+
+.meta-panel-footer .meta-back {
+  position: static;
+  width: 100%;
 }
 
 .meta-back {

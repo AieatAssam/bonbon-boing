@@ -127,7 +127,11 @@ export function createMetaLayer(
     back.textContent = 'Back'
     back.addEventListener('click', () => close())
     const inner = panel.querySelector('.meta-panel')
-    if (inner) inner.append(back)
+    const footer = document.createElement('div')
+    footer.className = 'meta-panel-footer'
+    footer.append(back)
+    if (inner?.querySelector('.meta-panel-body')) inner.append(footer)
+    else if (inner) inner.append(back)
     else panel.append(back)
     openEl = panel
     slot.append(panel)

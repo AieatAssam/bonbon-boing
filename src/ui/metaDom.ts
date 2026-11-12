@@ -230,7 +230,7 @@ export function renderShop(save: SaveV3, opts: ShopRenderOpts = {}): HTMLElement
 }
 
 export function renderAchievements(save: SaveV3): HTMLElement {
-  const panel = el('div', 'meta-panel')
+  const panel = el('div', 'meta-panel meta-panel--scroll')
   const unlocked = countUnlocked(save)
   const head = el('div', 'meta-head')
   head.append(
@@ -250,7 +250,9 @@ export function renderAchievements(save: SaveV3): HTMLElement {
     card.append(em, body)
     grid.append(card)
   }
-  panel.append(head, grid)
+  const body = el('div', 'meta-panel-body')
+  body.append(grid)
+  panel.append(head, body)
   const scrim = el('div', 'meta-scrim')
   scrim.append(panel)
   return scrim
